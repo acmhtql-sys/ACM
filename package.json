@@ -1,0 +1,39 @@
+{
+  "name": "acm-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "ACM – Components & Equipment Management System Monorepo",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace=@acm/web",
+    "dev:all": "npm run dev --workspace=@acm/api & npm run dev --workspace=@acm/web",
+    "dev:web": "npm run dev --workspace=@acm/web",
+    "dev:api": "npm run dev --workspace=@acm/api",
+    "build": "npm run build --workspace=@acm/shared && npm run build --workspace=@acm/api && npm run build --workspace=@acm/web",
+    "build:shared": "npm run build --workspace=@acm/shared",
+    "build:api": "npm run build --workspace=@acm/api",
+    "build:web": "npm run build --workspace=@acm/web",
+    "test": "npm run test --workspaces --if-present",
+    "test:api": "npm run test --workspace=@acm/api",
+    "test:web": "npm run test --workspace=@acm/web",
+    "prisma:generate": "npm run prisma:generate --workspace=@acm/api",
+    "prisma:validate": "npm run prisma:validate --workspace=@acm/api",
+    "prisma:migrate:test": "npm run prisma:migrate:test --workspace=@acm/api",
+    "prisma:seed:test": "npm run prisma:seed:test --workspace=@acm/api",
+    "lint": "npm run lint --workspaces --if-present"
+  },
+  "keywords": [
+    "acm",
+    "inventory-management",
+    "lab-management",
+    "react",
+    "express",
+    "prisma",
+    "typescript"
+  ],
+  "author": "ACM Engineering Team",
+  "license": "UNLICENSED"
+}
