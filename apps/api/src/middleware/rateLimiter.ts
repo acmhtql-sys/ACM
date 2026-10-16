@@ -15,6 +15,12 @@ interface ClientRecord {
   resetAt: number;
 }
 
+type LoginRateLimiterMiddleware = ((req: Request, res: Response, next: NextFunction) => void) & {
+  reset: (targetKey?: string) => void;
+  getRecord: (targetKey: string) => ClientRecord | undefined;
+  destroy: () => void;
+};
+
 const MAX_TRACKED_CLIENTS = 10_000;
 
 /**
@@ -54,7 +60,7 @@ export function createLoginRateLimiter(options: RateLimiterOptions = {}) {
     cleanupInterval.unref();
   }
 
-  const middleware = (req: Request, res: Response, next: NextFunction): void => {
+  const middleware = ((req: Request, res: Response, next: NextFunction): void => {
     const key = keyGen(req);
     const now = Date.now();
 
@@ -106,7 +112,7 @@ export function createLoginRateLimiter(options: RateLimiterOptions = {}) {
     }
 
     next();
-  };
+  }) as LoginRateLimiterMiddleware;
 
   // Helper method to reset hit count (used in tests or manual unblock)
   middleware.reset = (targetKey?: string) => {
