@@ -50,7 +50,7 @@ export async function authenticate(req: Request, _res: Response, next: NextFunct
     !decoded ||
     typeof decoded !== 'object' ||
     typeof decoded.id !== 'string' ||
-    !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(decoded.id)
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(decoded.id)
   ) {
     return next(new AppError('Mã xác thực không hợp lệ: thiếu thông tin định danh', 401));
   }
@@ -123,7 +123,7 @@ export async function authenticateOptional(req: Request, _res: Response, next: N
     !decoded ||
     typeof decoded !== 'object' ||
     typeof decoded.id !== 'string' ||
-    !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(decoded.id)
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(decoded.id)
   ) {
     return next();
   }

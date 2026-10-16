@@ -45,7 +45,7 @@ export function validateSeedEnvironment(
   if (!localHosts.has(hostname)) {
     return {
       allowed: false,
-      reason: 'Seed dữ liệu demo chỉ được phép trên database local (localhost/127.0.0.1/::1/host.docker.internal).',
+      reason: 'Seed dữ liệu demo chỉ được phép trên database local (localhost/127.0.0.1/::1/host.docker.internal). Không được phép seed trên database từ xa hoặc Cloud.',
     };
   }
 
