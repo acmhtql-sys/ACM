@@ -160,6 +160,57 @@ describe('Phase 1 – Authentication & Security Hardening Unit Tests', () => {
       expect(err.message).toContain('thiếu thông tin định danh');
     });
 
+    it('validates UUID format in token payload: accepts valid fixture UUIDs and rejects malformed strings', async () => {
+      const validUuids = [
+        '11111111-2222-3333-4444-555555555555',
+        'c38fdbe1-7a5c-4a8b-9e22-e5486de41067',
+        '00000000-0000-0000-0000-000000000000',
+        'ffffffff-ffff-ffff-ffff-ffffffffffff',
+      ];
+
+      for (const validId of validUuids) {
+        const token = jwt.sign({ id: validId }, secret);
+        const { req, res, next, getError } = createMockContext({
+          authorization: `Bearer ${token}`,
+        });
+        vi.spyOn(prisma.user, 'findUnique').mockResolvedValueOnce({
+          id: validId,
+          email: 'valid@acm.local',
+          fullName: 'Valid User',
+          role: UserRole.STUDENT,
+          isActive: true,
+          isLocked: false,
+        } as any);
+
+        await authenticate(req, res as any, next);
+        expect(getError()).toBeNull();
+        expect(req.user?.id).toBe(validId);
+      }
+
+      const malformedIds = [
+        'not-a-uuid',
+        '11111111-2222-3333-4444-55555555555g',
+        '11111111222233334444555555555555',
+        '1111111-2222-3333-4444-555555555555',
+        "11111111-2222-3333-4444-555555555555' OR 1=1 --",
+        '<script>alert(1)</script>',
+        '',
+      ];
+
+      for (const invalidId of malformedIds) {
+        const token = jwt.sign({ id: invalidId }, secret);
+        const { req, res, next, getError } = createMockContext({
+          authorization: `Bearer ${token}`,
+        });
+
+        await authenticate(req, res as any, next);
+        const err = getError();
+        expect(err).toBeInstanceOf(AppError);
+        expect(err.statusCode).toBe(401);
+        expect(err.message).toContain('thiếu thông tin định danh');
+      }
+    });
+
     it('rejects request with 401 when user was deleted from database', async () => {
       const token = jwt.sign({ id: mockUserId, role: UserRole.STUDENT }, secret);
       const { req, res, next, getError } = createMockContext({
