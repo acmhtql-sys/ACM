@@ -40,7 +40,7 @@ All cloud staging components run in separate execution boundaries and require di
 | **Render** | `LOG_LEVEL` | NO | Low | `info` | `info`, `warn`, `error` | Winston/Morgan logger verbosity. |
 | **Render** | `ACM_DEPLOYMENT_PROFILE` | **YES** | Low | `local_dev` | `cloud_staging` | **Security Profile:** Specifies deployment target. For Cloud Staging, MUST be `cloud_staging`. |
 | **Render** | `STAGING_READ_ONLY` | **YES** | **HIGH** | Optional | `'true'` | **Fail-Closed Write Gate:** Mandatory when profile is `cloud_staging`. Activates global Express read-only protection. |
-| **Render** | `ALLOW_STAGING_AUTH_LOGIN` | NO | Low | `'true'` | `'true'`, `'false'` | **Auth Exception:** Permits audited `POST /api/v1/auth/login` (zero writes). Set to `'false'` to disable all POSTs. |
+| **Render** | `ALLOW_STAGING_AUTH_LOGIN` | NO | Low | `'false'` | `'true'`, `'false'` | **Auth Exception:** Permits audited `POST /api/v1/auth/login` (zero writes). Set to `'false'` to disable all POSTs. |
 | **Render** | `CLOUDINARY_CLOUD_NAME` | Future (C2) | Low | None | `String` | Cloudinary account identifier for image uploads. |
 
 | **Render** | `CLOUDINARY_API_KEY` | Future (C2) | Medium | None | `Numeric string` | Public identifier for Cloudinary API requests. |
