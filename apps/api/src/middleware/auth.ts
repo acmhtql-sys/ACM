@@ -3,6 +3,7 @@ import jwt from 'jsonwebtoken';
 import { env } from '../config/env';
 import { AppError } from '../shared/AppError';
 import { UserRole } from '@prisma/client';
+import { prisma } from '../config/database';
 
 export interface AuthenticatedUser {
   id: string;
