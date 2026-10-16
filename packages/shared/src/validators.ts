@@ -230,13 +230,14 @@ export const exportStockItemSchema = z
     itemId: z.string().uuid('ID linh kiện không hợp lệ'),
     locationId: z.string().uuid('ID vị trí kho không hợp lệ'),
     quantity: z.number().int('Số lượng phải là số nguyên').positive('Số lượng xuất kho phải lớn hơn 0'),
-    reason: z.string().trim().min(3, 'Lý do xuất kho phải có ít nhất 3 ký tự').max(500, 'Lý do xuất kho tối đa 500 ký tự'),
+    reason: z.string().trim().min(3, 'Lý do xuất kho phải có ít nhất 3 ký tự').max(500, 'Lý do xuất kho tối đa 500 ký tự').optional().nullable(),
     notes: z.string().trim().max(500, 'Ghi chú tối đa 500 ký tự').optional().nullable(),
   })
   .strict();
 
 export const exportStockSchema = z
   .object({
+    reason: z.string().trim().min(3, 'Lý do xuất kho phải có ít nhất 3 ký tự').max(500, 'Lý do xuất kho tối đa 500 ký tự'),
     notes: z.string().trim().max(500, 'Ghi chú tối đa 500 ký tự').optional().nullable(),
     idempotencyKey: z.string().trim().min(1).max(64).optional(),
     items: z
@@ -264,33 +265,63 @@ export const exportStockSchema = z
 export const transferStockItemSchema = z
   .object({
     itemId: z.string().uuid('ID linh kiện không hợp lệ'),
+    fromLocationId: z.string().uuid('ID vị trí nguồn không hợp lệ').optional(),
+    toLocationId: z.string().uuid('ID vị trí đích không hợp lệ').optional(),
     quantity: z.number().int('Số lượng phải là số nguyên').positive('Số lượng điều chuyển phải lớn hơn 0'),
+    reason: z.string().trim().max(500, 'Lý do dòng điều chuyển tối đa 500 ký tự').optional().nullable(),
     notes: z.string().trim().max(500, 'Ghi chú tối đa 500 ký tự').optional().nullable(),
   })
   .strict();
 
 export const transferStockSchema = z
   .object({
-    fromLocationId: z.string().uuid('ID vị trí nguồn không hợp lệ'),
-    toLocationId: z.string().uuid('ID vị trí đích không hợp lệ'),
+    fromLocationId: z.string().uuid('ID vị trí nguồn không hợp lệ').optional(),
+    toLocationId: z.string().uuid('ID vị trí đích không hợp lệ').optional(),
+    reason: z.string().trim().min(5, 'Lý do điều chuyển kho phải có ít nhất 5 ký tự').max(500, 'Lý do điều chuyển tối đa 500 ký tự'),
     notes: z.string().trim().max(500, 'Ghi chú tối đa 500 ký tự').optional().nullable(),
-    idempotencyKey: z.string().trim().min(1).max(64).optional(),
+    idempotencyKey: z.string().trim().min(8, 'Khóa Idempotency tối thiểu 8 ký tự').max(64, 'Khóa Idempotency tối đa 64 ký tự').regex(/^[a-zA-Z0-9_-]+$/, 'Định dạng Idempotency-Key không hợp lệ').optional(),
     items: z
       .array(transferStockItemSchema)
       .min(1, 'Phiếu điều chuyển phải có ít nhất 1 mặt hàng')
       .max(100, 'Phiếu điều chuyển tối đa 100 mặt hàng mỗi lần'),
   })
   .strict()
-  .refine((data) => data.fromLocationId !== data.toLocationId, {
-    message: 'Vị trí nguồn và vị trí đích không được trùng nhau',
-    path: ['toLocationId'],
-  })
+  .refine(
+    (data) => {
+      for (const item of data.items) {
+        const from = item.fromLocationId || data.fromLocationId;
+        const to = item.toLocationId || data.toLocationId;
+        if (!from || !to) return false;
+      }
+      return true;
+    },
+    {
+      message: 'Vị trí nguồn và vị trí đích phải được xác định cho tất cả mặt hàng điều chuyển',
+    }
+  )
+  .refine(
+    (data) => {
+      for (const item of data.items) {
+        const from = item.fromLocationId || data.fromLocationId;
+        const to = item.toLocationId || data.toLocationId;
+        if (from && to && from === to) return false;
+      }
+      return true;
+    },
+    {
+      message: 'Vị trí nguồn và vị trí đích không được trùng nhau',
+      path: ['toLocationId'],
+    }
+  )
   .refine(
     (data) => {
       const seen = new Set<string>();
       for (const item of data.items) {
-        if (seen.has(item.itemId)) return false;
-        seen.add(item.itemId);
+        const from = item.fromLocationId || data.fromLocationId;
+        const to = item.toLocationId || data.toLocationId;
+        const key = `${item.itemId}:${from}:${to}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
       }
       return true;
     },
@@ -303,17 +334,19 @@ export const transferStockSchema = z
 export const adjustStockItemSchema = z
   .object({
     itemId: z.string().uuid('ID linh kiện không hợp lệ'),
+    locationId: z.string().uuid('ID vị trí kiểm kê không hợp lệ').optional(),
     actualOnHand: z.number().int('Số lượng tồn thực tế phải là số nguyên').min(0, 'Số lượng tồn thực tế không được âm'),
-    reason: z.string().trim().min(5, 'Lý do điều chỉnh tồn kho phải có ít nhất 5 ký tự').max(500, 'Lý do điều chỉnh tối đa 500 ký tự'),
+    reason: z.string().trim().max(500, 'Lý do dòng điều chỉnh tối đa 500 ký tự').optional().nullable(),
     notes: z.string().trim().max(500, 'Ghi chú tối đa 500 ký tự').optional().nullable(),
   })
   .strict();
 
 export const adjustStockSchema = z
   .object({
-    locationId: z.string().uuid('ID vị trí kiểm kê không hợp lệ'),
+    locationId: z.string().uuid('ID vị trí kiểm kê không hợp lệ').optional(),
+    reason: z.string().trim().min(5, 'Lý do điều chỉnh tồn kho phải có ít nhất 5 ký tự').max(500, 'Lý do điều chỉnh tối đa 500 ký tự'),
     notes: z.string().trim().max(500, 'Ghi chú tối đa 500 ký tự').optional().nullable(),
-    idempotencyKey: z.string().trim().min(1).max(64).optional(),
+    idempotencyKey: z.string().trim().min(8, 'Khóa Idempotency tối thiểu 8 ký tự').max(64, 'Khóa Idempotency tối đa 64 ký tự').regex(/^[a-zA-Z0-9_-]+$/, 'Định dạng Idempotency-Key không hợp lệ').optional(),
     items: z
       .array(adjustStockItemSchema)
       .min(1, 'Phiếu điều chỉnh phải có ít nhất 1 mặt hàng')
@@ -322,15 +355,102 @@ export const adjustStockSchema = z
   .strict()
   .refine(
     (data) => {
-      const seen = new Set<string>();
       for (const item of data.items) {
-        if (seen.has(item.itemId)) return false;
-        seen.add(item.itemId);
+        if (!item.locationId && !data.locationId) return false;
       }
       return true;
     },
     {
-      message: 'Không được trùng lặp mặt hàng trong cùng một phiếu điều chỉnh tồn kho',
+      message: 'Vị trí kho phải được cung cấp ở cấp phiếu hoặc trên từng dòng mặt hàng',
+      path: ['locationId'],
+    }
+  )
+  .refine(
+    (data) => {
+      const seen = new Set<string>();
+      for (const item of data.items) {
+        const loc = item.locationId || data.locationId;
+        const key = `${item.itemId}:${loc}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+      }
+      return true;
+    },
+    {
+      message: 'Không được trùng lặp linh kiện tại cùng một vị trí trong cùng một phiếu điều chỉnh',
+    }
+  );
+
+// Adjustment V2 (Concurrency Protected with Snapshot Validation - Step S2B)
+export const adjustStockItemSchemaV2 = z
+  .object({
+    itemId: z.string().uuid('ID linh kiện không hợp lệ'),
+    locationId: z.string().uuid('ID vị trí kiểm kê không hợp lệ').optional(),
+    expectedOnHand: z
+      .number({ required_error: 'Số lượng tồn sổ sách (expectedOnHand) là bắt buộc' })
+      .int('Số lượng tồn sổ sách phải là số nguyên')
+      .min(0, 'Số lượng tồn sổ sách không được âm'),
+    expectedReserved: z
+      .number({ required_error: 'Số lượng đã giữ chỗ (expectedReserved) là bắt buộc' })
+      .int('Số lượng đã giữ chỗ phải là số nguyên')
+      .min(0, 'Số lượng đã giữ chỗ không được âm'),
+    expectedQuarantined: z
+      .number({ required_error: 'Số lượng cách ly (expectedQuarantined) là bắt buộc' })
+      .int('Số lượng cách ly phải là số nguyên')
+      .min(0, 'Số lượng cách ly không được âm'),
+    expectedKitAllocated: z
+      .number({ required_error: 'Số lượng kit (expectedKitAllocated) là bắt buộc' })
+      .int('Số lượng kit phải là số nguyên')
+      .min(0, 'Số lượng kit không được âm'),
+    actualOnHand: z
+      .number({ required_error: 'Số lượng kiểm đếm thực tế (actualOnHand) là bắt buộc' })
+      .int('Số lượng kiểm đếm thực tế phải là số nguyên')
+      .min(0, 'Số lượng kiểm đếm thực tế không được âm'),
+    reason: z.string().trim().max(500, 'Lý do dòng điều chỉnh tối đa 500 ký tự').optional().nullable(),
+    notes: z.string().trim().max(500, 'Ghi chú tối đa 500 ký tự').optional().nullable(),
+  })
+  .strict();
+
+export const adjustStockSchemaV2 = z
+  .object({
+    locationId: z.string().uuid('ID vị trí kiểm kê không hợp lệ').optional(),
+    reason: z
+      .string({ required_error: 'Lý do điều chỉnh tồn kho là bắt buộc' })
+      .trim()
+      .min(5, 'Lý do điều chỉnh tồn kho phải có ít nhất 5 ký tự')
+      .max(500, 'Lý do điều chỉnh tối đa 500 ký tự'),
+    notes: z.string().trim().max(500, 'Ghi chú tối đa 500 ký tự').optional().nullable(),
+    items: z
+      .array(adjustStockItemSchemaV2)
+      .min(1, 'Phiếu điều chỉnh phải có ít nhất 1 mặt hàng')
+      .max(100, 'Phiếu điều chỉnh tối đa 100 mặt hàng mỗi lần'),
+  })
+  .strict()
+  .refine(
+    (data) => {
+      for (const item of data.items) {
+        if (!item.locationId && !data.locationId) return false;
+      }
+      return true;
+    },
+    {
+      message: 'Vị trí kho phải được cung cấp ở cấp phiếu hoặc trên từng dòng mặt hàng',
+      path: ['locationId'],
+    }
+  )
+  .refine(
+    (data) => {
+      const seen = new Set<string>();
+      for (const item of data.items) {
+        const loc = item.locationId || data.locationId;
+        const key = `${item.itemId}:${loc}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+      }
+      return true;
+    },
+    {
+      message: 'Không được trùng lặp linh kiện tại cùng một vị trí trong cùng một phiếu điều chỉnh',
     }
   );
 
@@ -352,6 +472,7 @@ export const createStockTransactionSchema = z.object({
 
 // Stock Transaction & Movement Query Schemas
 export const queryStockTransactionsSchema = z.object({
+  search: z.string().trim().optional(),
   type: z.nativeEnum(StockTransactionType).optional(),
   status: z.nativeEnum(TransactionStatus).optional(),
   startDate: z.string().datetime().or(z.string().regex(/^\d{4}-\d{2}-\d{2}/)).optional(),
@@ -363,6 +484,7 @@ export const queryStockTransactionsSchema = z.object({
 });
 
 export const queryStockMovementsSchema = z.object({
+  search: z.string().trim().optional(),
   itemId: z.string().uuid('ID linh kiện không hợp lệ').optional(),
   locationId: z.string().uuid('ID vị trí không hợp lệ').optional(),
   type: z.nativeEnum(StockTransactionType).optional(),
@@ -420,9 +542,66 @@ export type TransferStockInput = z.infer<typeof transferStockSchema>;
 
 export type AdjustStockItemInput = z.infer<typeof adjustStockItemSchema>;
 export type AdjustStockInput = z.infer<typeof adjustStockSchema>;
+export type AdjustStockItemInputV2 = z.infer<typeof adjustStockItemSchemaV2>;
+export type AdjustStockInputV2 = z.infer<typeof adjustStockSchemaV2>;
 
 export type CreateStockTransactionInput = z.infer<typeof createStockTransactionSchema>;
 export type QueryStockTransactionsInput = z.infer<typeof queryStockTransactionsSchema>;
 export type QueryStockMovementsInput = z.infer<typeof queryStockMovementsSchema>;
 
 export type CreateBorrowRequestInput = z.infer<typeof createBorrowRequestSchema>;
+
+// Idempotency Query Schemas & Types (Step S2A)
+export const queryIdempotencyParamsSchema = z.object({
+  key: z
+    .string()
+    .trim()
+    .min(8, 'Khóa Idempotency tối thiểu 8 ký tự')
+    .max(64, 'Khóa Idempotency tối đa 64 ký tự')
+    .regex(/^[a-zA-Z0-9_-]+$/, 'Định dạng Idempotency-Key không hợp lệ'),
+});
+
+export const idempotencyQueryStatusEnum = z.enum([
+  'COMMITTED',
+  'IN_PROGRESS',
+  'CONFIRMED_FAILED',
+  'EXPIRED',
+  'UNKNOWN',
+]);
+
+export const idempotencyQueryResponseSchema = z.object({
+  success: z.boolean(),
+  message: z.string().optional(),
+  data: z.object({
+    key: z.string(),
+    status: idempotencyQueryStatusEnum,
+    endpoint: z.string().optional(),
+    statusCode: z.number().int().optional(),
+    transaction: z
+      .object({
+        id: z.string().uuid(),
+        transactionNumber: z.string(),
+        type: z.nativeEnum(StockTransactionType),
+        status: z.nativeEnum(TransactionStatus),
+        notes: z.string().nullable().optional(),
+        itemCount: z.number().int(),
+        totalQuantity: z.number().int(),
+        createdAt: z.string().or(z.date()).optional(),
+      })
+      .optional(),
+    error: z
+      .object({
+        statusCode: z.number().int(),
+        errorCode: z.string().optional(),
+        message: z.string(),
+      })
+      .optional(),
+    retryAfterSeconds: z.number().int().optional(),
+    createdAt: z.string().or(z.date()).optional(),
+    expiresAt: z.string().or(z.date()).optional(),
+  }),
+});
+
+export type QueryIdempotencyParams = z.infer<typeof queryIdempotencyParamsSchema>;
+export type IdempotencyQueryStatus = z.infer<typeof idempotencyQueryStatusEnum>;
+export type IdempotencyQueryResponse = z.infer<typeof idempotencyQueryResponseSchema>;

@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 
 export interface UserProfile {
   id: string;
@@ -10,7 +11,7 @@ export interface UserProfile {
 interface AuthContextType {
   user: UserProfile | null;
   token: string | null;
-  login: (token: string, user: UserProfile) => void;
+  login: (newToken: string, newUser: UserProfile) => void;
   logout: () => void;
   isAuthenticated: boolean;
 }
@@ -18,6 +19,13 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  let queryClient: ReturnType<typeof useQueryClient> | null = null;
+  try {
+    queryClient = useQueryClient();
+  } catch {
+    queryClient = null;
+  }
+
   const [token, setToken] = useState<string | null>(() => localStorage.getItem('acm_token'));
   const [user, setUser] = useState<UserProfile | null>(() => {
     const saved = localStorage.getItem('acm_user');
@@ -25,6 +33,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   });
 
   const login = (newToken: string, newUser: UserProfile) => {
+    // Cancel any in-flight background requests to prevent late responses from populating cache
+    queryClient?.cancelQueries();
+    queryClient?.clear();
     localStorage.setItem('acm_token', newToken);
     localStorage.setItem('acm_user', JSON.stringify(newUser));
     setToken(newToken);
@@ -32,6 +43,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const logout = () => {
+    // Cancel in-flight queries immediately on logout
+    queryClient?.cancelQueries();
+    queryClient?.clear();
     localStorage.removeItem('acm_token');
     localStorage.removeItem('acm_user');
     setToken(null);

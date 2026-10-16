@@ -119,6 +119,7 @@ model User {
   returnsReceived         ReturnTransaction[]     @relation("ReceiverRelation")
   stockMovementsMade      StockMovement[]         @relation("UserMovementRelation")
   auditLogs               AuditLog[]
+  idempotencyRecords      IdempotencyRecord[]
 
   @@map("users")
 }
@@ -178,11 +179,12 @@ model Location {
   updatedAt   DateTime      @updatedAt
 
   // Relations
-  assets                  Asset[]
-  stockBalances           StockBalance[]
-  stockMovements          StockMovement[]
-  stockReservations       StockReservation[]
-  stockTransactionDetails StockTransactionDetail[]
+  assets                        Asset[]
+  stockBalances                 StockBalance[]
+  stockMovements                StockMovement[]
+  stockReservations             StockReservation[]
+  stockTransactionDetails       StockTransactionDetail[] @relation("TransferFromLocation")
+  stockTransactionDetailsDest   StockTransactionDetail[] @relation("TransferToLocation")
 
   @@map("locations")
 }
@@ -277,6 +279,7 @@ model StockTransaction {
   createdById       String                   @db.Uuid
   createdBy         User                     @relation("CreatedByRelation", fields: [createdById], references: [id])
   details           StockTransactionDetail[]
+  idempotencyRecord IdempotencyRecord?
   createdAt         DateTime                 @default(now())
   updatedAt         DateTime                 @updatedAt
 
@@ -290,7 +293,9 @@ model StockTransactionDetail {
   itemId             String           @db.Uuid
   item               Item             @relation(fields: [itemId], references: [id])
   locationId         String           @db.Uuid
-  location           Location         @relation(fields: [locationId], references: [id])
+  location           Location         @relation("TransferFromLocation", fields: [locationId], references: [id])
+  toLocationId       String?          @map("to_location_id") @db.Uuid
+  toLocation         Location?        @relation("TransferToLocation", fields: [toLocationId], references: [id], onDelete: Restrict)
   quantity           Int
   unitCost           Float?
   notes              String?
@@ -385,4 +390,24 @@ model AuditLog {
   createdAt DateTime @default(now())
 
   @@map("audit_logs")
+}
+
+model IdempotencyRecord {
+  id            String            @id @default(uuid()) @db.Uuid
+  key           String            @unique
+  userId        String            @map("user_id") @db.Uuid
+  user          User              @relation(fields: [userId], references: [id], onDelete: Restrict)
+  endpoint      String
+  requestHash   String            @map("request_hash")
+  status        String            @default("PENDING") // PENDING, COMPLETED, FAILED
+  transactionId String?           @unique @map("transaction_id") @db.Uuid
+  transaction   StockTransaction? @relation(fields: [transactionId], references: [id], onDelete: Restrict)
+  responseBody  Json?             @map("response_body")
+  statusCode    Int?              @map("status_code")
+  createdAt     DateTime          @default(now()) @map("created_at")
+  expiresAt     DateTime          @map("expires_at")
+
+  @@index([userId, endpoint])
+  @@index([expiresAt])
+  @@map("idempotency_records")
 }

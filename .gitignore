@@ -31,6 +31,42 @@ Thumbs.db
 # Testing & Coverage
 coverage/
 .nyc_output/
+test-results/
+playwright-report/
+playwright-report-*/
+blob-report/
+playwright/.cache/
+playwright/.auth/
+.auth/
+dist-*/
+storageState*.json
+*.trace
+*.webm
 
 # Prisma
 # Keep schema and migrations, ignore generated client if copied
+
+# Database dumps & local backups (Prisma migration SQL files remain eligible)
+database/backups/
+*.dump
+*.bak
+
+# Local handoff archives and binary bundles
+*.zip
+*.tar
+*.gz
+*.rar
+
+# Certificates, private keys and local credentials
+*.pem
+*.key
+*.cert
+*.crt
+*.pfx
+*.p12
+
+# Local test snapshots & database audit manifests
+apps/api/scripts/*.json
+
+# Local scratch and temporary directories
+scratch/

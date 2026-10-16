@@ -13,9 +13,13 @@ import {
   exportStockSchema,
   transferStockSchema,
   adjustStockSchema,
+  adjustStockItemSchemaV2,
+  adjustStockSchemaV2,
   queryStockBalancesSchema,
   queryStockTransactionsSchema,
   queryStockMovementsSchema,
+  queryIdempotencyParamsSchema,
+  idempotencyQueryResponseSchema,
 } from './validators';
 import {
   ItemType,
@@ -514,6 +518,7 @@ describe('Shared Validators Tests', () => {
   describe('exportStockSchema', () => {
     it('validates a valid export batch with required reason', () => {
       const parsed = exportStockSchema.parse({
+        reason: 'Xuất phục vụ nghiên cứu đề tài vi điều khiển',
         notes: 'Xuất cấp phát sinh viên lớp Robotics',
         items: [
           {
@@ -524,19 +529,48 @@ describe('Shared Validators Tests', () => {
           },
         ],
       });
+      expect(parsed.reason).toBe('Xuất phục vụ nghiên cứu đề tài vi điều khiển');
       expect(parsed.items).toHaveLength(1);
       expect(parsed.items[0].reason).toBe('Thực hành môn Vi điều khiển');
     });
 
-    it('rejects missing or too short reason (< 3 chars)', () => {
+    it('rejects missing root reason', () => {
       expect(() =>
         exportStockSchema.parse({
+          notes: 'Chỉ có notes mà không có reason',
           items: [
             {
               itemId: validUUID,
               locationId: validUUID2,
               quantity: 5,
-              reason: 'AB', // < 3 chars
+            },
+          ],
+        })
+      ).toThrow();
+    });
+
+    it('rejects whitespace-only or too short root reason (< 3 chars)', () => {
+      expect(() =>
+        exportStockSchema.parse({
+          reason: '   ',
+          items: [
+            {
+              itemId: validUUID,
+              locationId: validUUID2,
+              quantity: 5,
+            },
+          ],
+        })
+      ).toThrow(/Lý do xuất kho phải có ít nhất 3 ký tự/);
+
+      expect(() =>
+        exportStockSchema.parse({
+          reason: 'AB',
+          items: [
+            {
+              itemId: validUUID,
+              locationId: validUUID2,
+              quantity: 5,
             },
           ],
         })
@@ -546,6 +580,7 @@ describe('Shared Validators Tests', () => {
     it('rejects duplicate (itemId, locationId) pairs in export batch', () => {
       expect(() =>
         exportStockSchema.parse({
+          reason: 'Lý do xuất kho hợp lệ',
           items: [
             { itemId: validUUID, locationId: validUUID2, quantity: 5, reason: 'Lý do 1' },
             { itemId: validUUID, locationId: validUUID2, quantity: 3, reason: 'Lý do 2' },
@@ -557,6 +592,7 @@ describe('Shared Validators Tests', () => {
     it('strictly rejects direct balance manipulation fields', () => {
       expect(() =>
         exportStockSchema.parse({
+          reason: 'Lý do xuất kho hợp lệ',
           items: [
             {
               itemId: validUUID,
@@ -576,17 +612,49 @@ describe('Shared Validators Tests', () => {
       const parsed = transferStockSchema.parse({
         fromLocationId: validUUID,
         toLocationId: validUUID2,
+        reason: 'Điều chuyển linh kiện phục vụ lớp thực hành',
         notes: 'Chuyển linh kiện từ Kho tổng sang Khay thực hành',
         items: [
           {
             itemId: 'c3d4e5f6-a7b8-9c0d-1e2f-3a4b5c6d7e8f',
             quantity: 15,
+            reason: 'Bổ sung khay thực hành',
           },
         ],
       });
       expect(parsed.fromLocationId).toBe(validUUID);
       expect(parsed.toLocationId).toBe(validUUID2);
+      expect(parsed.reason).toBe('Điều chuyển linh kiện phục vụ lớp thực hành');
       expect(parsed.items[0].quantity).toBe(15);
+      expect(parsed.items[0].reason).toBe('Bổ sung khay thực hành');
+    });
+
+    it('rejects missing or whitespace-only root reason (< 5 chars)', () => {
+      expect(() =>
+        transferStockSchema.parse({
+          fromLocationId: validUUID,
+          toLocationId: validUUID2,
+          items: [{ itemId: 'c3d4e5f6-a7b8-9c0d-1e2f-3a4b5c6d7e8f', quantity: 10 }],
+        })
+      ).toThrow();
+
+      expect(() =>
+        transferStockSchema.parse({
+          fromLocationId: validUUID,
+          toLocationId: validUUID2,
+          reason: '   ',
+          items: [{ itemId: 'c3d4e5f6-a7b8-9c0d-1e2f-3a4b5c6d7e8f', quantity: 10 }],
+        })
+      ).toThrow(/ít nhất 5 ký tự/);
+
+      expect(() =>
+        transferStockSchema.parse({
+          fromLocationId: validUUID,
+          toLocationId: validUUID2,
+          reason: 'ABCD',
+          items: [{ itemId: 'c3d4e5f6-a7b8-9c0d-1e2f-3a4b5c6d7e8f', quantity: 10 }],
+        })
+      ).toThrow(/ít nhất 5 ký tự/);
     });
 
     it('rejects transfer when fromLocationId is identical to toLocationId', () => {
@@ -594,6 +662,7 @@ describe('Shared Validators Tests', () => {
         transferStockSchema.parse({
           fromLocationId: validUUID,
           toLocationId: validUUID, // Same location!
+          reason: 'Điều chuyển linh kiện cùng vị trí',
           items: [
             {
               itemId: 'c3d4e5f6-a7b8-9c0d-1e2f-3a4b5c6d7e8f',
@@ -610,6 +679,7 @@ describe('Shared Validators Tests', () => {
         transferStockSchema.parse({
           fromLocationId: validUUID,
           toLocationId: validUUID2,
+          reason: 'Điều chuyển linh kiện thực hành',
           items: [
             { itemId, quantity: 10 },
             { itemId, quantity: 5 }, // Duplicate itemId!
@@ -623,6 +693,7 @@ describe('Shared Validators Tests', () => {
         transferStockSchema.parse({
           fromLocationId: validUUID,
           toLocationId: validUUID2,
+          reason: 'Điều chuyển linh kiện thực hành',
           items: [
             {
               itemId: 'c3d4e5f6-a7b8-9c0d-1e2f-3a4b5c6d7e8f',
@@ -639,6 +710,7 @@ describe('Shared Validators Tests', () => {
     it('validates a valid inventory stock count adjustment with required reason', () => {
       const parsed = adjustStockSchema.parse({
         locationId: validUUID,
+        reason: 'Kiểm kê định kỳ kho linh kiện tháng 10',
         notes: 'Kiểm kê kho tháng 10',
         items: [
           {
@@ -649,6 +721,7 @@ describe('Shared Validators Tests', () => {
         ],
       });
       expect(parsed.locationId).toBe(validUUID);
+      expect(parsed.reason).toBe('Kiểm kê định kỳ kho linh kiện tháng 10');
       expect(parsed.items[0].actualOnHand).toBe(35);
       expect(parsed.items[0].reason).toBe('Kiểm kê định kỳ phát hiện thừa 2 chiếc');
     });
@@ -656,6 +729,7 @@ describe('Shared Validators Tests', () => {
     it('allows actualOnHand = 0 (out of stock adjustment)', () => {
       const parsed = adjustStockSchema.parse({
         locationId: validUUID,
+        reason: 'Kiểm kê phát hiện hỏng hết linh kiện',
         items: [
           {
             itemId: validUUID2,
@@ -667,10 +741,52 @@ describe('Shared Validators Tests', () => {
       expect(parsed.items[0].actualOnHand).toBe(0);
     });
 
+    it('rejects missing or whitespace-only root reason (< 5 chars)', () => {
+      expect(() =>
+        adjustStockSchema.parse({
+          locationId: validUUID,
+          items: [{ itemId: validUUID2, actualOnHand: 10 }],
+        })
+      ).toThrow();
+
+      expect(() =>
+        adjustStockSchema.parse({
+          locationId: validUUID,
+          reason: '   ',
+          items: [{ itemId: validUUID2, actualOnHand: 10 }],
+        })
+      ).toThrow(/ít nhất 5 ký tự/);
+
+      expect(() =>
+        adjustStockSchema.parse({
+          locationId: validUUID,
+          reason: 'ABC',
+          items: [{ itemId: validUUID2, actualOnHand: 10 }],
+        })
+      ).toThrow(/ít nhất 5 ký tự/);
+    });
+
+    it('rejects when reason is provided ONLY at line level without voucher-level reason', () => {
+      expect(() =>
+        adjustStockSchema.parse({
+          locationId: validUUID,
+          // voucher reason omitted
+          items: [
+            {
+              itemId: validUUID2,
+              actualOnHand: 10,
+              reason: 'Lý do chỉ ghi ở cấp dòng mặt hàng',
+            },
+          ],
+        })
+      ).toThrow();
+    });
+
     it('rejects negative actualOnHand', () => {
       expect(() =>
         adjustStockSchema.parse({
           locationId: validUUID,
+          reason: 'Kiểm kê kho định kỳ',
           items: [
             {
               itemId: validUUID2,
@@ -682,37 +798,24 @@ describe('Shared Validators Tests', () => {
       ).toThrow(/không được âm/);
     });
 
-    it('rejects adjustment reason shorter than 5 characters', () => {
-      expect(() =>
-        adjustStockSchema.parse({
-          locationId: validUUID,
-          items: [
-            {
-              itemId: validUUID2,
-              actualOnHand: 10,
-              reason: 'Sai', // < 5 chars
-            },
-          ],
-        })
-      ).toThrow(/ít nhất 5 ký tự/);
-    });
-
     it('rejects duplicate items within the same adjustment payload', () => {
       expect(() =>
         adjustStockSchema.parse({
           locationId: validUUID,
+          reason: 'Kiểm kê kho linh kiện',
           items: [
             { itemId: validUUID2, actualOnHand: 10, reason: 'Lý do 1 kiểm kê' },
             { itemId: validUUID2, actualOnHand: 12, reason: 'Lý do 2 kiểm kê' },
           ],
         })
-      ).toThrow(/Không được trùng lặp mặt hàng trong cùng một phiếu điều chỉnh tồn kho/);
+      ).toThrow(/Không được trùng lặp linh kiện tại cùng một vị trí/);
     });
 
     it('strictly rejects direct delta or balance overrides', () => {
       expect(() =>
         adjustStockSchema.parse({
           locationId: validUUID,
+          reason: 'Kiểm kê kho linh kiện',
           items: [
             {
               itemId: validUUID2,
@@ -769,6 +872,241 @@ describe('Shared Validators Tests', () => {
       expect(query.itemId).toBe(validUUID);
       expect(query.type).toBe(StockTransactionType.TRANSFER);
       expect(query.sortBy).toBe(StockMovementSortField.QUANTITY_DELTA);
+    });
+  });
+
+  describe('queryIdempotencyParamsSchema & idempotencyQueryResponseSchema (Step S2A)', () => {
+    it('ZT-IDEM-01: validates a valid idempotency key parameter', () => {
+      const validKeys = [
+        '9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d',
+        'valid-key-1234',
+        'KEY_UPPER_LOWER_1234',
+        '8charsmn',
+      ];
+      for (const key of validKeys) {
+        const result = queryIdempotencyParamsSchema.safeParse({ key });
+        expect(result.success).toBe(true);
+        if (result.success) {
+          expect(result.data.key).toBe(key);
+        }
+      }
+    });
+
+    it('ZT-IDEM-02: rejects invalid idempotency key parameter (< 8 chars, > 64 chars, special chars, empty)', () => {
+      const invalidKeys = [
+        'short',
+        '',
+        '   ',
+        'key$with@specials',
+        'key with spaces',
+        'a'.repeat(65),
+      ];
+      for (const key of invalidKeys) {
+        const result = queryIdempotencyParamsSchema.safeParse({ key });
+        expect(result.success).toBe(false);
+      }
+    });
+
+    it('validates idempotencyQueryResponseSchema for COMMITTED status', () => {
+      const responsePayload = {
+        success: true,
+        message: 'Tra cứu trạng thái thành công',
+        data: {
+          key: 'valid-uuid-key-1234',
+          status: 'COMMITTED',
+          endpoint: '/api/v1/stock-transactions/import',
+          statusCode: 201,
+          transaction: {
+            id: validUUID,
+            transactionNumber: 'TX-20261013-0001',
+            type: StockTransactionType.IMPORT,
+            status: TransactionStatus.COMPLETED,
+            notes: 'Nhập kho thử nghiệm',
+            itemCount: 2,
+            totalQuantity: 10,
+          },
+        },
+      };
+      const parsed = idempotencyQueryResponseSchema.safeParse(responsePayload);
+      expect(parsed.success).toBe(true);
+    });
+
+    it('validates idempotencyQueryResponseSchema for IN_PROGRESS and UNKNOWN status', () => {
+      const inProgressPayload = {
+        success: true,
+        data: {
+          key: 'valid-uuid-key-1234',
+          status: 'IN_PROGRESS',
+          retryAfterSeconds: 2,
+        },
+      };
+      expect(idempotencyQueryResponseSchema.safeParse(inProgressPayload).success).toBe(true);
+
+      const unknownPayload = {
+        success: false,
+        message: 'Không tìm thấy bản ghi',
+        data: {
+          key: 'valid-uuid-key-1234',
+          status: 'UNKNOWN',
+        },
+      };
+      expect(idempotencyQueryResponseSchema.safeParse(unknownPayload).success).toBe(true);
+    });
+  });
+
+  // =========================================================================
+  // Step S2B: Shared Zod Adjustment V2 Schema Tests (ZT-ADJ-01 .. ZT-ADJ-05)
+  // =========================================================================
+  describe('adjustStockSchemaV2 & adjustStockItemSchemaV2 (Step S2B)', () => {
+    const validPayload = {
+      reason: 'Kiểm kê kho định kỳ cuối tháng',
+      locationId: validUUID2,
+      items: [
+        {
+          itemId: validUUID,
+          expectedOnHand: 50,
+          expectedReserved: 10,
+          expectedQuarantined: 5,
+          expectedKitAllocated: 5,
+          actualOnHand: 55,
+          reason: 'Tìm thấy thêm linh kiện',
+        },
+      ],
+    };
+
+    // ZT-ADJ-01: Valid payload with all 4 snapshot fields and actualOnHand
+    it('ZT-ADJ-01: validates adjustStockSchemaV2 with complete snapshot fields', () => {
+      const result = adjustStockSchemaV2.safeParse(validPayload);
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.items[0].expectedOnHand).toBe(50);
+        expect(result.data.items[0].expectedReserved).toBe(10);
+        expect(result.data.items[0].expectedQuarantined).toBe(5);
+        expect(result.data.items[0].expectedKitAllocated).toBe(5);
+        expect(result.data.items[0].actualOnHand).toBe(55);
+      }
+    });
+
+    // ZT-ADJ-02: Missing expectedOnHand -> fails with required field error
+    it('ZT-ADJ-02: rejects when expectedOnHand is missing', () => {
+      const invalidPayload = {
+        ...validPayload,
+        items: [
+          {
+            itemId: validUUID,
+            // expectedOnHand omitted
+            expectedReserved: 10,
+            expectedQuarantined: 5,
+            expectedKitAllocated: 5,
+            actualOnHand: 55,
+          },
+        ],
+      };
+      const result = adjustStockSchemaV2.safeParse(invalidPayload);
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        const errors = result.error.errors;
+        expect(errors.some((e) => e.path.includes('expectedOnHand'))).toBe(true);
+      }
+    });
+
+    // ZT-ADJ-03: expectedOnHand is negative (-5) or decimal (5.5) -> fails
+    it('ZT-ADJ-03: rejects when expectedOnHand is negative or decimal', () => {
+      const negativePayload = {
+        ...validPayload,
+        items: [
+          {
+            ...validPayload.items[0],
+            expectedOnHand: -5,
+          },
+        ],
+      };
+      const negResult = adjustStockSchemaV2.safeParse(negativePayload);
+      expect(negResult.success).toBe(false);
+
+      const decimalPayload = {
+        ...validPayload,
+        items: [
+          {
+            ...validPayload.items[0],
+            expectedOnHand: 5.5,
+          },
+        ],
+      };
+      const decResult = adjustStockSchemaV2.safeParse(decimalPayload);
+      expect(decResult.success).toBe(false);
+    });
+
+    // ZT-ADJ-04: Missing expectedReserved, expectedQuarantined, or expectedKitAllocated -> fails (no fallback .default(0))
+    it('ZT-ADJ-04: rejects when any committed snapshot field is missing (no fallback default)', () => {
+      const missingReserved = {
+        ...validPayload,
+        items: [
+          {
+            itemId: validUUID,
+            expectedOnHand: 50,
+            // expectedReserved omitted
+            expectedQuarantined: 5,
+            expectedKitAllocated: 5,
+            actualOnHand: 55,
+          },
+        ],
+      };
+      expect(adjustStockSchemaV2.safeParse(missingReserved).success).toBe(false);
+
+      const missingQuarantined = {
+        ...validPayload,
+        items: [
+          {
+            itemId: validUUID,
+            expectedOnHand: 50,
+            expectedReserved: 10,
+            // expectedQuarantined omitted
+            expectedKitAllocated: 5,
+            actualOnHand: 55,
+          },
+        ],
+      };
+      expect(adjustStockSchemaV2.safeParse(missingQuarantined).success).toBe(false);
+
+      const missingKitAllocated = {
+        ...validPayload,
+        items: [
+          {
+            itemId: validUUID,
+            expectedOnHand: 50,
+            expectedReserved: 10,
+            expectedQuarantined: 5,
+            // expectedKitAllocated omitted
+            actualOnHand: 55,
+          },
+        ],
+      };
+      expect(adjustStockSchemaV2.safeParse(missingKitAllocated).success).toBe(false);
+    });
+
+    // ZT-ADJ-05: Missing locationId at both header and line level -> fails refinement
+    it('ZT-ADJ-05: rejects when locationId is missing at both header and line level', () => {
+      const noLocationPayload = {
+        reason: 'Kiểm kê kho định kỳ cuối tháng',
+        // header locationId omitted
+        items: [
+          {
+            itemId: validUUID,
+            // line locationId omitted
+            expectedOnHand: 50,
+            expectedReserved: 10,
+            expectedQuarantined: 5,
+            expectedKitAllocated: 5,
+            actualOnHand: 55,
+          },
+        ],
+      };
+      const result = adjustStockSchemaV2.safeParse(noLocationPayload);
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error.errors.some((e) => e.path.includes('locationId'))).toBe(true);
+      }
     });
   });
 });

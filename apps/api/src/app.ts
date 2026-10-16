@@ -9,13 +9,16 @@ import { authRouter } from './modules/auth/auth.router';
 import { usersRouter } from './modules/users/users.router';
 import { categoriesRouter } from './modules/categories/categories.router';
 import { itemsRouter } from './modules/items/items.router';
+import { locationsRouter } from './modules/locations/locations.router';
 import { inventoryRouter } from './modules/inventory/inventory.router';
 import { stockTransactionsRouter } from './modules/stock-transactions/stock-transactions.router';
+import { stockMovementsRouter } from './modules/stock-movements/stock-movements.router';
 import { borrowRouter } from './modules/borrow/borrow.router';
 import { reportsRouter } from './modules/reports/reports.router';
 import { auditLogsRouter } from './modules/audit-logs/audit-logs.router';
+import { cloudStagingReadOnlyMiddleware, StagingReadOnlyOptions } from './middleware/cloudStagingReadOnly';
 
-export function createApp(): Express {
+export function createApp(options?: { stagingReadOnly?: StagingReadOnlyOptions }): Express {
   const app = express();
 
   // Basic security and parsing middleware
@@ -28,8 +31,12 @@ export function createApp(): Express {
     app.use(morgan('dev'));
   }
 
+  // Cloud Staging Read-Only Protection Middleware (Fail-Closed)
+  app.use(cloudStagingReadOnlyMiddleware(options?.stagingReadOnly));
+
   // API prefix
   const prefix = env.API_PREFIX; // default /api/v1
+
 
   // Routes registration
   app.use(`${prefix}/health`, healthRouter);
@@ -37,8 +44,10 @@ export function createApp(): Express {
   app.use(`${prefix}/users`, usersRouter);
   app.use(`${prefix}/categories`, categoriesRouter);
   app.use(`${prefix}/items`, itemsRouter);
+  app.use(`${prefix}/locations`, locationsRouter);
   app.use(`${prefix}/inventory`, inventoryRouter);
   app.use(`${prefix}/stock-transactions`, stockTransactionsRouter);
+  app.use(`${prefix}/stock-movements`, stockMovementsRouter);
   app.use(`${prefix}/borrow-requests`, borrowRouter);
   app.use(`${prefix}/reports`, reportsRouter);
   app.use(`${prefix}/audit-logs`, auditLogsRouter);

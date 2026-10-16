@@ -151,7 +151,9 @@ describe('ACM Phase 1 Real Database Integration Test Suite', () => {
 
   // Test Case 7: Check stock quantity & invariant calculations
   it('TC07: Checks stock balance & enforces Available = OnHand - Reserved - Quarantined - KitAllocated', async () => {
-    const res = await request(app).get('/api/v1/inventory/balance');
+    const res = await request(app)
+      .get('/api/v1/inventory/balance')
+      .set('Authorization', `Bearer ${adminToken}`);
     expect(res.status).toBe(200);
     expect(res.body.success).toBe(true);
     expect(Array.isArray(res.body.data)).toBe(true);

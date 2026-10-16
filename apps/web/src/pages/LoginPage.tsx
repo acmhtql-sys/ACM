@@ -22,8 +22,14 @@ export const LoginPage: React.FC = () => {
       if (res.data.success) {
         login(res.data.data.token, res.data.data.user);
         navigate('/dashboard');
+      } else {
+        setError(res.data.message || 'Email hoặc mật khẩu không chính xác');
       }
     } catch (err: any) {
+      if (err.response) {
+        setError(err.response.data?.message || 'Email hoặc mật khẩu không chính xác');
+        return;
+      }
       // In Phase 1 foundation, if API is not running yet, provide instant offline mock fallback
       console.warn('API connection failed, falling back to local session', err);
       const mockRole = email.includes('manager')

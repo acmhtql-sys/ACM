@@ -2,6 +2,23 @@ import dotenv from 'dotenv';
 import path from 'path';
 import fs from 'fs';
 import { z } from 'zod';
+import {
+  isSecureCloudJwtSecret,
+  isValidCloudCorsOrigin,
+  deploymentProfileSchema,
+  validateDeploymentProfileConfig,
+  validateSecurityConfig,
+  INSECURE_JWT_SECRETS,
+} from './securityPolicy';
+
+export {
+  isSecureCloudJwtSecret,
+  isValidCloudCorsOrigin,
+  deploymentProfileSchema,
+  validateDeploymentProfileConfig,
+  validateSecurityConfig,
+  INSECURE_JWT_SECRETS,
+};
 
 const isTest = process.env.NODE_ENV === 'test' || Boolean(process.env.VITEST);
 
@@ -34,6 +51,11 @@ const envSchema = z
     JWT_SECRET: z.string().min(8).default('acm-default-jwt-secret-for-dev-only-min-32chars'),
     JWT_EXPIRES_IN: z.string().default('1d'),
     LOG_LEVEL: z.string().default('info'),
+    ACM_DEPLOYMENT_PROFILE: z
+      .enum(['local_dev', 'gate_b', 's2c_sandbox', 'cloud_staging', 'production'])
+      .optional(),
+    STAGING_READ_ONLY: z.enum(['true', 'false']).optional(),
+    ALLOW_STAGING_AUTH_LOGIN: z.enum(['true', 'false']).optional(),
   })
   .superRefine((data, ctx) => {
     if (isTest || data.NODE_ENV === 'test') {
@@ -44,6 +66,69 @@ const envSchema = z
           message:
             'SAFETY VIOLATION: Test environment DATABASE_URL must target "acm_inventory_test". Never run tests against development or production databases.',
           path: ['DATABASE_URL'],
+        });
+      }
+    }
+
+    const isProdEnv = data.NODE_ENV === 'production';
+    const profile = data.ACM_DEPLOYMENT_PROFILE;
+
+    // RULE 1: In production NODE_ENV, ACM_DEPLOYMENT_PROFILE is mandatory
+    if (isProdEnv) {
+      if (!profile) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'NODE_ENV=production requires explicit ACM_DEPLOYMENT_PROFILE declaration',
+          path: ['ACM_DEPLOYMENT_PROFILE'],
+        });
+        return;
+      }
+      // In production (Render), ONLY 'cloud_staging' is approved in Phase C1A.2R
+      if (profile !== 'cloud_staging') {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `Profile '${profile}' is not permitted in NODE_ENV=production (only 'cloud_staging' is approved in Phase C1A.2R)`,
+          path: ['ACM_DEPLOYMENT_PROFILE'],
+        });
+        return;
+      }
+    }
+
+    // RULE 2: Profile 'production' is strictly not yet approved in Phase C1A.2R
+    if (profile === 'production') {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Profile 'production' is not approved for deployment in Phase C1A.2R (FAIL-CLOSED)",
+        path: ['ACM_DEPLOYMENT_PROFILE'],
+      });
+      return;
+    }
+
+    // RULE 3: Cloud Staging profile validation
+    if (profile === 'cloud_staging') {
+      if (data.STAGING_READ_ONLY !== 'true') {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'cloud_staging requires STAGING_READ_ONLY=true',
+          path: ['STAGING_READ_ONLY'],
+        });
+      }
+
+      const jwtCheck = isSecureCloudJwtSecret(data.JWT_SECRET);
+      if (!jwtCheck.valid) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: jwtCheck.reason || 'Cloud deployment requires a high-entropy JWT_SECRET',
+          path: ['JWT_SECRET'],
+        });
+      }
+
+      const corsCheck = isValidCloudCorsOrigin(data.CORS_ORIGIN);
+      if (!corsCheck.valid) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: corsCheck.reason || 'Cloud deployment requires valid HTTPS CORS_ORIGIN',
+          path: ['CORS_ORIGIN'],
         });
       }
     }
@@ -59,4 +144,8 @@ if (!parsed.success) {
   process.exit(1);
 }
 
-export const env = parsed.data;
+export const env = {
+  ...parsed.data,
+  ACM_DEPLOYMENT_PROFILE: parsed.data.ACM_DEPLOYMENT_PROFILE ?? 'local_dev',
+  ALLOW_STAGING_AUTH_LOGIN: parsed.data.ALLOW_STAGING_AUTH_LOGIN ?? 'false',
+};

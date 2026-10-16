@@ -458,34 +458,56 @@ describe('ACM Phase 2.1 – End-to-End Acceptance Test Suite', () => {
   // Scenario 17: Transaction Rollback on Failure
   // ========================================================
   it('E2E-13: Ensures transaction rollback occurs if AuditLog writing fails', async () => {
-    const initialItemCount = await prisma.item.count();
-    const initialAuditCount = await prisma.auditLog.count();
+    const rollbackCode = `E2E-ROLLBACK-ITEM-${Date.now()}`;
+    const testAdmin = await prisma.user.findFirst({ where: { role: 'ADMIN' } });
+    expect(testAdmin).toBeTruthy();
 
     let rollbackSucceeded = false;
     try {
       await prisma.$transaction(async (tx) => {
-        await tx.item.create({
+        const item = await tx.item.create({
           data: {
-            code: 'E2E-ROLLBACK-ITEM',
+            code: rollbackCode,
             name: 'Will Be Rolled Back',
             unit: 'Cái',
             categoryId: testCategoryId,
           },
         });
-        // Intentionally throw error to simulate failure
-        throw new Error('Simulated Audit Failure for Transaction Rollback');
+
+        // Write audit log inside the same transaction
+        await tx.auditLog.create({
+          data: {
+            userId: testAdmin!.id,
+            action: 'CREATE_ITEM',
+            entity: 'Item',
+            entityId: item.id,
+            newValue: { code: rollbackCode },
+          },
+        });
+
+        // Intentionally throw error to simulate downstream failure
+        throw new Error('Simulated Downstream Failure for Transaction Rollback');
       });
     } catch (e: any) {
-      if (e.message.includes('Simulated Audit Failure')) {
+      if (e.message.includes('Simulated Downstream Failure')) {
         rollbackSucceeded = true;
       }
     }
 
     expect(rollbackSucceeded).toBe(true);
-    const afterItemCount = await prisma.item.count();
-    const afterAuditCount = await prisma.auditLog.count();
 
-    expect(afterItemCount).toBe(initialItemCount);
-    expect(afterAuditCount).toBe(initialAuditCount);
+    // Verify specifically that neither the item NOR the audit log from this transaction persisted
+    const rolledBackItem = await prisma.item.findUnique({
+      where: { code: rollbackCode },
+    });
+    expect(rolledBackItem).toBeNull();
+
+    const rolledBackAudit = await prisma.auditLog.findFirst({
+      where: {
+        entity: 'Item',
+        newValue: { path: ['code'], equals: rollbackCode },
+      },
+    });
+    expect(rolledBackAudit).toBeNull();
   });
 });
