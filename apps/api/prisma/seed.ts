@@ -41,7 +41,7 @@ export function validateSeedEnvironment(
     return { allowed: false, reason: 'DATABASE_URL không hợp lệ.' };
   }
 
-  const localHosts = new Set(['localhost', '127.0.0.1', '::1', 'host.docker.internal']);
+  const localHosts = new Set(['localhost', '127.0.0.1', '::1', '[::1]', 'host.docker.internal']);
   if (!localHosts.has(hostname)) {
     return {
       allowed: false,
@@ -56,6 +56,11 @@ async function main() {
   const guard = validateSeedEnvironment(process.env.DATABASE_URL, process.env.NODE_ENV);
   if (!guard.allowed) {
     console.error(`\n❌ [SEED GUARD REJECTION] ${guard.reason}\n`);
+    process.exit(1);
+  }
+
+  if (process.env.ACM_ALLOW_DEMO_SEED !== 'true') {
+    console.error('\n❌ [SEED GUARD REJECTION] Set ACM_ALLOW_DEMO_SEED=true to explicitly confirm local demo seeding.\n');
     process.exit(1);
   }
 
