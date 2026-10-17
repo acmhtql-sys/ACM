@@ -4,9 +4,9 @@ import bcrypt from 'bcryptjs';
 import { UserRole } from '@prisma/client';
 import { authenticate, authenticateOptional } from '../src/middleware/auth';
 import { authorizeRoles } from '../src/middleware/rbac';
-import { createLoginRateLimiter } from '../src/middleware/rateLimiter';
+import { createLoginRateLimiter, loginRateLimiter } from '../src/middleware/rateLimiter';
 import { validateSeedEnvironment } from '../prisma/seed';
-import { MAX_FAILED_LOGIN_ATTEMPTS } from '../src/modules/auth/auth.router';
+import { authRouter, MAX_FAILED_LOGIN_ATTEMPTS } from '../src/modules/auth/auth.router';
 import { AppError } from '../src/shared/AppError';
 import { env } from '../src/config/env';
 import { prisma } from '../src/config/database';
@@ -52,9 +52,16 @@ class MockResponse {
 function createMockContext(
   headers: Record<string, string> = {},
   ip: string = '127.0.0.1',
-  body: any = {}
+  body: any = {},
+  method: string = 'GET',
+  url: string = '/'
 ) {
   const req: any = {
+    method,
+    url,
+    originalUrl: url,
+    path: url,
+    baseUrl: '',
     headers: { ...headers },
     ip,
     socket: { remoteAddress: ip },
@@ -85,6 +92,13 @@ describe('Phase 1 – Authentication & Security Hardening Unit Tests', () => {
 
   beforeEach(() => {
     vi.restoreAllMocks();
+    loginRateLimiter.reset();
+    vi.spyOn(prisma, '$transaction').mockImplementation(async (callback: any) => {
+      if (typeof callback === 'function') {
+        return callback(prisma);
+      }
+      return Promise.all(callback);
+    });
   });
 
   afterEach(() => {
@@ -554,6 +568,400 @@ describe('Phase 1 – Authentication & Security Hardening Unit Tests', () => {
 
       const resetAttempts = userState.failedLoginAttempts > 0 ? 0 : userState.failedLoginAttempts;
       expect(resetAttempts).toBe(0);
+    });
+
+    // ========================================================
+    // SEC-02 CONCURRENCY & RACE CONDITION GUARDS SIMULATION
+    // ========================================================
+    it('aborts login with 403 Forbidden and denies token if account is concurrently locked during password verification', async () => {
+      const password = 'CorrectSecret123!';
+      const passwordHash = await bcrypt.hash(password, 10);
+
+      vi.spyOn(prisma.user, 'findUnique').mockResolvedValue({
+        id: mockUserId,
+        email: 'concurrent-locked@acm.local',
+        fullName: 'Concurrent Locked User',
+        role: UserRole.STUDENT,
+        passwordHash,
+        failedLoginAttempts: 4,
+        isLocked: false, // Initially unlocked when query started
+        isActive: true,
+      } as any);
+
+      // Simulate race condition: another concurrent request locked the account while bcrypt was evaluating.
+      // updateMany returns count: 0 because isLocked = false no longer matches.
+      const updateManySpy = vi.spyOn(prisma.user, 'updateMany').mockResolvedValue({ count: 0 });
+
+      const ctx = createMockContext(
+        {},
+        '127.0.0.1',
+        { email: 'concurrent-locked@acm.local', password },
+        'POST',
+        '/login'
+      );
+
+      await new Promise<void>((resolve) => {
+        let finished = false;
+        const done = () => { if (!finished) { finished = true; resolve(); } };
+        const origJson = ctx.res.json.bind(ctx.res);
+        ctx.res.json = (payload: any) => { origJson(payload); done(); return ctx.res; };
+        authRouter(ctx.req, ctx.res as any, (err) => { ctx.next(err); done(); });
+      });
+
+      const err = ctx.getError();
+      expect(err).toBeInstanceOf(AppError);
+      expect(err.statusCode).toBe(403);
+      expect(err.message).toContain('Tài khoản đã bị tạm khóa do vi phạm chính sách bảo mật');
+      // Crucial security invariant: No token was issued
+      expect(ctx.res.body).toBeNull();
+      expect(updateManySpy).toHaveBeenCalledWith({
+        where: {
+          id: mockUserId,
+          isLocked: false,
+          isActive: true,
+          failedLoginAttempts: { lt: MAX_FAILED_LOGIN_ATTEMPTS },
+        },
+        data: { failedLoginAttempts: 0 },
+      });
+    });
+
+    it('aborts login with 403 Forbidden and denies token if account is concurrently deactivated during password verification', async () => {
+      const password = 'CorrectSecret123!';
+      const passwordHash = await bcrypt.hash(password, 10);
+
+      vi.spyOn(prisma.user, 'findUnique').mockResolvedValue({
+        id: mockUserId,
+        email: 'concurrent-deactivated@acm.local',
+        fullName: 'Concurrent Deactivated User',
+        role: UserRole.STUDENT,
+        passwordHash,
+        failedLoginAttempts: 0,
+        isLocked: false,
+        isActive: true, // Active when checked initially
+      } as any);
+
+      // Simulate race condition: administrator deactivated user while bcrypt was evaluating.
+      // updateMany returns count: 0 because isActive = true no longer matches.
+      const updateManySpy = vi.spyOn(prisma.user, 'updateMany').mockResolvedValue({ count: 0 });
+
+      const ctx = createMockContext(
+        {},
+        '127.0.0.1',
+        { email: 'concurrent-deactivated@acm.local', password },
+        'POST',
+        '/login'
+      );
+
+      await new Promise<void>((resolve) => {
+        let finished = false;
+        const done = () => { if (!finished) { finished = true; resolve(); } };
+        const origJson = ctx.res.json.bind(ctx.res);
+        ctx.res.json = (payload: any) => { origJson(payload); done(); return ctx.res; };
+        authRouter(ctx.req, ctx.res as any, (err) => { ctx.next(err); done(); });
+      });
+
+      const err = ctx.getError();
+      expect(err).toBeInstanceOf(AppError);
+      expect(err.statusCode).toBe(403);
+      expect(err.message).toContain('Tài khoản đã bị tạm khóa do vi phạm chính sách bảo mật');
+      expect(ctx.res.body).toBeNull();
+    });
+
+    it('successfully resets failedLoginAttempts to 0 and issues token when account remains active and unlocked', async () => {
+      const password = 'CorrectSecret123!';
+      const passwordHash = await bcrypt.hash(password, 10);
+
+      vi.spyOn(prisma.user, 'findUnique').mockResolvedValue({
+        id: mockUserId,
+        email: 'valid-success@acm.local',
+        fullName: 'Valid Success User',
+        role: UserRole.STUDENT,
+        passwordHash,
+        failedLoginAttempts: 3, // Had previous failed attempts
+        isLocked: false,
+        isActive: true,
+      } as any);
+
+      const updateManySpy = vi.spyOn(prisma.user, 'updateMany').mockResolvedValue({ count: 1 });
+
+      const ctx = createMockContext(
+        {},
+        '127.0.0.1',
+        { email: 'valid-success@acm.local', password },
+        'POST',
+        '/login'
+      );
+
+      await new Promise<void>((resolve) => {
+        let finished = false;
+        const done = () => { if (!finished) { finished = true; resolve(); } };
+        const origJson = ctx.res.json.bind(ctx.res);
+        ctx.res.json = (payload: any) => { origJson(payload); done(); return ctx.res; };
+        authRouter(ctx.req, ctx.res as any, (err) => { ctx.next(err); done(); });
+      });
+
+      expect(ctx.getError()).toBeNull();
+      expect(ctx.res.statusCode).toBe(200);
+      expect(ctx.res.body.success).toBe(true);
+      expect(ctx.res.body.data).toHaveProperty('token');
+      expect(ctx.res.body.data.user.id).toBe(mockUserId);
+
+      // Verify token is valid and signed
+      const decoded: any = jwt.verify(ctx.res.body.data.token, secret);
+      expect(decoded.id).toBe(mockUserId);
+      expect(decoded.role).toBe(UserRole.STUDENT);
+
+      // Verify atomic reset call
+      expect(updateManySpy).toHaveBeenCalledWith({
+        where: {
+          id: mockUserId,
+          isLocked: false,
+          isActive: true,
+          failedLoginAttempts: { lt: MAX_FAILED_LOGIN_ATTEMPTS },
+        },
+        data: { failedLoginAttempts: 0 },
+      });
+    });
+
+    it('increments failedLoginAttempts atomically in database on failed password attempt', async () => {
+      const passwordHash = await bcrypt.hash('CorrectSecret123!', 10);
+
+      vi.spyOn(prisma.user, 'findUnique').mockResolvedValue({
+        id: mockUserId,
+        email: 'atomic-increment@acm.local',
+        fullName: 'Atomic User',
+        role: UserRole.STUDENT,
+        passwordHash,
+        failedLoginAttempts: 2,
+        isLocked: false,
+        isActive: true,
+      } as any);
+
+      // Atomic DB increment returns new count (3 < 5)
+      const updateSpy = vi.spyOn(prisma.user, 'update').mockResolvedValue({
+        failedLoginAttempts: 3,
+      } as any);
+
+      const ctx = createMockContext(
+        {},
+        '127.0.0.1',
+        { email: 'atomic-increment@acm.local', password: 'WrongPassword999!' },
+        'POST',
+        '/login'
+      );
+
+      await new Promise<void>((resolve) => {
+        let finished = false;
+        const done = () => { if (!finished) { finished = true; resolve(); } };
+        const origJson = ctx.res.json.bind(ctx.res);
+        ctx.res.json = (payload: any) => { origJson(payload); done(); return ctx.res; };
+        authRouter(ctx.req, ctx.res as any, (err) => { ctx.next(err); done(); });
+      });
+
+      const err = ctx.getError();
+      expect(err).toBeInstanceOf(AppError);
+      expect(err.statusCode).toBe(401);
+      expect(err.message).toContain('Email hoặc mật khẩu không chính xác');
+
+      // Assert database-side atomic increment was executed with { increment: 1 }
+      expect(updateSpy).toHaveBeenCalledWith({
+        where: { id: mockUserId },
+        data: { failedLoginAttempts: { increment: 1 } },
+        select: { failedLoginAttempts: true },
+      });
+    });
+
+    it('locks account and returns 403 when atomic counter increment reaches MAX_FAILED_LOGIN_ATTEMPTS', async () => {
+      const passwordHash = await bcrypt.hash('CorrectSecret123!', 10);
+
+      vi.spyOn(prisma.user, 'findUnique').mockResolvedValue({
+        id: mockUserId,
+        email: 'reach-lock@acm.local',
+        fullName: 'Lock Target User',
+        role: UserRole.STUDENT,
+        passwordHash,
+        failedLoginAttempts: 4,
+        isLocked: false,
+        isActive: true,
+      } as any);
+
+      // 1st update: increment reaches 5
+      // 2nd update: locks the user
+      const updateSpy = vi.spyOn(prisma.user, 'update')
+        .mockResolvedValueOnce({ failedLoginAttempts: 5 } as any)
+        .mockResolvedValueOnce({ id: mockUserId, isLocked: true } as any);
+
+      const ctx = createMockContext(
+        {},
+        '127.0.0.1',
+        { email: 'reach-lock@acm.local', password: 'WrongPassword999!' },
+        'POST',
+        '/login'
+      );
+
+      await new Promise<void>((resolve) => {
+        let finished = false;
+        const done = () => { if (!finished) { finished = true; resolve(); } };
+        const origJson = ctx.res.json.bind(ctx.res);
+        ctx.res.json = (payload: any) => { origJson(payload); done(); return ctx.res; };
+        authRouter(ctx.req, ctx.res as any, (err) => { ctx.next(err); done(); });
+      });
+
+      const err = ctx.getError();
+      expect(err).toBeInstanceOf(AppError);
+      expect(err.statusCode).toBe(403);
+      expect(err.message).toContain('Tài khoản đã bị tạm khóa do nhập sai mật khẩu quá 5 lần liên tiếp');
+
+      expect(updateSpy).toHaveBeenNthCalledWith(1, {
+        where: { id: mockUserId },
+        data: { failedLoginAttempts: { increment: 1 } },
+        select: { failedLoginAttempts: true },
+      });
+      expect(updateSpy).toHaveBeenNthCalledWith(2, {
+        where: { id: mockUserId },
+        data: { isLocked: true },
+      });
+    });
+
+    it('immediately blocks login attempt with 403 when account is already locked prior to password check', async () => {
+      vi.spyOn(prisma.user, 'findUnique').mockResolvedValue({
+        id: mockUserId,
+        email: 'already-locked@acm.local',
+        fullName: 'Already Locked User',
+        role: UserRole.STUDENT,
+        passwordHash: 'dummy-hash',
+        failedLoginAttempts: 5,
+        isLocked: true,
+        isActive: true,
+      } as any);
+
+      const bcryptSpy = vi.spyOn(bcrypt, 'compare');
+
+      const ctx = createMockContext(
+        {},
+        '127.0.0.1',
+        { email: 'already-locked@acm.local', password: 'AnyPassword123!' },
+        'POST',
+        '/login'
+      );
+
+      await new Promise<void>((resolve) => {
+        let finished = false;
+        const done = () => { if (!finished) { finished = true; resolve(); } };
+        const origJson = ctx.res.json.bind(ctx.res);
+        ctx.res.json = (payload: any) => { origJson(payload); done(); return ctx.res; };
+        authRouter(ctx.req, ctx.res as any, (err) => { ctx.next(err); done(); });
+      });
+
+      const err = ctx.getError();
+      expect(err).toBeInstanceOf(AppError);
+      expect(err.statusCode).toBe(403);
+      expect(err.message).toContain('Tài khoản đã bị tạm khóa do vi phạm chính sách bảo mật');
+      // bcrypt.compare must not be called
+      expect(bcryptSpy).not.toHaveBeenCalled();
+    });
+
+    it('prevents Request B from resetting counter and acquiring JWT if Request A reached MAX_FAILED_LOGIN_ATTEMPTS before isLocked is updated', async () => {
+      const password = 'CorrectSecret123!';
+      const passwordHash = await bcrypt.hash(password, 10);
+
+      // User state read before Request A incremented: was 4 failures, unlocked
+      vi.spyOn(prisma.user, 'findUnique').mockResolvedValue({
+        id: mockUserId,
+        email: 'race-condition@acm.local',
+        fullName: 'Race Target User',
+        role: UserRole.STUDENT,
+        passwordHash,
+        failedLoginAttempts: 4,
+        isLocked: false,
+        isActive: true,
+      } as any);
+
+      // In the database, Request A has incremented failedLoginAttempts to 5 (>= MAX_FAILED_LOGIN_ATTEMPTS).
+      // Even if isLocked was not yet set to true in DB, the conditional updateMany with { lt: MAX_FAILED_LOGIN_ATTEMPTS }
+      // matches ZERO rows because failedLoginAttempts is 5.
+      const updateManySpy = vi.spyOn(prisma.user, 'updateMany').mockResolvedValue({ count: 0 });
+
+      const ctx = createMockContext(
+        {},
+        '127.0.0.1',
+        { email: 'race-condition@acm.local', password },
+        'POST',
+        '/login'
+      );
+
+      await new Promise<void>((resolve) => {
+        let finished = false;
+        const done = () => { if (!finished) { finished = true; resolve(); } };
+        const origJson = ctx.res.json.bind(ctx.res);
+        ctx.res.json = (payload: any) => { origJson(payload); done(); return ctx.res; };
+        authRouter(ctx.req, ctx.res as any, (err) => { ctx.next(err); done(); });
+      });
+
+      const err = ctx.getError();
+      expect(err).toBeInstanceOf(AppError);
+      expect(err.statusCode).toBe(403);
+      expect(err.message).toContain('Tài khoản đã bị tạm khóa do vi phạm chính sách bảo mật');
+      // Crucial invariant: zero JWT token issued to user
+      expect(ctx.res.body).toBeNull();
+
+      expect(updateManySpy).toHaveBeenCalledWith({
+        where: {
+          id: mockUserId,
+          isLocked: false,
+          isActive: true,
+          failedLoginAttempts: { lt: MAX_FAILED_LOGIN_ATTEMPTS },
+        },
+        data: { failedLoginAttempts: 0 },
+      });
+    });
+
+    it('executes counter increment and account locking atomically inside a database transaction', async () => {
+      const passwordHash = await bcrypt.hash('CorrectSecret123!', 10);
+
+      vi.spyOn(prisma.user, 'findUnique').mockResolvedValue({
+        id: mockUserId,
+        email: 'tx-lock@acm.local',
+        fullName: 'Tx Lock User',
+        role: UserRole.STUDENT,
+        passwordHash,
+        failedLoginAttempts: 4,
+        isLocked: false,
+        isActive: true,
+      } as any);
+
+      const txSpy = vi.spyOn(prisma, '$transaction');
+      const updateSpy = vi.spyOn(prisma.user, 'update')
+        .mockResolvedValueOnce({ failedLoginAttempts: 5 } as any)
+        .mockResolvedValueOnce({ id: mockUserId, isLocked: true } as any);
+
+      const ctx = createMockContext(
+        {},
+        '127.0.0.1',
+        { email: 'tx-lock@acm.local', password: 'WrongPassword999!' },
+        'POST',
+        '/login'
+      );
+
+      await new Promise<void>((resolve) => {
+        let finished = false;
+        const done = () => { if (!finished) { finished = true; resolve(); } };
+        const origJson = ctx.res.json.bind(ctx.res);
+        ctx.res.json = (payload: any) => { origJson(payload); done(); return ctx.res; };
+        authRouter(ctx.req, ctx.res as any, (err) => { ctx.next(err); done(); });
+      });
+
+      expect(txSpy).toHaveBeenCalled();
+      expect(updateSpy).toHaveBeenNthCalledWith(1, {
+        where: { id: mockUserId },
+        data: { failedLoginAttempts: { increment: 1 } },
+        select: { failedLoginAttempts: true },
+      });
+      expect(updateSpy).toHaveBeenNthCalledWith(2, {
+        where: { id: mockUserId },
+        data: { isLocked: true },
+      });
+      expect(ctx.getError()?.statusCode).toBe(403);
     });
   });
 

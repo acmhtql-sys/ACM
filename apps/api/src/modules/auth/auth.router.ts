@@ -45,21 +45,27 @@ authRouter.post('/login', loginRateLimiter, async (req: Request, res: Response, 
 
     const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
     if (!isPasswordValid) {
-      // Use a database-side increment to avoid lost updates when several failed
-      // attempts arrive concurrently for the same account.
-      const updatedUser = await prisma.user.update({
-        where: { id: user.id },
-        data: { failedLoginAttempts: { increment: 1 } },
-        select: { failedLoginAttempts: true },
-      });
-      const willLock = updatedUser.failedLoginAttempts >= MAX_FAILED_LOGIN_ATTEMPTS;
-
-      if (willLock) {
-        await prisma.user.update({
+      // Execute counter increment and account locking atomically inside a PostgreSQL transaction.
+      // The row-level lock acquired during tx.user.update prevents concurrent requests from observing
+      // or resetting failedLoginAttempts >= MAX_FAILED_LOGIN_ATTEMPTS before isLocked is committed.
+      const { willLock } = await prisma.$transaction(async (tx) => {
+        const updatedUser = await tx.user.update({
           where: { id: user.id },
-          data: { isLocked: true },
+          data: { failedLoginAttempts: { increment: 1 } },
+          select: { failedLoginAttempts: true },
         });
-      }
+
+        const locked = updatedUser.failedLoginAttempts >= MAX_FAILED_LOGIN_ATTEMPTS;
+
+        if (locked) {
+          await tx.user.update({
+            where: { id: user.id },
+            data: { isLocked: true },
+          });
+        }
+
+        return { willLock: locked };
+      });
 
       if (willLock) {
         throw new AppError(
@@ -71,12 +77,21 @@ authRouter.post('/login', loginRateLimiter, async (req: Request, res: Response, 
       throw new AppError('Email hoặc mật khẩu không chính xác', 401);
     }
 
-    // Reset failed login attempts on successful authentication
-    if (user.failedLoginAttempts > 0) {
-      await prisma.user.update({
-        where: { id: user.id },
-        data: { failedLoginAttempts: 0 },
-      });
+    // Atomically reset failed login attempts on successful authentication,
+    // and verify the account was not concurrently locked, deactivated, or reached the failed attempt threshold
+    // during password verification.
+    const resetResult = await prisma.user.updateMany({
+      where: {
+        id: user.id,
+        isLocked: false,
+        isActive: true,
+        failedLoginAttempts: { lt: MAX_FAILED_LOGIN_ATTEMPTS },
+      },
+      data: { failedLoginAttempts: 0 },
+    });
+
+    if (resetResult.count === 0) {
+      throw new AppError('Tài khoản đã bị tạm khóa do vi phạm chính sách bảo mật', 403);
     }
 
     const tokenPayload = {
