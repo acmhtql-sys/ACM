@@ -16,14 +16,18 @@
     "build:shared": "npm run build --workspace=@acm/shared",
     "build:api": "npm run build --workspace=@acm/api",
     "build:web": "npm run build --workspace=@acm/web",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
+    "test:unit": "npm run test:unit --workspace=@acm/shared && npm run test:unit --workspace=@acm/api && npm run test:unit --workspace=@acm/web",
+    "test:integration": "npm run test:integration --workspace=@acm/api",
     "test:api": "npm run test --workspace=@acm/api",
     "test:web": "npm run test --workspace=@acm/web",
     "prisma:generate": "npm run prisma:generate --workspace=@acm/api",
     "prisma:validate": "npm run prisma:validate --workspace=@acm/api",
     "prisma:migrate:test": "npm run prisma:migrate:test --workspace=@acm/api",
     "prisma:seed:test": "npm run prisma:seed:test --workspace=@acm/api",
-    "lint": "npm run lint --workspaces --if-present"
+    "ci": "npm run prisma:validate && npm run typecheck && npm run lint && npm run build && npm run test:unit"
   },
   "keywords": [
     "acm",

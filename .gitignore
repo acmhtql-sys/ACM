@@ -66,7 +66,24 @@ database/backups/
 *.p12
 
 # Local test snapshots & database audit manifests
-apps/api/scripts/*.json
+apps/api/scripts/*
+!apps/api/scripts/migrateTestDb.ts
+!apps/api/scripts/seedTestDb.ts
+
+# Temporary logs, test output, checksums, and handoff manifests
+test-log.txt
+*-log.txt
+*.txt
+
+# Temporary step reports, live evidence, and sandbox audit markdown
+ACM_CLOUD_C1*.md
+ACM_CLOUD_PHASE_*.md
+ACM_GATE_*.md
+ACM_PHASE_*.md
+ACM_PRE_LIVE_*.md
+ACM_STEP_*.md
+S2C_*.md
+FINAL_GATE_B_*.md
 
 # Local scratch and temporary directories
 scratch/

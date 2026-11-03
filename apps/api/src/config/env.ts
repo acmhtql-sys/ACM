@@ -10,6 +10,7 @@ import {
   validateSecurityConfig,
   INSECURE_JWT_SECRETS,
 } from './securityPolicy';
+import { validateDatabaseUrl } from './databaseGuard';
 
 export {
   isSecureCloudJwtSecret,
@@ -31,6 +32,8 @@ if (isTest) {
     dotenv.config({ path: apiTestEnv, override: true });
   } else if (fs.existsSync(rootTestEnv)) {
     dotenv.config({ path: rootTestEnv, override: true });
+  } else if (process.env.CI) {
+    // In CI environments, variables are provided directly by the workflow runner
   } else {
     console.error('❌ FATAL: .env.test not found. Test suite aborted to prevent accidental database corruption.');
     process.exit(1);
@@ -60,11 +63,11 @@ const envSchema = z
   .superRefine((data, ctx) => {
     if (isTest || data.NODE_ENV === 'test') {
       // Safety check: tests must strictly target acm_inventory_test and never the dev/prod databases
-      if (!data.DATABASE_URL.includes('acm_inventory_test')) {
+      const guardResult = validateDatabaseUrl(data.DATABASE_URL);
+      if (!guardResult.valid) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
-          message:
-            'SAFETY VIOLATION: Test environment DATABASE_URL must target "acm_inventory_test". Never run tests against development or production databases.',
+          message: `SAFETY VIOLATION: Test environment DATABASE_URL is invalid: ${guardResult.reason}`,
           path: ['DATABASE_URL'],
         });
       }

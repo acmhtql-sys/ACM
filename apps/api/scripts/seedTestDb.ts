@@ -3,10 +3,7 @@ import path from 'path';
 import fs from 'fs';
 import { PrismaClient, UserRole, ItemType, LocationType } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
-
-function sanitizeUrl(url: string): string {
-  return url.replace(/postgresql:\/\/([^:]+):([^@]+)@([^/]+)\/(.+)/, 'postgresql://$1:****@$3/$4');
-}
+import { assertSafeTestDatabaseUrl, assertRuntimeDatabaseIsTest, sanitizeDatabaseUrl } from '../src/config/databaseGuard';
 
 async function seedTestDatabase() {
   console.log('🌱 [ACM Test Seed] Preparing to seed Test Database...');
@@ -14,29 +11,25 @@ async function seedTestDatabase() {
   const testEnvPath = path.resolve(__dirname, '../.env.test');
   const rootTestEnvPath = path.resolve(__dirname, '../../../.env.test');
   const resolvedEnv = fs.existsSync(testEnvPath) ? testEnvPath : rootTestEnvPath;
+  let testDbUrl = process.env.DATABASE_URL;
 
-  if (!fs.existsSync(resolvedEnv)) {
+  if (fs.existsSync(resolvedEnv)) {
+    const envConfig = dotenv.parse(fs.readFileSync(resolvedEnv));
+    testDbUrl = envConfig.DATABASE_URL || testDbUrl;
+  } else if (!process.env.CI) {
     console.error('❌ [ACM Test Seed] Error: .env.test was not found. Seeding aborted.');
     process.exit(1);
   }
 
-  const envConfig = dotenv.parse(fs.readFileSync(resolvedEnv));
-  const testDbUrl = envConfig.DATABASE_URL;
-
-  if (!testDbUrl || !testDbUrl.includes('acm_inventory_test')) {
-    console.error('❌ [ACM Test Seed] CRITICAL SAFETY ABORT:');
-    console.error(`   DATABASE_URL must target "acm_inventory_test". Received: ${testDbUrl ? sanitizeUrl(testDbUrl) : 'UNDEFINED'}`);
-    process.exit(1);
-  }
-
-  // Safety check: ensure not pointing to development acm_inventory
-  if (testDbUrl.match(/\/acm_inventory(\?|$)/)) {
-    console.error('❌ [ACM Test Seed] CRITICAL SAFETY ABORT: Target is "acm_inventory". Aborted.');
+  try {
+    assertSafeTestDatabaseUrl(testDbUrl);
+  } catch (err: any) {
+    console.error(err.message);
     process.exit(1);
   }
 
   console.log(`✅ [ACM Test Seed] Target Database Verified: "acm_inventory_test"`);
-  console.log(`📡 [ACM Test Seed] Target Connection: ${sanitizeUrl(testDbUrl)}`);
+  console.log(`📡 [ACM Test Seed] Target Connection: ${sanitizeDatabaseUrl(testDbUrl)}`);
 
   const prisma = new PrismaClient({
     datasources: {
@@ -48,10 +41,7 @@ async function seedTestDatabase() {
     // Extra safety query
     const dbCheck: any = await prisma.$queryRaw`SELECT current_database() as db;`;
     const connectedDb = dbCheck[0]?.db;
-    if (connectedDb !== 'acm_inventory_test') {
-      console.error(`❌ [ACM Test Seed] Live connection check failed: connected to "${connectedDb}" instead of "acm_inventory_test"! Aborting.`);
-      process.exit(1);
-    }
+    assertRuntimeDatabaseIsTest(connectedDb);
 
     console.log(`🔒 [ACM Test Seed] Live Database confirmed: "${connectedDb}". Starting seed insertion...`);
 
