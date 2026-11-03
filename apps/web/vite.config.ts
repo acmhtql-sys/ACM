@@ -17,5 +17,6 @@ export default defineConfig({
   },
   test: {
     exclude: ['**/node_modules/**', '**/dist/**', '**/playwright/**'],
+    setupFiles: [path.resolve(__dirname, './src/test/setup.ts')],
   },
 });
