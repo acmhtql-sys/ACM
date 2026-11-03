@@ -66,6 +66,9 @@ jobs:
       - name: Generate Prisma Client
         run: npm run prisma:generate
 
+      - name: Build Shared Package
+        run: npm run build:shared
+
       - name: Typecheck Monorepo
         run: npm run typecheck
 
@@ -86,3 +89,4 @@ jobs:
 
       - name: Run PostgreSQL Integration Tests
         run: npm run test:integration
+
