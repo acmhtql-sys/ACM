@@ -4,6 +4,7 @@ import { sendSuccess } from '../../shared/response';
 import { authenticate } from '../../middleware/auth';
 import { authorizeRoles } from '../../middleware/rbac';
 import { UserRole } from '@prisma/client';
+import { deepRedactSensitiveData } from './audit-logs.security';
 
 export const auditLogsRouter = Router();
 
@@ -19,15 +20,18 @@ auditLogsRouter.get(
         take: 50,
       });
 
-      const mapped = logs.map((log) => ({
-        id: log.id,
-        action: log.action,
-        entity: log.entity,
-        entityId: log.entityId,
-        userName: log.user ? log.user.fullName : 'System',
-        createdAt: log.createdAt.toISOString(),
-        details: JSON.stringify(log.newValue || {}),
-      }));
+      const mapped = logs.map((log) => {
+        const sanitizedNewValue = deepRedactSensitiveData(log.newValue || {});
+        return {
+          id: log.id,
+          action: log.action,
+          entity: log.entity,
+          entityId: log.entityId,
+          userName: log.user ? log.user.fullName : 'System',
+          createdAt: log.createdAt.toISOString(),
+          details: JSON.stringify(sanitizedNewValue),
+        };
+      });
 
       return sendSuccess(res, mapped, 'Nhật ký kiểm toán');
     } catch (err) {

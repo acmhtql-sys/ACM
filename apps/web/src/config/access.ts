@@ -13,6 +13,7 @@ export const PAGE_ACCESS: Readonly<Record<string, readonly AcmRole[]>> = {
   '/borrow-return': ALL, // Student has read-only access inside the page.
   '/users': ['ADMIN'],
   '/reports': ['ADMIN'],
+  '/audit-logs': ['ADMIN'],
   '/settings': ALL,
 };
 

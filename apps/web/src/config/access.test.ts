@@ -2,25 +2,31 @@ import { describe, expect, it } from 'vitest';
 import { canAccessPage, canManageUsers } from './access';
 
 describe('Users/RBAC frontend routing', () => {
-  it('ADMIN can access Users and Reports', () => {
+  it('ADMIN can access Users, Reports, and Audit Logs', () => {
     expect(canAccessPage('ADMIN', '/users')).toBe(true);
     expect(canAccessPage('ADMIN', '/reports')).toBe(true);
+    expect(canAccessPage('ADMIN', '/audit-logs')).toBe(true);
   });
-  it('LAB_MANAGER cannot enter Users or Reports UI', () => {
+  it('LAB_MANAGER cannot enter Users, Reports, or Audit Logs UI', () => {
     expect(canAccessPage('LAB_MANAGER', '/users')).toBe(false);
     expect(canAccessPage('LAB_MANAGER', '/reports')).toBe(false);
+    expect(canAccessPage('LAB_MANAGER', '/audit-logs')).toBe(false);
   });
-  it('TECHNICIAN cannot enter Users UI', () => {
+  it('TECHNICIAN cannot enter Users or Audit Logs UI', () => {
     expect(canAccessPage('TECHNICIAN', '/users')).toBe(false);
+    expect(canAccessPage('TECHNICIAN', '/audit-logs')).toBe(false);
   });
-  it('STUDENT can view Borrow & Return but not inventory mutations pages', () => {
+  it('STUDENT can view Borrow & Return but not inventory mutations or audit pages', () => {
     expect(canAccessPage('STUDENT', '/borrow-return')).toBe(true);
     expect(canAccessPage('STUDENT', '/inventory')).toBe(false);
     expect(canAccessPage('STUDENT', '/users')).toBe(false);
+    expect(canAccessPage('STUDENT', '/audit-logs')).toBe(false);
   });
   it('unknown role, path and unauthenticated users are denied', () => {
     expect(canAccessPage('UNKNOWN', '/users')).toBe(false);
+    expect(canAccessPage('UNKNOWN', '/audit-logs')).toBe(false);
     expect(canAccessPage(undefined, '/users')).toBe(false);
+    expect(canAccessPage(undefined, '/audit-logs')).toBe(false);
     expect(canAccessPage('ADMIN', '/admin-unknown')).toBe(false);
   });
   it('only ADMIN may manage users', () => {

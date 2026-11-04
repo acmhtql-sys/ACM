@@ -12,6 +12,7 @@ import { StockTransactionsPage } from '../pages/StockTransactionsPage';
 import { BorrowReturnPage } from '../pages/BorrowReturnPage';
 import { UsersPage } from '../pages/UsersPage';
 import { ReportsPage } from '../pages/ReportsPage';
+import { AuditLogsPage } from '../pages/AuditLogsPage';
 import { SettingsPage } from '../pages/SettingsPage';
 
 // Protected Route wrapper
@@ -26,12 +27,15 @@ const ProtectedRoute: React.FC<{ children: React.ReactElement }> = ({ children }
 const RoleProtectedPage: React.FC<{ path: string; children: React.ReactElement }> = ({ path, children }) => {
   const { user } = useAuth();
   if (!canAccessPage(user?.role, path)) {
-    return <div role="alert" className="rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm text-rose-900">
-      Không có quyền truy cập trang này.
-    </div>;
+    return (
+      <div role="alert" className="rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm text-rose-900">
+        Không có quyền truy cập trang này.
+      </div>
+    );
   }
   return children;
 };
+
 export const App: React.FC = () => {
   return (
     <BrowserRouter>
@@ -56,6 +60,7 @@ export const App: React.FC = () => {
           <Route path="borrow-return" element={<BorrowReturnPage />} />
           <Route path="users" element={<RoleProtectedPage path="/users"><UsersPage /></RoleProtectedPage>} />
           <Route path="reports" element={<RoleProtectedPage path="/reports"><ReportsPage /></RoleProtectedPage>} />
+          <Route path="audit-logs" element={<RoleProtectedPage path="/audit-logs"><AuditLogsPage /></RoleProtectedPage>} />
           <Route path="settings" element={<SettingsPage />} />
         </Route>
 

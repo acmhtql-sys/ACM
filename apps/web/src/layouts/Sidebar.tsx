@@ -30,12 +30,14 @@ const navItems = [
   { name: 'Mượn & Trả (Borrow & Return)', path: '/borrow-return', icon: ClipboardList },
   { name: 'Người dùng (Users)', path: '/users', icon: Users },
   { name: 'Báo cáo & Thống kê', path: '/reports', icon: BarChart3 },
+  { name: 'Nhật ký kiểm toán', path: '/audit-logs', icon: ShieldCheck },
   { name: 'Cài đặt hệ thống', path: '/settings', icon: Settings },
 ];
 
 export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
   const { user } = useAuth();
-  const visibleNavItems = navItems.filter(item => canAccessPage(user?.role, item.path));
+  const visibleNavItems = navItems.filter((item) => canAccessPage(user?.role, item.path));
+
   return (
     <>
       {/* Mobile Backdrop */}
