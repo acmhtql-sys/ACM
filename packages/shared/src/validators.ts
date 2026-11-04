@@ -15,6 +15,8 @@ import {
   BorrowStatus,
   AssetCondition,
   StockStatus,
+  KitStatus,
+  KitSortField,
 } from './types';
 
 // Auth validation schemas
@@ -691,3 +693,93 @@ export const idempotencyQueryResponseSchema = z.object({
 export type QueryIdempotencyParams = z.infer<typeof queryIdempotencyParamsSchema>;
 export type IdempotencyQueryStatus = z.infer<typeof idempotencyQueryStatusEnum>;
 export type IdempotencyQueryResponse = z.infer<typeof idempotencyQueryResponseSchema>;
+
+// ==========================================
+// KIT SCHEMAS
+// ==========================================
+
+export const kitItemInputSchema = z.object({
+  itemId: z.string().uuid('ID linh kiện (itemId) không hợp lệ'),
+  quantity: z.number().int('Số lượng linh kiện phải là số nguyên').positive('Số lượng linh kiện trong kit phải lớn hơn 0'),
+  notes: z.string().trim().max(255, 'Ghi chú linh kiện trong kit tối đa 255 ký tự').optional().nullable(),
+});
+
+export const createKitSchema = z
+  .object({
+    code: z
+      .string()
+      .trim()
+      .min(2, 'Mã hộp kit phải có ít nhất 2 ký tự')
+      .max(50, 'Mã hộp kit tối đa 50 ký tự')
+      .regex(/^[A-Za-z0-9_-]+$/, 'Mã hộp kit chỉ được chứa chữ cái, số, dấu gạch ngang (-) và gạch dưới (_)'),
+    name: z.string().trim().min(2, 'Tên hộp kit phải có ít nhất 2 ký tự').max(100, 'Tên hộp kit tối đa 100 ký tự'),
+    description: z.string().trim().optional().nullable(),
+    locationId: z.string().uuid('ID vị trí lưu trữ hộp kit (locationId) không hợp lệ').optional().nullable(),
+    items: z.array(kitItemInputSchema).min(1, 'Hộp kit phải có ít nhất 1 linh kiện thành phần'),
+  })
+  .strict()
+  .refine(
+    (data) => {
+      const itemIds = data.items.map((i) => i.itemId);
+      return new Set(itemIds).size === itemIds.length;
+    },
+    { message: 'Danh sách linh kiện trong hộp kit không được chứa linh kiện trùng lặp' }
+  );
+
+export const updateKitSchema = z
+  .object({
+    name: z.string().trim().min(2, 'Tên hộp kit phải có ít nhất 2 ký tự').max(100, 'Tên hộp kit tối đa 100 ký tự').optional(),
+    description: z.string().trim().optional().nullable(),
+    locationId: z.string().uuid('ID vị trí lưu trữ hộp kit (locationId) không hợp lệ').optional().nullable(),
+    items: z
+      .array(kitItemInputSchema)
+      .min(1, 'Hộp kit phải có ít nhất 1 linh kiện thành phần')
+      .refine(
+        (items) => {
+          const itemIds = items.map((i) => i.itemId);
+          return new Set(itemIds).size === itemIds.length;
+        },
+        { message: 'Danh sách linh kiện trong hộp kit không được chứa linh kiện trùng lặp' }
+      )
+      .optional(),
+  })
+  .strict()
+  .refine((data) => Object.keys(data).length > 0, {
+    message: 'Dữ liệu cập nhật hộp kit không được để trống',
+  });
+
+export const updateKitStatusSchema = z
+  .object({
+    status: z.nativeEnum(KitStatus, { required_error: 'Trạng thái kit là bắt buộc' }),
+    notes: z.string().trim().max(255, 'Ghi chú thay đổi trạng thái tối đa 255 ký tự').optional().nullable(),
+  })
+  .strict();
+
+export const queryKitsSchema = z.object({
+  search: z.string().trim().optional(),
+  status: z.nativeEnum(KitStatus).optional(),
+  locationId: z.string().uuid('ID vị trí không hợp lệ').optional(),
+  sortBy: z.nativeEnum(KitSortField).default(KitSortField.CREATED_AT),
+  sortOrder: z.nativeEnum(SortOrder).default(SortOrder.DESC),
+  page: z.preprocess((val) => (val !== undefined && val !== '' ? Number(val) : 1), z.number().int().min(1).default(1)),
+  limit: z.preprocess((val) => (val !== undefined && val !== '' ? Number(val) : 20), z.number().int().min(1).max(100).default(20)),
+});
+
+// ==========================================
+// REPORT SCHEMAS
+// ==========================================
+
+export const queryReportsSchema = z.object({
+  startDate: z.string().optional(),
+  endDate: z.string().optional(),
+  categoryId: z.string().uuid('ID danh mục không hợp lệ').optional(),
+  locationId: z.string().uuid('ID vị trí không hợp lệ').optional(),
+  type: z.nativeEnum(ItemType).optional(),
+});
+
+export type KitItemInput = z.infer<typeof kitItemInputSchema>;
+export type CreateKitInput = z.infer<typeof createKitSchema>;
+export type UpdateKitInput = z.infer<typeof updateKitSchema>;
+export type UpdateKitStatusInput = z.infer<typeof updateKitStatusSchema>;
+export type QueryKitsInput = z.infer<typeof queryKitsSchema>;
+export type QueryReportsInput = z.infer<typeof queryReportsSchema>;

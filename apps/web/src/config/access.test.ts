@@ -22,11 +22,19 @@ describe('Users/RBAC frontend routing', () => {
     expect(canAccessPage('STUDENT', '/users')).toBe(false);
     expect(canAccessPage('STUDENT', '/audit-logs')).toBe(false);
   });
+  it('all authenticated roles can access Kits page', () => {
+    expect(canAccessPage('ADMIN', '/kits')).toBe(true);
+    expect(canAccessPage('LAB_MANAGER', '/kits')).toBe(true);
+    expect(canAccessPage('TECHNICIAN', '/kits')).toBe(true);
+    expect(canAccessPage('STUDENT', '/kits')).toBe(true);
+  });
   it('unknown role, path and unauthenticated users are denied', () => {
     expect(canAccessPage('UNKNOWN', '/users')).toBe(false);
     expect(canAccessPage('UNKNOWN', '/audit-logs')).toBe(false);
+    expect(canAccessPage('UNKNOWN', '/kits')).toBe(false);
     expect(canAccessPage(undefined, '/users')).toBe(false);
     expect(canAccessPage(undefined, '/audit-logs')).toBe(false);
+    expect(canAccessPage(undefined, '/kits')).toBe(false);
     expect(canAccessPage('ADMIN', '/admin-unknown')).toBe(false);
   });
   it('only ADMIN may manage users', () => {

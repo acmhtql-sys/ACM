@@ -65,6 +65,21 @@ export enum BorrowSortField {
   STATUS = 'status',
 }
 
+export enum KitSortField {
+  CODE = 'code',
+  NAME = 'name',
+  STATUS = 'status',
+  CREATED_AT = 'createdAt',
+  UPDATED_AT = 'updatedAt',
+}
+
+export enum KitStatus {
+  AVAILABLE = 'AVAILABLE',
+  ALLOCATED = 'ALLOCATED',
+  MAINTENANCE = 'MAINTENANCE',
+  RETIRED = 'RETIRED',
+}
+
 export enum SortOrder {
   ASC = 'asc',
   DESC = 'desc',
@@ -456,4 +471,118 @@ export interface BorrowRequestResponse {
   isOverdue: boolean;
   createdAt: string | Date;
   updatedAt: string | Date;
+}
+
+
+// Kit Item Response DTO
+export interface KitItemResponse {
+  id: string;
+  kitId: string;
+  itemId: string;
+  item?: {
+    id: string;
+    code: string;
+    name: string;
+    unit: string;
+    type: ItemType;
+  };
+  quantity: number;
+  notes?: string | null;
+  createdAt: string | Date;
+}
+
+// Kit Response DTO
+export interface KitResponse {
+  id: string;
+  code: string;
+  name: string;
+  description?: string | null;
+  status: KitStatus;
+  locationId?: string | null;
+  location?: {
+    id: string;
+    code: string;
+    name: string;
+  } | null;
+  createdById?: string | null;
+  createdBy?: {
+    id: string;
+    fullName: string;
+    email: string;
+  } | null;
+  items: KitItemResponse[];
+  totalItems: number;
+  createdAt: string | Date;
+  updatedAt: string | Date;
+}
+
+// Inventory Valuation & Breakdown Report Item
+export interface InventoryReportItem {
+  id: string;
+  code: string;
+  name: string;
+  unit: string;
+  type: ItemType;
+  categoryName: string;
+  onHand: number;
+  reserved: number;
+  quarantined: number;
+  kitAllocated: number;
+  borrowed: number;
+  available: number;
+  minStockAlert: number;
+  stockStatus: StockStatus;
+}
+
+// Borrow & Return Operational Report Summary
+export interface BorrowReturnReportSummary {
+  totalRequests: number;
+  approvedCount: number;
+  handedOverCount: number;
+  returnedCount: number;
+  partiallyReturnedCount: number;
+  rejectedCount: number;
+  cancelledCount: number;
+  overdueCount: number;
+  returnRatePercent: number;
+  damagedOrLostCount: number;
+}
+
+// Low & Out of Stock Critical Alert Item
+export interface LowStockAlertItem {
+  id: string;
+  code: string;
+  name: string;
+  unit: string;
+  categoryName: string;
+  onHand: number;
+  available: number;
+  minStockAlert: number;
+  stockStatus: StockStatus;
+  urgencyRatio: number;
+}
+
+// Overdue Loan Item Detail
+export interface OverdueLoanItem {
+  id: string;
+  requestNumber: string;
+  borrowerName?: string;
+  borrowerEmail?: string;
+  borrowerPhone?: string | null;
+  purpose?: string | null;
+  expectedBorrowDate: string | Date;
+  expectedReturnDate: string | Date;
+  daysOverdue: number;
+  items: {
+    code?: string;
+    name?: string;
+    quantity: number;
+    returnedQuantity: number;
+  }[];
+}
+
+// Complete Borrow & Return Report Response
+export interface BorrowReturnReportResponse {
+  summary: BorrowReturnReportSummary;
+  overdueList: OverdueLoanItem[];
 }

@@ -2,7 +2,7 @@ import React from 'react';
 
 interface StatusBadgeProps {
   status: string;
-  variant?: 'role' | 'borrow' | 'itemType' | 'activeStatus' | 'stockStatus' | 'default';
+  variant?: 'role' | 'borrow' | 'itemType' | 'activeStatus' | 'stockStatus' | 'kitStatus' | 'default';
 }
 
 export const StatusBadge: React.FC<StatusBadgeProps> = ({ status, variant = 'default' }) => {
@@ -64,7 +64,7 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({ status, variant = 'def
       displayLabel = 'Hoạt động';
     } else {
       colorClasses = 'bg-slate-100 text-slate-600 border-slate-300';
-      displayLabel = 'Ngưng hoạt động';
+      displayLabel = 'Ngừng hoạt động';
     }
   } else if (variant === 'stockStatus') {
     switch (status) {
@@ -79,6 +79,25 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({ status, variant = 'def
       case 'OUT_OF_STOCK':
         colorClasses = 'bg-rose-50 text-rose-700 border-rose-200';
         displayLabel = 'Đã hết';
+        break;
+    }
+  } else if (variant === 'kitStatus') {
+    switch (status) {
+      case 'AVAILABLE':
+        colorClasses = 'bg-emerald-50 text-emerald-700 border-emerald-200';
+        displayLabel = 'Sẵn sàng';
+        break;
+      case 'ALLOCATED':
+        colorClasses = 'bg-indigo-50 text-indigo-700 border-indigo-200';
+        displayLabel = 'Đang phân bổ';
+        break;
+      case 'MAINTENANCE':
+        colorClasses = 'bg-amber-50 text-amber-700 border-amber-200';
+        displayLabel = 'Bảo trì';
+        break;
+      case 'RETIRED':
+        colorClasses = 'bg-slate-100 text-slate-600 border-slate-300';
+        displayLabel = 'Thanh lý';
         break;
     }
   }

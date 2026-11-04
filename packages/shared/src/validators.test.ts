@@ -27,6 +27,12 @@ import {
   handoverBorrowRequestSchema,
   returnBorrowRequestSchema,
   queryBorrowRequestsSchema,
+  kitItemInputSchema,
+  createKitSchema,
+  updateKitSchema,
+  updateKitStatusSchema,
+  queryKitsSchema,
+  queryReportsSchema,
 } from './validators';
 import {
   ItemType,
@@ -43,6 +49,8 @@ import {
   BorrowStatus,
   AssetCondition,
   BorrowSortField,
+  KitStatus,
+  KitSortField,
 } from './types';
 
 describe('Shared Validators Tests', () => {
@@ -1298,6 +1306,155 @@ describe('Shared Validators Tests', () => {
       it('validates status filter', () => {
         const parsed = queryBorrowRequestsSchema.parse({ status: BorrowStatus.APPROVED });
         expect(parsed.status).toBe(BorrowStatus.APPROVED);
+      });
+    });
+  });
+
+  // ==========================================
+  // KIT MANAGEMENT VALIDATION SUITES
+  // ==========================================
+
+  describe('Kit Management Validation Suites', () => {
+    const validUUID = 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11';
+    const validUUID2 = 'b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a22';
+
+    describe('kitItemInputSchema', () => {
+      it('validates a valid kit item', () => {
+        const parsed = kitItemInputSchema.parse({
+          itemId: validUUID,
+          quantity: 2,
+          notes: 'Module chính',
+        });
+        expect(parsed.itemId).toBe(validUUID);
+        expect(parsed.quantity).toBe(2);
+      });
+
+      it('rejects quantity <= 0', () => {
+        expect(kitItemInputSchema.safeParse({ itemId: validUUID, quantity: 0 }).success).toBe(false);
+        expect(kitItemInputSchema.safeParse({ itemId: validUUID, quantity: -1 }).success).toBe(false);
+      });
+
+      it('rejects non-uuid itemId', () => {
+        expect(kitItemInputSchema.safeParse({ itemId: 'not-a-uuid', quantity: 1 }).success).toBe(false);
+      });
+    });
+
+    describe('createKitSchema', () => {
+      it('validates a correct kit creation payload', () => {
+        const parsed = createKitSchema.parse({
+          code: 'KIT-IOT-001',
+          name: 'Bộ thực hành IoT ESP32 Cơ bản',
+          description: 'Bao gồm kit ESP32 và cảm biến DHT22',
+          locationId: validUUID,
+          items: [
+            { itemId: validUUID, quantity: 1, notes: 'ESP32 board' },
+            { itemId: validUUID2, quantity: 2, notes: 'DHT22 sensors' },
+          ],
+        });
+        expect(parsed.code).toBe('KIT-IOT-001');
+        expect(parsed.items).toHaveLength(2);
+      });
+
+      it('rejects duplicate itemIds in kit items', () => {
+        const res = createKitSchema.safeParse({
+          code: 'KIT-DUP-01',
+          name: 'Kit Trùng Linh Kiện',
+          items: [
+            { itemId: validUUID, quantity: 1 },
+            { itemId: validUUID, quantity: 2 },
+          ],
+        });
+        expect(res.success).toBe(false);
+      });
+
+      it('rejects empty items array', () => {
+        const res = createKitSchema.safeParse({
+          code: 'KIT-EMPTY',
+          name: 'Kit Rỗng',
+          items: [],
+        });
+        expect(res.success).toBe(false);
+      });
+
+      it('rejects invalid kit code format', () => {
+        const res = createKitSchema.safeParse({
+          code: 'KIT IOT $#@',
+          name: 'Kit Tên Sai',
+          items: [{ itemId: validUUID, quantity: 1 }],
+        });
+        expect(res.success).toBe(false);
+      });
+    });
+
+    describe('updateKitSchema', () => {
+      it('validates partial update of name and description', () => {
+        const parsed = updateKitSchema.parse({
+          name: 'Tên Kit Mới',
+          description: 'Mô tả mới',
+        });
+        expect(parsed.name).toBe('Tên Kit Mới');
+      });
+
+      it('rejects empty update object', () => {
+        expect(updateKitSchema.safeParse({}).success).toBe(false);
+      });
+
+      it('rejects update with duplicate items', () => {
+        const res = updateKitSchema.safeParse({
+          items: [
+            { itemId: validUUID, quantity: 1 },
+            { itemId: validUUID, quantity: 3 },
+          ],
+        });
+        expect(res.success).toBe(false);
+      });
+    });
+
+    describe('updateKitStatusSchema', () => {
+      it('validates valid status transition payload', () => {
+        const parsed = updateKitStatusSchema.parse({
+          status: KitStatus.MAINTENANCE,
+          notes: 'Đang kiểm tra bảo trì linh kiện hỏng',
+        });
+        expect(parsed.status).toBe(KitStatus.MAINTENANCE);
+      });
+
+      it('rejects invalid status', () => {
+        expect(updateKitStatusSchema.safeParse({ status: 'BROKEN' }).success).toBe(false);
+      });
+    });
+
+    describe('queryKitsSchema', () => {
+      it('applies defaults for page, limit, sortBy, sortOrder', () => {
+        const parsed = queryKitsSchema.parse({});
+        expect(parsed.page).toBe(1);
+        expect(parsed.limit).toBe(20);
+        expect(parsed.sortBy).toBe(KitSortField.CREATED_AT);
+        expect(parsed.sortOrder).toBe(SortOrder.DESC);
+      });
+
+      it('validates status and locationId filters', () => {
+        const parsed = queryKitsSchema.parse({
+          status: KitStatus.AVAILABLE,
+          locationId: validUUID,
+        });
+        expect(parsed.status).toBe(KitStatus.AVAILABLE);
+        expect(parsed.locationId).toBe(validUUID);
+      });
+    });
+
+    describe('queryReportsSchema', () => {
+      it('validates categoryId and type filters', () => {
+        const parsed = queryReportsSchema.parse({
+          categoryId: validUUID,
+          type: 'TRACKED_ASSET',
+        });
+        expect(parsed.categoryId).toBe(validUUID);
+        expect(parsed.type).toBe('TRACKED_ASSET');
+      });
+
+      it('rejects invalid categoryId format', () => {
+        expect(queryReportsSchema.safeParse({ categoryId: 'invalid-id' }).success).toBe(false);
       });
     });
   });

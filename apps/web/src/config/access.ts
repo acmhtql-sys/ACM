@@ -8,6 +8,7 @@ export const PAGE_ACCESS: Readonly<Record<string, readonly AcmRole[]>> = {
   '/dashboard': ALL,
   '/items': ALL,
   '/categories': ALL,
+  '/kits': ALL,
   '/inventory': OPERATORS,
   '/transactions': OPERATORS,
   '/borrow-return': ALL, // Student has read-only access inside the page.
