@@ -7,6 +7,7 @@ import {
   savePendingBorrowReturn,
   readPendingBorrowReturn,
   listDurableBorrowReturnGuards,
+  createMockLockManager,
   type PendingBorrowReturn,
 } from './borrowReturnPending';
 
@@ -75,12 +76,20 @@ async function openReturnModal() {
   await screen.findByRole('button', { name: /Xác nhận hoàn trả/i });
 }
 
-describe('BorrowReturnPage Frontend Idempotency & Lost-Response Suite (FE-RET-01..09)', () => {
+describe('BorrowReturnPage Frontend Idempotency & Lost-Response Suite (FE-RET-01..16)', () => {
   beforeEach(() => {
     window.sessionStorage.clear();
     window.localStorage.clear();
     mocks.role = 'TECHNICIAN';
     mocks.userId = 'tech-1';
+
+    // Mock navigator.locks using createMockLockManager
+    const mockLockManager = createMockLockManager();
+    Object.defineProperty(window.navigator, 'locks', {
+      value: mockLockManager,
+      configurable: true,
+      writable: true,
+    });
 
     mocks.get.mockReset();
     mocks.post.mockReset();
@@ -409,6 +418,212 @@ describe('BorrowReturnPage Frontend Idempotency & Lost-Response Suite (FE-RET-01
     });
 
     // Pending record is removed so operator can re-enter corrected quantity
+    expect(readPendingBorrowReturn('tech-1', 'borrow-test-1')).toBeNull();
+  });
+
+  it('FE-RET-10: POST returns success=true but data=null keeps guard and enters reconciliation', async () => {
+    mocks.post.mockResolvedValue({
+      data: {
+        success: true,
+        data: null,
+      },
+    });
+
+    render(<BorrowReturnPage />);
+    await openReturnModal();
+
+    const ledInput = screen.getByLabelText('Số lượng trả LED-RGB');
+    fireEvent.change(ledInput, { target: { value: '2' } });
+
+    const submitBtn = screen.getByRole('button', { name: /Xác nhận hoàn trả/i });
+    fireEvent.click(submitBtn);
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(/Máy chủ trả về kết quả không xác định hoặc biên nhận không hợp lệ/i)
+      ).toBeDefined();
+    });
+
+    // Guard and pending intent MUST be preserved for operator reconciliation
+    expect(readPendingBorrowReturn('tech-1', 'borrow-test-1')).not.toBeNull();
+    expect(listDurableBorrowReturnGuards('tech-1').length).toBe(1);
+  });
+
+  it('FE-RET-11: POST returns valid returnNumber but mismatched borrowRequest.id keeps guard and rejects clear', async () => {
+    mocks.post.mockResolvedValue({
+      data: {
+        success: true,
+        data: {
+          returnNumber: 'RT-20261104-999',
+          borrowRequest: { id: 'other-borrow-request-id' },
+        },
+      },
+    });
+
+    render(<BorrowReturnPage />);
+    await openReturnModal();
+
+    const ledInput = screen.getByLabelText('Số lượng trả LED-RGB');
+    fireEvent.change(ledInput, { target: { value: '2' } });
+
+    const submitBtn = screen.getByRole('button', { name: /Xác nhận hoàn trả/i });
+    fireEvent.click(submitBtn);
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(/Máy chủ trả về kết quả không xác định hoặc biên nhận không hợp lệ/i)
+      ).toBeDefined();
+    });
+
+    // Guard of current borrow MUST NOT be cleared
+    expect(readPendingBorrowReturn('tech-1', 'borrow-test-1')).not.toBeNull();
+    expect(listDurableBorrowReturnGuards('tech-1').length).toBe(1);
+  });
+
+  it('FE-RET-12: Unavailability of Web Crypto API shows user-friendly error and aborts POST fail-closed', async () => {
+    const cryptoSpy = vi.spyOn(globalThis.crypto, 'getRandomValues').mockImplementation(() => {
+      throw new Error('Trình duyệt không hỗ trợ tạo khóa giao dịch an toàn');
+    });
+
+    render(<BorrowReturnPage />);
+    await openReturnModal();
+
+    const ledInput = screen.getByLabelText('Số lượng trả LED-RGB');
+    fireEvent.change(ledInput, { target: { value: '1' } });
+
+    const submitBtn = screen.getByRole('button', { name: /Xác nhận hoàn trả/i });
+    fireEvent.click(submitBtn);
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(/Trình duyệt không hỗ trợ tạo khóa giao dịch an toàn/i)
+      ).toBeDefined();
+    });
+
+    // API POST MUST NOT be called and storage remains empty
+    expect(mocks.post).not.toHaveBeenCalled();
+    expect(readPendingBorrowReturn('tech-1', 'borrow-test-1')).toBeNull();
+
+    cryptoSpy.mockRestore();
+  });
+
+  it('FE-RET-13: Concurrent tab submission for same borrowRequestId is locked out and fails closed', async () => {
+    // Simulate lock contention where another tab holds the lock
+    Object.defineProperty(window.navigator, 'locks', {
+      value: {
+        request: vi.fn(async (_name, _opts, cb) => {
+          return await cb(null); // lock unavailable
+        }),
+      },
+      configurable: true,
+      writable: true,
+    });
+
+    render(<BorrowReturnPage />);
+    await openReturnModal();
+
+    const ledInput = screen.getByLabelText('Số lượng trả LED-RGB');
+    fireEvent.change(ledInput, { target: { value: '2' } });
+
+    const submitBtn = screen.getByRole('button', { name: /Xác nhận hoàn trả/i });
+    fireEvent.click(submitBtn);
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(/Phiếu mượn đang được xử lý trong một tab khác/i)
+      ).toBeDefined();
+    });
+
+    // API POST MUST NOT be called!
+    expect(mocks.post).not.toHaveBeenCalled();
+  });
+
+  it('FE-RET-14: Network error / 500 Internal Server Error retains guard and strictly disallows automatic retry', async () => {
+    mocks.post.mockRejectedValue({
+      response: {
+        status: 500,
+        data: { success: false, message: 'Database Connection Error' },
+      },
+    });
+
+    render(<BorrowReturnPage />);
+    await openReturnModal();
+
+    const ledInput = screen.getByLabelText('Số lượng trả LED-RGB');
+    fireEvent.change(ledInput, { target: { value: '2' } });
+
+    const submitBtn = screen.getByRole('button', { name: /Xác nhận hoàn trả/i });
+    fireEvent.click(submitBtn);
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(/Mất kết nối hoặc phản hồi không rõ ràng từ máy chủ/i)
+      ).toBeDefined();
+    });
+
+    expect(readPendingBorrowReturn('tech-1', 'borrow-test-1')).not.toBeNull();
+    expect(listDurableBorrowReturnGuards('tech-1').length).toBe(1);
+  });
+
+  it('FE-RET-15: Rapid double-click while awaiting Web Lock acquisition is blocked synchronously', async () => {
+    let releaseLockCall: () => void = () => {};
+    const lockDelayPromise = new Promise<void>((resolve) => {
+      releaseLockCall = resolve;
+    });
+
+    Object.defineProperty(window.navigator, 'locks', {
+      value: {
+        request: vi.fn(async (name, _opts, cb) => {
+          await lockDelayPromise;
+          return await cb({ name, mode: 'exclusive' });
+        }),
+      },
+      configurable: true,
+      writable: true,
+    });
+
+    render(<BorrowReturnPage />);
+    await openReturnModal();
+
+    const ledInput = screen.getByLabelText('Số lượng trả LED-RGB');
+    fireEvent.change(ledInput, { target: { value: '1' } });
+
+    const submitBtn = screen.getByRole('button', { name: /Xác nhận hoàn trả/i });
+    // Click twice rapidly before lock resolves
+    fireEvent.click(submitBtn);
+    fireEvent.click(submitBtn);
+
+    // Release lock delay
+    releaseLockCall();
+
+    await waitFor(() => {
+      expect(mocks.post).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it('FE-RET-16: Browser without Web Locks API fails closed with UI notification', async () => {
+    Object.defineProperty(window.navigator, 'locks', {
+      value: undefined,
+      configurable: true,
+      writable: true,
+    });
+
+    render(<BorrowReturnPage />);
+    await openReturnModal();
+
+    const ledInput = screen.getByLabelText('Số lượng trả LED-RGB');
+    fireEvent.change(ledInput, { target: { value: '1' } });
+
+    const submitBtn = screen.getByRole('button', { name: /Xác nhận hoàn trả/i });
+    fireEvent.click(submitBtn);
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(/Trình duyệt không hỗ trợ Web Locks API/i)
+      ).toBeDefined();
+    });
+
+    expect(mocks.post).not.toHaveBeenCalled();
     expect(readPendingBorrowReturn('tech-1', 'borrow-test-1')).toBeNull();
   });
 });

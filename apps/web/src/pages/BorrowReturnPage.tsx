@@ -22,6 +22,7 @@ import {
   listPendingBorrowReturns,
   readPendingBorrowReturn,
   savePendingBorrowReturn,
+  withBorrowReturnWebLock,
   listDurableBorrowReturnGuards,
   clearDurableBorrowReturnGuard,
   type DurableBorrowReturnGuard,
@@ -321,7 +322,17 @@ export const BorrowReturnPage: React.FC = () => {
       return;
     }
 
-    const key = createReturnIdempotencyKey();
+    let key: string;
+    try {
+      key = createReturnIdempotencyKey();
+    } catch (err: any) {
+      setStatusMessage({
+        type: 'error',
+        text: err.message || 'Không thể tạo khóa giao dịch an toàn',
+      });
+      return;
+    }
+
     const payload = {
       items,
       notes: returnNotes.trim() || 'Hoàn trả linh kiện tại phòng Lab',
@@ -335,20 +346,25 @@ export const BorrowReturnPage: React.FC = () => {
       createdAt: Date.now(),
     };
 
-    // Pre-dispatch persist: save to sessionStorage & durable guard FIRST
+    // Synchronous click guard set BEFORE the first await
+    isSubmittingRef.current = true;
+    setActionLoading(returningBorrow.id);
+    setStatusMessage(null);
+
+    // Pre-dispatch persist: check durable guard and save intent while holding exclusive Web Lock
     try {
-      savePendingBorrowReturn(record);
+      await withBorrowReturnWebLock(user.id, returningBorrow.id, () => {
+        savePendingBorrowReturn(record);
+      });
     } catch (err: any) {
+      isSubmittingRef.current = false;
+      setActionLoading(null);
       setStatusMessage({
         type: 'error',
         text: `Không thể lưu an toàn ý định hoàn trả (${err.message}). Đã dừng thao tác gửi API để bảo vệ kho.`,
       });
       return;
     }
-
-    isSubmittingRef.current = true;
-    setActionLoading(returningBorrow.id);
-    setStatusMessage(null);
 
     try {
       const res = await apiClient.post(
@@ -361,7 +377,17 @@ export const BorrowReturnPage: React.FC = () => {
         }
       );
 
-      if (res.data?.success) {
+      const resData = res.data?.data;
+      const receiptReturnNumber = resData?.returnNumber;
+      const receiptBorrowId = resData?.borrowRequest?.id;
+
+      const isReceiptValid =
+        res.data?.success === true &&
+        typeof receiptReturnNumber === 'string' &&
+        receiptReturnNumber.trim().length > 0 &&
+        receiptBorrowId === returningBorrow.id;
+
+      if (isReceiptValid) {
         clearPendingBorrowReturn(user.id, returningBorrow.id, key);
         syncStorageIntents();
         setReturningBorrow(null);
@@ -369,14 +395,14 @@ export const BorrowReturnPage: React.FC = () => {
         setReturnNotes('');
         setStatusMessage({
           type: 'success',
-          text: `Đã hoàn trả thành công! Mã phiếu trả: ${res.data.data?.returnNumber || ''}`,
+          text: `Đã hoàn trả thành công! Mã phiếu trả: ${receiptReturnNumber}`,
         });
         await fetchBorrows();
       } else {
         syncStorageIntents();
         setStatusMessage({
           type: 'error',
-          text: 'Máy chủ trả về kết quả không xác định. Khóa giao dịch đã được giữ lại để đối soát.',
+          text: 'Máy chủ trả về kết quả không xác định hoặc biên nhận không hợp lệ. Khóa giao dịch đã được giữ lại để đối soát.',
         });
       }
     } catch (err: any) {

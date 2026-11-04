@@ -6,6 +6,8 @@ import {
   savePendingBorrowReturn,
   listDurableBorrowReturnGuards,
   clearDurableBorrowReturnGuard,
+  withBorrowReturnWebLock,
+  createMockLockManager,
   type PendingBorrowReturn,
 } from './borrowReturnPending';
 
@@ -298,5 +300,82 @@ describe('Phase 11D — Stage 4B failed session write is safe', () => {
     expect(() => savePendingBorrowReturn(
       record({ key: 'return_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb' }), makeStorage(), durable,
     )).toThrow(/chưa đối soát/);
+  });
+});
+
+
+describe('Phase 11D — Stage 4C multi-tab concurrency & Web Locks hardening', () => {
+  it('GUARD-18: Real interleaving test with two concurrent tasks and shared-state LockManager', async () => {
+    const lockManager = createMockLockManager();
+    const session1 = makeStorage();
+    const session2 = makeStorage();
+    const durable = makeStorage();
+
+    const r1 = record({ key: 'return_0123456789abcdef0123456789abcdef' });
+    const r2 = record({ key: 'return_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' });
+
+    let task1Started = false;
+    let releaseTask1: () => void = () => {};
+    const task1WaitPromise = new Promise<void>((resolve) => {
+      releaseTask1 = resolve;
+    });
+
+    // Task 1: acquires lock, signals that it started, and pauses inside the lock
+    const task1Promise = withBorrowReturnWebLock('admin-a', 'borrow-a', async () => {
+      task1Started = true;
+      savePendingBorrowReturn(r1, session1, durable);
+      await task1WaitPromise; // Hold lock until task 2 has attempted acquisition
+    }, lockManager);
+
+    // Yield event loop until task 1 has acquired the lock
+    while (!task1Started) {
+      await new Promise((r) => setTimeout(r, 2));
+    }
+
+    // Task 2: concurrently attempts to acquire the lock for the same userId and borrowId
+    let task2Error: Error | null = null;
+    try {
+      await withBorrowReturnWebLock('admin-a', 'borrow-a', async () => {
+        savePendingBorrowReturn(r2, session2, durable);
+      }, lockManager);
+    } catch (err: any) {
+      task2Error = err;
+    }
+
+    // Release Task 1
+    releaseTask1();
+    await task1Promise;
+
+    // Assertions:
+    // 1. Task 2 failed closed due to lock contention
+    expect(task2Error).not.toBeNull();
+    expect(task2Error?.message).toMatch(/Phiếu mượn đang được xử lý trong một tab khác/i);
+
+    // 2. Only Task 1's record exists in durable storage
+    expect(listDurableBorrowReturnGuards('admin-a', durable)).toHaveLength(1);
+    expect(listDurableBorrowReturnGuards('admin-a', durable)[0].key).toBe(r1.key);
+
+    // 3. Task 2's session storage remains empty (fail closed)
+    expect(session2.length).toBe(0);
+
+    // 4. Task 1's session storage contains r1
+    expect(session1.length).toBe(1);
+    expect(readPendingBorrowReturn('admin-a', 'borrow-a', session1, durable)?.key).toBe(r1.key);
+  });
+
+  it('GUARD-19: Fails closed when Web Locks API is unsupported', async () => {
+    await expect(
+      withBorrowReturnWebLock('admin-a', 'borrow-a', () => {}, {} as LockManager)
+    ).rejects.toThrow(/Trình duyệt không hỗ trợ Web Locks API/i);
+  });
+
+  it('GUARD-20: Rejects invalid or colon-containing identifiers', async () => {
+    const lockManager = createMockLockManager();
+    await expect(
+      withBorrowReturnWebLock('admin:a', 'borrow-a', () => {}, lockManager)
+    ).rejects.toThrow(/Thiếu thông tin người dùng hoặc phiếu mượn/i);
+    await expect(
+      withBorrowReturnWebLock('', 'borrow-a', () => {}, lockManager)
+    ).rejects.toThrow(/Thiếu thông tin người dùng hoặc phiếu mượn/i);
   });
 });

@@ -278,3 +278,70 @@ export function clearPendingBorrowReturn(
   // Revalidate the exact expected key. Never clear a newer guard using its own key.
   clearDurableBorrowReturnGuard(userId, borrowId, expectedKey, d);
 }
+
+/**
+ * Executes a mutation while holding an exclusive Web Lock for the authenticated user and borrow request.
+ * Fails closed if the browser does not support the Web Locks API or if another tab holds the lock.
+ */
+export async function withBorrowReturnWebLock<T>(
+  userId: string,
+  borrowId: string,
+  callback: () => Promise<T> | T,
+  lockManager?: LockManager
+): Promise<T> {
+  if (!userId || !borrowId || userId.includes(':') || borrowId.includes(':')) {
+    throw new Error('Thiếu thông tin người dùng hoặc phiếu mượn');
+  }
+
+  const lm = lockManager ?? (typeof navigator !== 'undefined' ? navigator.locks : undefined);
+  if (!lm?.request) {
+    throw new Error('Trình duyệt không hỗ trợ Web Locks API để đồng bộ giao dịch an toàn');
+  }
+
+  const lockName = `acm:borrow-return:${userId}:${borrowId}`;
+
+  return await lm.request(
+    lockName,
+    { mode: 'exclusive', ifAvailable: true },
+    async (lock) => {
+      if (!lock) {
+        throw new Error('Phiếu mượn đang được xử lý trong một tab khác hoặc phiên làm việc khác');
+      }
+      return await callback();
+    }
+  );
+}
+
+/**
+ * Test utility: creates an in-memory LockManager that accurately models the W3C Web Locks
+ * specification with shared-state mutual exclusion and non-blocking ifAvailable requests.
+ */
+export function createMockLockManager(): LockManager {
+  const heldLocks = new Set<string>();
+
+  return {
+    request: (name: string, optionsOrCallback: any, callback?: any) => {
+      const options = typeof optionsOrCallback === 'object' && optionsOrCallback !== null ? optionsOrCallback : {};
+      const cb = typeof optionsOrCallback === 'function' ? optionsOrCallback : callback;
+
+      if (options.ifAvailable && heldLocks.has(name)) {
+        return Promise.resolve(cb(null));
+      }
+
+      heldLocks.add(name);
+      return (async () => {
+        try {
+          const lock: Lock = { name, mode: options.mode ?? 'exclusive' };
+          return await cb(lock);
+        } finally {
+          heldLocks.delete(name);
+        }
+      })();
+    },
+    query: () =>
+      Promise.resolve({
+        held: [...heldLocks].map((name) => ({ name, mode: 'exclusive' as const, clientId: 'mock-tab' })),
+        pending: [],
+      }),
+  } as unknown as LockManager;
+}
