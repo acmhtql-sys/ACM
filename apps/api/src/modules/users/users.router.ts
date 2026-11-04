@@ -6,7 +6,8 @@ import { sendSuccess } from '../../shared/response';
 import { AppError } from '../../shared/AppError';
 import { authenticate } from '../../middleware/auth';
 import { authorizeRoles } from '../../middleware/rbac';
-import { Prisma, UserRole } from '@prisma/client';
+import { UserRole } from '@prisma/client';
+import { updateUserWithAudit, updateUserStatusWithAudit, resetUserPasswordWithAudit } from './users.mutation.service';
 
 export const usersRouter = Router();
 
@@ -99,18 +100,33 @@ usersRouter.post(
       const data = parsed.data;
       const roleId = await findRoleId(data.role);
       const passwordHash = await bcrypt.hash(data.password, 12);
-      const user = await prisma.user.create({
-        data: {
-          email: data.email.toLowerCase(),
-          fullName: data.fullName,
-          passwordHash,
-          role: data.role,
-          roleId,
-          studentOrStaffId: data.studentOrStaffId ?? null,
-          department: data.department ?? null,
-          phoneNumber: data.phoneNumber ?? null,
-        },
-        select: publicUserSelect,
+      const user = await prisma.$transaction(async (tx) => {
+        // SEC-07: Revalidate actor within the transaction
+        const actor = await tx.user.findUnique({
+          where: { id: req.user!.id },
+          select: { role: true, isActive: true, isLocked: true },
+        });
+        if (!actor || actor.role !== UserRole.ADMIN || !actor.isActive || actor.isLocked) {
+          throw new AppError('Tài khoản thực hiện không có quyền quản trị viên hợp lệ', 403);
+        }
+
+        const created = await tx.user.create({
+          data: {
+            email: data.email.toLowerCase(), fullName: data.fullName,
+            passwordHash, role: data.role, roleId,
+            studentOrStaffId: data.studentOrStaffId ?? null,
+            department: data.department ?? null, phoneNumber: data.phoneNumber ?? null,
+          },
+          select: publicUserSelect,
+        });
+        await tx.auditLog.create({ data: {
+          userId: req.user!.id, action: 'CREATE', entity: 'User', entityId: created.id,
+          newValue: {
+            email: created.email, fullName: created.fullName, role: created.role,
+            isActive: created.isActive, isLocked: created.isLocked,
+          },
+        } });
+        return created;
       });
       return sendSuccess(res, user, 'Tạo người dùng thành công', 201);
     } catch (err) {
@@ -132,19 +148,7 @@ usersRouter.put(
         throw new AppError('Dữ liệu cập nhật người dùng không hợp lệ', 422, parsed.error.errors);
       }
 
-      const data = parsed.data;
-      if (idParsed.data === req.user?.id && data.role && data.role !== UserRole.ADMIN) {
-        throw new AppError('Không thể tự hạ quyền quản trị của chính mình', 400);
-      }
-      const updateData: Prisma.UserUncheckedUpdateInput = { ...data };
-      if (data.email) updateData.email = data.email.toLowerCase();
-      if (data.role) updateData.roleId = await findRoleId(data.role);
-
-      const user = await prisma.user.update({
-        where: { id: idParsed.data },
-        data: updateData,
-        select: publicUserSelect,
-      });
+      const user = await updateUserWithAudit(idParsed.data, req.user!.id, parsed.data);
       return sendSuccess(res, user, 'Cập nhật người dùng thành công');
     } catch (err) {
       next(err);
@@ -165,21 +169,7 @@ usersRouter.patch(
         throw new AppError('Trạng thái tài khoản không hợp lệ', 422, parsed.error.errors);
       }
 
-      if (
-        idParsed.data === req.user?.id &&
-        (parsed.data.isActive === false || parsed.data.isLocked === true)
-      ) {
-        throw new AppError('Không thể tự vô hiệu hóa hoặc khóa chính tài khoản đang đăng nhập', 400);
-      }
-
-      const user = await prisma.user.update({
-        where: { id: idParsed.data },
-        data: {
-          ...parsed.data,
-          ...(parsed.data.isLocked === false ? { failedLoginAttempts: 0 } : {}),
-        },
-        select: publicUserSelect,
-      });
+      const user = await updateUserStatusWithAudit(idParsed.data, req.user!.id, parsed.data);
       return sendSuccess(res, user, 'Cập nhật trạng thái tài khoản thành công');
     } catch (err) {
       next(err);
@@ -200,13 +190,8 @@ usersRouter.post(
         throw new AppError('Mật khẩu mới không đáp ứng chính sách bảo mật', 422, parsed.error.errors);
       }
 
-      const passwordHash = await bcrypt.hash(parsed.data.password, 12);
-      await prisma.user.update({
-        where: { id: idParsed.data },
-        data: { passwordHash, failedLoginAttempts: 0, isLocked: false },
-        select: { id: true },
-      });
-      return sendSuccess(res, { id: idParsed.data }, 'Đặt lại mật khẩu thành công');
+      const result = await resetUserPasswordWithAudit(idParsed.data, req.user!.id, parsed.data.password);
+      return sendSuccess(res, result, 'Đặt lại mật khẩu thành công');
     } catch (err) {
       next(err);
     }

@@ -5,6 +5,7 @@ import { prisma } from '../config/database';
 import { logger } from '../config/logger';
 import { AppError } from '../shared/AppError';
 import { UserRole } from '@prisma/client';
+import { computePasswordTag, verifyPasswordTag } from '../modules/auth/auth.security';
 
 export interface AuthenticatedUser {
   id: string;
@@ -23,8 +24,9 @@ declare global {
 
 /**
  * Mandatory authentication middleware.
- * Verifies JWT signature & expiration, queries user in database,
- * validates active/locked status, applies live database role (overriding any stale token role),
+ * Verifies JWT signature & expiration, validates active/locked status,
+ * enforces cryptographically bound pwdTag (SEC-01 session invalidation on password change),
+ * applies live database role (overriding any stale token role),
  * and strictly distinguishes token errors (401) from database connection errors (500).
  */
 export async function authenticate(req: Request, _res: Response, next: NextFunction): Promise<void> {
@@ -66,6 +68,7 @@ export async function authenticate(req: Request, _res: Response, next: NextFunct
         fullName: true,
         isActive: true,
         isLocked: true,
+        passwordHash: true,
       },
     });
   } catch (dbErr: any) {
@@ -84,6 +87,14 @@ export async function authenticate(req: Request, _res: Response, next: NextFunct
 
   if (user.isLocked) {
     return next(new AppError('Tài khoản đã bị tạm khóa do vi phạm chính sách bảo mật', 403));
+  }
+
+  // SEC-01: Invalidate JWT session if password has changed or pwdTag claim is missing/invalid
+  const expectedPwdTag = computePasswordTag(user.id, user.passwordHash);
+  if (!verifyPasswordTag(expectedPwdTag, decoded.pwdTag)) {
+    return next(
+      new AppError('Phiên đăng nhập đã hết hiệu lực do mật khẩu đã thay đổi, vui lòng đăng nhập lại', 401)
+    );
   }
 
   // Use current role and attributes from database (stale role in token payload is overridden)
@@ -138,16 +149,20 @@ export async function authenticateOptional(req: Request, _res: Response, next: N
         fullName: true,
         isActive: true,
         isLocked: true,
+        passwordHash: true,
       },
     });
 
     if (user && user.isActive && !user.isLocked) {
-      req.user = {
-        id: user.id,
-        email: user.email,
-        role: user.role,
-        fullName: user.fullName,
-      };
+      const expectedPwdTag = computePasswordTag(user.id, user.passwordHash);
+      if (verifyPasswordTag(expectedPwdTag, decoded.pwdTag)) {
+        req.user = {
+          id: user.id,
+          email: user.email,
+          role: user.role,
+          fullName: user.fullName,
+        };
+      }
     }
   } catch (dbErr) {
     logger.error('Database error during authenticateOptional:', dbErr);
@@ -156,4 +171,3 @@ export async function authenticateOptional(req: Request, _res: Response, next: N
 
   next();
 }
-

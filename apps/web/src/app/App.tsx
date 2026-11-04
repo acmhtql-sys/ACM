@@ -1,6 +1,7 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
+import { canAccessPage } from '../config/access';
 import { DashboardLayout } from '../layouts/DashboardLayout';
 import { LoginPage } from '../pages/LoginPage';
 import { DashboardPage } from '../pages/DashboardPage';
@@ -22,6 +23,15 @@ const ProtectedRoute: React.FC<{ children: React.ReactElement }> = ({ children }
   return children;
 };
 
+const RoleProtectedPage: React.FC<{ path: string; children: React.ReactElement }> = ({ path, children }) => {
+  const { user } = useAuth();
+  if (!canAccessPage(user?.role, path)) {
+    return <div role="alert" className="rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm text-rose-900">
+      Không có quyền truy cập trang này.
+    </div>;
+  }
+  return children;
+};
 export const App: React.FC = () => {
   return (
     <BrowserRouter>
@@ -41,11 +51,11 @@ export const App: React.FC = () => {
           <Route path="dashboard" element={<DashboardPage />} />
           <Route path="items" element={<ItemsPage />} />
           <Route path="categories" element={<CategoriesPage />} />
-          <Route path="inventory" element={<InventoryPage />} />
-          <Route path="transactions" element={<StockTransactionsPage />} />
+          <Route path="inventory" element={<RoleProtectedPage path="/inventory"><InventoryPage /></RoleProtectedPage>} />
+          <Route path="transactions" element={<RoleProtectedPage path="/transactions"><StockTransactionsPage /></RoleProtectedPage>} />
           <Route path="borrow-return" element={<BorrowReturnPage />} />
-          <Route path="users" element={<UsersPage />} />
-          <Route path="reports" element={<ReportsPage />} />
+          <Route path="users" element={<RoleProtectedPage path="/users"><UsersPage /></RoleProtectedPage>} />
+          <Route path="reports" element={<RoleProtectedPage path="/reports"><ReportsPage /></RoleProtectedPage>} />
           <Route path="settings" element={<SettingsPage />} />
         </Route>
 

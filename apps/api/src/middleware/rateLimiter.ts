@@ -143,3 +143,18 @@ export const loginRateLimiter = createLoginRateLimiter({
   max: 5,
   message: 'Quá nhiều yêu cầu đăng nhập từ địa chỉ IP này. Vui lòng thử lại sau 15 phút.',
 });
+
+/**
+ * Account-level Login Rate Limiter:
+ * Protects against distributed brute-force and credential-stuffing attacks across multiple source IPs.
+ * Tracks consecutive attempts per normalized account email address.
+ */
+export const accountLoginRateLimiter = createLoginRateLimiter({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  message: 'Tài khoản này đã vượt quá số lần thử đăng nhập cho phép. Vui lòng thử lại sau 15 phút.',
+  keyGenerator: (req: Request) => {
+    const email = typeof req.body?.email === 'string' ? req.body.email.trim().toLowerCase() : '';
+    return email ? `acct:${email}` : `ip:${req.ip || req.socket?.remoteAddress || 'unknown'}`;
+  },
+});

@@ -13,6 +13,7 @@ import { borrowRouter } from '../src/modules/borrow/borrow.router';
 import { prisma } from '../src/config/database';
 import { AppError } from '../src/shared/AppError';
 import jwt from 'jsonwebtoken';
+import { computePasswordTag } from '../src/modules/auth/auth.security';
 import { env } from '../src/config/env';
 
 // Mock prisma client
@@ -217,8 +218,10 @@ describe('ACM Phase 4 – Borrow & Return Management Test Suite', () => {
   const reservationId = 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee';
 
   function createAuthHeaders(user: any): Record<string, string> {
+    const passwordHash = '$2a$12$e8kP0PzK3J5K3J5K3J5K3.O3n3o3n3o3n3o3n3o3n3o3n3o3n3o';
+    const pwdTag = computePasswordTag(user.id, passwordHash);
     const token = jwt.sign(
-      { id: user.id, email: user.email, role: user.role, fullName: user.fullName },
+      { id: user.id, email: user.email, role: user.role, fullName: user.fullName, pwdTag },
       env.JWT_SECRET
     );
     return { authorization: `Bearer ${token}` };
@@ -234,6 +237,7 @@ describe('ACM Phase 4 – Borrow & Return Management Test Suite', () => {
           ...found,
           isActive: true,
           isLocked: false,
+          passwordHash: '$2a$12$e8kP0PzK3J5K3J5K3J5K3.O3n3o3n3o3n3o3n3o3n3o3n3o3n3o',
         } as any;
       }
       return null;
