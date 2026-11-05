@@ -209,6 +209,11 @@ export class KitsService {
       throw new AppError('Sinh viên không có quyền tạo hộp kit thực hành', 403);
     }
 
+    // Service-level Guard: Kit AVAILABLE with items must strictly have a valid location
+    if (!input.locationId) {
+      throw new AppError('Vị trí lưu kho cho hộp kit (locationId) là bắt buộc', 400);
+    }
+
     const normalizedCode = input.code.trim().toUpperCase();
 
     // Check code uniqueness
@@ -220,18 +225,15 @@ export class KitsService {
       throw new AppError(`Mã hộp kit '${normalizedCode}' đã tồn tại trong hệ thống`, 409);
     }
 
-    // Verify location if provided
-    if (input.locationId) {
-      const loc = await prisma.location.findUnique({
-        where: { id: input.locationId },
-        select: { id: true, isActive: true },
-      });
-      if (!loc) {
-        throw new AppError('Vị trí lưu trữ hộp kit không tồn tại', 404);
-      }
-      if (!loc.isActive) {
-        throw new AppError('Vị trí lưu trữ hộp kit đã bị vô hiệu hóa', 400);
-      }
+    const loc = await prisma.location.findUnique({
+      where: { id: input.locationId },
+      select: { id: true, isActive: true },
+    });
+    if (!loc) {
+      throw new AppError('Vị trí lưu trữ hộp kit không tồn tại', 404);
+    }
+    if (!loc.isActive) {
+      throw new AppError('Vị trí lưu trữ hộp kit đã bị vô hiệu hóa', 400);
     }
 
     // Verify all component items exist and are active
@@ -390,6 +392,11 @@ export class KitsService {
 
     if (kit.status === KitStatus.ALLOCATED && input.items !== undefined) {
       throw new AppError('Không thể chỉnh sửa danh sách linh kiện khi hộp kit đang được phân bổ', 400);
+    }
+
+    // Service-level Guard: Do not allow removing location from active kit containing items
+    if (input.locationId === null || (input.locationId === undefined && !kit.locationId && ((input.items && input.items.length > 0) || kit.items.length > 0))) {
+      throw new AppError('Không thể gỡ bỏ vị trí kho khi hộp kit đang chứa linh kiện thành phần', 400);
     }
 
     const targetLocationId = input.locationId !== undefined ? input.locationId : kit.locationId;
@@ -604,6 +611,11 @@ export class KitsService {
         `Không thể chuyển trạng thái hộp kit từ '${currentStatus}' sang '${targetStatus}'`,
         400
       );
+    }
+
+    // Service-level Guard: Cannot transition to AVAILABLE if kit has items but no location
+    if (targetStatus === KitStatus.AVAILABLE && !kit.locationId && kit.items.length > 0) {
+      throw new AppError('Không thể chuyển trạng thái hộp kit sang AVAILABLE khi chưa có vị trí kho lưu trữ', 400);
     }
 
     return await withSerializableRetry(async (tx) => {

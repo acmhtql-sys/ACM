@@ -714,7 +714,9 @@ export const createKitSchema = z
       .regex(/^[A-Za-z0-9_-]+$/, 'Mã hộp kit chỉ được chứa chữ cái, số, dấu gạch ngang (-) và gạch dưới (_)'),
     name: z.string().trim().min(2, 'Tên hộp kit phải có ít nhất 2 ký tự').max(100, 'Tên hộp kit tối đa 100 ký tự'),
     description: z.string().trim().optional().nullable(),
-    locationId: z.string().uuid('ID vị trí lưu trữ hộp kit (locationId) không hợp lệ').optional().nullable(),
+    locationId: z
+      .string({ required_error: 'Vị trí lưu kho cho hộp kit (locationId) là bắt buộc' })
+      .uuid('ID vị trí lưu trữ hộp kit (locationId) không hợp lệ'),
     items: z.array(kitItemInputSchema).min(1, 'Hộp kit phải có ít nhất 1 linh kiện thành phần'),
   })
   .strict()
@@ -730,7 +732,7 @@ export const updateKitSchema = z
   .object({
     name: z.string().trim().min(2, 'Tên hộp kit phải có ít nhất 2 ký tự').max(100, 'Tên hộp kit tối đa 100 ký tự').optional(),
     description: z.string().trim().optional().nullable(),
-    locationId: z.string().uuid('ID vị trí lưu trữ hộp kit (locationId) không hợp lệ').optional().nullable(),
+    locationId: z.string().uuid('ID vị trí lưu trữ hộp kit (locationId) không hợp lệ').optional(),
     items: z
       .array(kitItemInputSchema)
       .min(1, 'Hộp kit phải có ít nhất 1 linh kiện thành phần')

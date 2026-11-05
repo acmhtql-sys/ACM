@@ -203,6 +203,10 @@ export const KitsPage: React.FC = () => {
       setStatusMessage({ type: 'error', text: 'Tên hộp kit không được để trống' });
       return;
     }
+    if (!createFormData.locationId) {
+      setStatusMessage({ type: 'error', text: 'Vui lòng chọn vị trí kho lưu trữ cho hộp kit' });
+      return;
+    }
     const validItems = createFormData.items.filter((i) => i.itemId && i.quantity > 0);
     if (validItems.length === 0) {
       setStatusMessage({ type: 'error', text: 'Vui lòng chọn ít nhất một linh kiện hợp lệ' });
@@ -632,7 +636,7 @@ export const KitsPage: React.FC = () => {
                   onChange={(e) => setCreateFormData({ ...createFormData, locationId: e.target.value })}
                   className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-1.5 text-xs focus:border-blue-500 focus:outline-none"
                 >
-                  <option value="">-- Chọn vị trí kho (Tùy chọn) --</option>
+                  <option value="">-- Chọn vị trí kho lưu trữ (Bắt buộc) --</option>
                   {locationsList.map((loc) => (
                     <option key={loc.id} value={loc.id}>
                       {loc.name} ({loc.code})
