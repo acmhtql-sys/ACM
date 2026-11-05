@@ -12,7 +12,10 @@ import {
   Search,
   RefreshCw,
   ShieldAlert,
+  Camera,
 } from 'lucide-react';
+import { isCameraReturnEnabled } from '../config/features';
+import { CameraReturnModal } from '../components/camera/CameraReturnModal';
 import { DemoDataNotice } from '../components/DemoDataNotice';
 import { StatusBadge } from '../components/StatusBadge';
 import { apiClient } from '../services/api';
@@ -86,6 +89,7 @@ export const BorrowReturnPage: React.FC = () => {
   const [returningBorrow, setReturningBorrow] = useState<BorrowRecord | null>(null);
   const [returnRows, setReturnRows] = useState<Record<string, ReturnInputRow>>({});
   const [returnNotes, setReturnNotes] = useState<string>('');
+  const [isCameraModalOpen, setIsCameraModalOpen] = useState<boolean>(false);
 
   // Persisted return intents & reconciliation state
   const [pendingReturns, setPendingReturns] = useState<PendingBorrowReturn[]>([]);
@@ -858,9 +862,21 @@ export const BorrowReturnPage: React.FC = () => {
               <CornerDownLeft className="h-4 w-4 text-emerald-600" />
               <span>Xác nhận hoàn trả linh kiện ({returningBorrow.requestNumber})</span>
             </h3>
-            <p className="mt-1 text-xs text-slate-500">
-              Người mượn: <span className="font-semibold text-slate-700">{returningBorrow.borrowerName}</span>
-            </p>
+            <div className="flex items-center justify-between mt-1 mb-1">
+              <p className="text-xs text-slate-500">
+                Người mượn: <span className="font-semibold text-slate-700">{returningBorrow.borrowerName}</span>
+              </p>
+              {isCameraReturnEnabled() && (
+                <button
+                  type="button"
+                  onClick={() => setIsCameraModalOpen(true)}
+                  className="inline-flex items-center space-x-1.5 rounded-md bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 border border-emerald-200 shadow-sm"
+                >
+                  <Camera className="h-3.5 w-3.5" />
+                  <span>Quét Camera AI</span>
+                </button>
+              )}
+            </div>
 
             {/* If there is an unresolved rejected return for this borrow */}
             {rejectedReturn && rejectedReturn.borrowId === returningBorrow.id && (
@@ -1009,6 +1025,24 @@ export const BorrowReturnPage: React.FC = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* AI Camera Return Modal */}
+      {isCameraModalOpen && returningBorrow && (
+        <CameraReturnModal
+          isOpen={isCameraModalOpen}
+          onClose={() => setIsCameraModalOpen(false)}
+          borrowRecord={returningBorrow}
+          onApplyReturnRows={(appliedRows, suggestedNotes) => {
+            setReturnRows((prev) => ({
+              ...prev,
+              ...appliedRows,
+            }));
+            if (suggestedNotes) {
+              setReturnNotes((prev) => (prev ? `${prev}\n${suggestedNotes}` : suggestedNotes));
+            }
+          }}
+        />
       )}
 
       {/* Reject Modal Dialog */}

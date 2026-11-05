@@ -32,3 +32,11 @@ export const isStockAdjustmentEnabled = (): boolean => {
   return import.meta.env.VITE_ENABLE_STOCK_ADJUSTMENT === 'true';
 };
 
+/**
+ * AI Camera-Assisted Component Return MVP (Parallel Track 20261105):
+ * Chế độ nhận diện linh kiện qua camera để hỗ trợ hoàn trả nhanh.
+ * Mặc định luôn bị vô hiệu hóa (false) trừ khi được bật rõ ràng qua VITE_ENABLE_CAMERA_RETURN=true.
+ */
+export const isCameraReturnEnabled = (): boolean => {
+  return import.meta.env.VITE_ENABLE_CAMERA_RETURN === 'true';
+};
