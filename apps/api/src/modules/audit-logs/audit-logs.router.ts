@@ -12,12 +12,18 @@ auditLogsRouter.get(
   '/',
   authenticate,
   authorizeRoles(UserRole.ADMIN),
-  async (_req: Request, res: Response, next: NextFunction) => {
+  async (req: Request, res: Response, next: NextFunction) => {
     try {
+      const page = req.query?.page ? Math.max(1, parseInt(String(req.query.page), 10) || 1) : 1;
+      const rawLimit = req.query?.limit ? parseInt(String(req.query.limit), 10) || 50 : 50;
+      const limit = Math.min(50, Math.max(1, rawLimit));
+      const skip = (page - 1) * limit;
+
       const logs = await prisma.auditLog.findMany({
         include: { user: { select: { fullName: true } } },
         orderBy: { createdAt: 'desc' },
-        take: 50,
+        take: limit,
+        ...(skip > 0 ? { skip } : {}),
       });
 
       const mapped = logs.map((log) => {

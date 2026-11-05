@@ -297,5 +297,69 @@ describe('Audit Logs Module – Unit Tests', () => {
       expect(err).toBeDefined();
       expect(err.message).toBe('DB Connection Timeout');
     });
+
+    it('TC-SEC-03: clamps requested limit to maximum 50 when client requests larger limit (e.g. limit=500)', async () => {
+      vi.mocked(prisma.auditLog.findMany).mockResolvedValue([]);
+
+      const req: any = {
+        method: 'GET',
+        url: '/?limit=500',
+        query: { limit: '500' },
+        headers: { authorization: 'Bearer admin-token' },
+        user: { id: 'admin-id', role: UserRole.ADMIN },
+      };
+      const res = new MockResponse();
+      await invokeRouter(auditLogsRouter, req, res);
+
+      expect(res.statusCode).toBe(200);
+      expect(prisma.auditLog.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          take: 50,
+        })
+      );
+    });
+
+    it('TC-SEC-03: computes skip offset correctly when paginating (page=3, limit=20 -> skip=40, take=20)', async () => {
+      vi.mocked(prisma.auditLog.findMany).mockResolvedValue([]);
+
+      const req: any = {
+        method: 'GET',
+        url: '/?page=3&limit=20',
+        query: { page: '3', limit: '20' },
+        headers: { authorization: 'Bearer admin-token' },
+        user: { id: 'admin-id', role: UserRole.ADMIN },
+      };
+      const res = new MockResponse();
+      await invokeRouter(auditLogsRouter, req, res);
+
+      expect(res.statusCode).toBe(200);
+      expect(prisma.auditLog.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          skip: 40,
+          take: 20,
+        })
+      );
+    });
+
+    it('TC-SEC-03: clamps negative or non-numeric page and limit to safe defaults', async () => {
+      vi.mocked(prisma.auditLog.findMany).mockResolvedValue([]);
+
+      const req: any = {
+        method: 'GET',
+        url: '/?page=-5&limit=abc',
+        query: { page: '-5', limit: 'abc' },
+        headers: { authorization: 'Bearer admin-token' },
+        user: { id: 'admin-id', role: UserRole.ADMIN },
+      };
+      const res = new MockResponse();
+      await invokeRouter(auditLogsRouter, req, res);
+
+      expect(res.statusCode).toBe(200);
+      expect(prisma.auditLog.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          take: 50,
+        })
+      );
+    });
   });
 });
