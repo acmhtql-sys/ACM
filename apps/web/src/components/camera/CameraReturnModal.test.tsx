@@ -294,4 +294,299 @@ describe('CameraReturnModal Test Suite (SUP-VISION-01, 02, 04, 05, 06, 08)', () 
     // Verify track.stop was called to free hardware camera resources
     expect(mockTracks[0].stop).toHaveBeenCalled();
   });
+
+  // =========================================================================
+  // ENHANCED AI CAMERA DETECTION TEST SUITE (5 Target Scenarios)
+  // =========================================================================
+
+  // Scenario 1: Nhận diện đúng (Correct Detection)
+  it('SCENARIO-01 [Nhận diện đúng]: displays matched class, confidence, bounding box and auto-stages item', async () => {
+    const handleClose = vi.fn();
+    const handleApply = vi.fn();
+
+    vi.spyOn(visionService, 'detectFrameFile').mockResolvedValueOnce({
+      success: true,
+      frameId: 'frame_correct_01',
+      inferenceTimeMs: 38.5,
+      detectionsCount: 1,
+      detections: [
+        {
+          classId: 59,
+          className: 'Servo',
+          confidence: 0.94,
+          boundingBox: { x1: 100, y1: 120, x2: 300, y2: 320 },
+          suggestedItemCode: 'SERVO-SG90',
+        },
+      ],
+    });
+
+    render(
+      <CameraReturnModal
+        isOpen={true}
+        onClose={handleClose}
+        borrowRecord={mockBorrowRecord}
+        onApplyReturnRows={handleApply}
+      />
+    );
+
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+    const file = new File(['fake-bytes'], 'servo_correct.jpg', { type: 'image/jpeg' });
+    fireEvent.change(input, { target: { files: [file] } });
+
+    await waitFor(() => {
+      // Summary banner shows 1 matched
+      expect(screen.getAllByText(/1 khớp phiếu/i).length).toBeGreaterThan(0);
+      // Auto-staged item in return list
+      expect(screen.getAllByText(/Servo Motor SG90/i).length).toBeGreaterThan(0);
+      expect(screen.getByText(/AI: Servo \(94%\)/i)).toBeTruthy();
+    });
+
+    // Switch to Detections tab to verify details
+    const detTab = screen.getByRole('button', { name: /Chi tiết AI nhận diện/i });
+    fireEvent.click(detTab);
+
+    await waitFor(() => {
+      expect(screen.getByText(/BBox: \[100, 120\] - \[300, 320\]/i)).toBeTruthy();
+      expect(screen.getByText(/Khớp phiếu mượn: Servo Motor SG90/i)).toBeTruthy();
+      expect(screen.getByText(/Đã thêm vào danh sách hoàn trả/i)).toBeTruthy();
+    });
+  });
+
+  // Scenario 2: Nhận diện sai / Không thuộc phiếu mượn (Catalog match but NOT in this borrow request)
+  it('SCENARIO-02 [Nhận diện sai/Không thuộc phiếu]: identifies catalog item but does NOT auto-stage when item is not in borrow request', async () => {
+    const handleClose = vi.fn();
+    const handleApply = vi.fn();
+
+    vi.spyOn(visionService, 'detectFrameFile').mockResolvedValueOnce({
+      success: true,
+      frameId: 'frame_unrelated_01',
+      inferenceTimeMs: 41.2,
+      detectionsCount: 1,
+      detections: [
+        {
+          classId: 63,
+          className: 'LED_lamp',
+          confidence: 0.88,
+          boundingBox: { x1: 50, y1: 50, x2: 120, y2: 150 },
+          suggestedItemCode: 'LED-5MM-RGB', // Valid catalog item, but NOT in mockBorrowRecord!
+        },
+      ],
+    });
+
+    render(
+      <CameraReturnModal
+        isOpen={true}
+        onClose={handleClose}
+        borrowRecord={mockBorrowRecord}
+        onApplyReturnRows={handleApply}
+      />
+    );
+
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+    const file = new File(['fake-bytes'], 'led.jpg', { type: 'image/jpeg' });
+    fireEvent.change(input, { target: { files: [file] } });
+
+    await waitFor(() => {
+      // Summary bar indicates 1 catalog match, 0 borrow match
+      expect(screen.getAllByText(/1 khớp DM/i).length).toBeGreaterThan(0);
+      expect(screen.getAllByText(/0 khớp phiếu/i).length).toBeGreaterThan(0);
+      // Does NOT auto-stage: list of return items remains empty
+      expect(screen.getByText(/Linh kiện hoàn trả \(0\)/i)).toBeTruthy();
+      expect(screen.getByText(/Chưa có linh kiện nào được nhận diện hoặc chọn hoàn trả/i)).toBeTruthy();
+    });
+
+    // Check Detections tab
+    const detTab = screen.getByRole('button', { name: /Chi tiết AI nhận diện/i });
+    fireEvent.click(detTab);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Khớp DM khác/i)).toBeTruthy();
+      expect(screen.getByText(/Khớp danh mục ACM: LED-5MM-RGB \(Không thuộc phiếu mượn này\)/i)).toBeTruthy();
+    });
+  });
+
+  // Scenario 3: Không ánh xạ được (Unmapped YOLO class)
+  it('SCENARIO-03 [Không ánh xạ được]: flags unmapped class and prevents automatic return claiming', async () => {
+    const handleClose = vi.fn();
+    const handleApply = vi.fn();
+
+    vi.spyOn(visionService, 'detectFrameFile').mockResolvedValueOnce({
+      success: true,
+      frameId: 'frame_unmapped_01',
+      inferenceTimeMs: 36.1,
+      detectionsCount: 1,
+      detections: [
+        {
+          classId: 1,
+          className: '11-hole_stick',
+          confidence: 0.91,
+          boundingBox: { x1: 80, y1: 90, x2: 240, y2: 140 },
+          suggestedItemCode: null, // Robotics part not in ACM catalog
+        },
+      ],
+    });
+
+    render(
+      <CameraReturnModal
+        isOpen={true}
+        onClose={handleClose}
+        borrowRecord={mockBorrowRecord}
+        onApplyReturnRows={handleApply}
+      />
+    );
+
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+    const file = new File(['fake-bytes'], 'stick.jpg', { type: 'image/jpeg' });
+    fireEvent.change(input, { target: { files: [file] } });
+
+    await waitFor(() => {
+      expect(screen.getAllByText(/1 chưa ánh xạ/i).length).toBeGreaterThan(0);
+      // Return list must be empty
+      expect(screen.getByText(/Linh kiện hoàn trả \(0\)/i)).toBeTruthy();
+    });
+
+    // Check Detections tab
+    const detTab = screen.getByRole('button', { name: /Chi tiết AI nhận diện/i });
+    fireEvent.click(detTab);
+
+    await waitFor(() => {
+      expect(screen.getAllByText(/Chưa ánh xạ/i).length).toBeGreaterThan(0);
+      expect(screen.getByText(/Chưa có ánh xạ trong danh mục linh kiện ACM/i)).toBeTruthy();
+      // Check manual assignment dropdown exists
+      expect(screen.getByText(/Gán thủ công:/i)).toBeTruthy();
+    });
+  });
+
+  // Scenario 4: Nhiều đối tượng (25 đối tượng phát hiện)
+  it('SCENARIO-04 [Nhiều đối tượng - 25 detections]: displays all 25 detections breakdown without losing unmapped objects', async () => {
+    const handleClose = vi.fn();
+    const handleApply = vi.fn();
+
+    // Create 25 detections: 2 Servos (matched borrow), 3 LEDs (matched catalog only), 20 sticks (unmapped)
+    const mock25Detections: visionService.VisionDetection[] = [
+      {
+        classId: 59,
+        className: 'Servo',
+        confidence: 0.95,
+        boundingBox: { x1: 10, y1: 10, x2: 60, y2: 60 },
+        suggestedItemCode: 'SERVO-SG90',
+      },
+      {
+        classId: 59,
+        className: 'Servo',
+        confidence: 0.91,
+        boundingBox: { x1: 70, y1: 10, x2: 120, y2: 60 },
+        suggestedItemCode: 'SERVO-SG90',
+      },
+      ...Array.from({ length: 3 }, (_, i) => ({
+        classId: 63,
+        className: 'LED_lamp',
+        confidence: 0.85,
+        boundingBox: { x1: 130 + i * 40, y1: 10, x2: 160 + i * 40, y2: 50 },
+        suggestedItemCode: 'LED-5MM-RGB',
+      })),
+      ...Array.from({ length: 20 }, (_, i) => ({
+        classId: 1,
+        className: '11-hole_stick',
+        confidence: 0.80 + (i % 15) * 0.01,
+        boundingBox: { x1: 10 + (i % 5) * 60, y1: 80 + Math.floor(i / 5) * 40, x2: 60 + (i % 5) * 60, y2: 110 + Math.floor(i / 5) * 40 },
+        suggestedItemCode: null,
+      })),
+    ];
+
+    expect(mock25Detections.length).toBe(25);
+
+    vi.spyOn(visionService, 'detectFrameFile').mockResolvedValueOnce({
+      success: true,
+      frameId: 'frame_25_objects',
+      inferenceTimeMs: 48.2,
+      detectionsCount: 25,
+      detections: mock25Detections,
+    });
+
+    render(
+      <CameraReturnModal
+        isOpen={true}
+        onClose={handleClose}
+        borrowRecord={mockBorrowRecord}
+        onApplyReturnRows={handleApply}
+      />
+    );
+
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+    const file = new File(['fake-bytes'], 'all_25.jpg', { type: 'image/jpeg' });
+    fireEvent.change(input, { target: { files: [file] } });
+
+    await waitFor(() => {
+      // Banner explicitly shows: AI phát hiện: 25 đối tượng
+      expect(screen.getByText(/AI phát hiện: 25 đối tượng/i)).toBeTruthy();
+      expect(screen.getAllByText(/2 khớp phiếu/i).length).toBeGreaterThan(0);
+      expect(screen.getAllByText(/3 khớp DM/i).length).toBeGreaterThan(0);
+      expect(screen.getAllByText(/20 chưa ánh xạ/i).length).toBeGreaterThan(0);
+
+      // Only the 2 Servos are staged in return items list
+      expect(screen.getByText(/Linh kiện hoàn trả \(1\)/i)).toBeTruthy();
+      expect(screen.getAllByText(/Servo Motor SG90/i).length).toBeGreaterThan(0);
+      const qtyInput = screen.getByRole('spinbutton') as HTMLInputElement;
+      expect(qtyInput.value).toBe('2'); // Staged 2 items from the 2 detected Servos
+    });
+
+    // Check Detections tab has all 25
+    const detTab = screen.getByRole('button', { name: /Chi tiết AI nhận diện \(25\)/i });
+    fireEvent.click(detTab);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Tất cả \(25\)/i)).toBeTruthy();
+      expect(screen.getByText(/Khớp phiếu \(2\)/i)).toBeTruthy();
+      expect(screen.getByText(/Khớp DM \(3\)/i)).toBeTruthy();
+      expect(screen.getByText(/Chưa ánh xạ \(20\)/i)).toBeTruthy();
+    });
+  });
+
+  // Scenario 5: Số lượng vượt outstanding (Quantity Exceeds Outstanding)
+  it('SCENARIO-05 [Số lượng vượt outstanding]: clamps staged quantity to remaining and alerts operator', async () => {
+    const handleClose = vi.fn();
+    const handleApply = vi.fn();
+
+    // mockBorrowRecord has Servo quantity=5, returnedQuantity=2 -> remaining=3
+    // Simulate detecting 5 Servos in the frame
+    const mock5Servos: visionService.VisionDetection[] = Array.from({ length: 5 }, (_, i) => ({
+      classId: 59,
+      className: 'Servo',
+      confidence: 0.90 + i * 0.01,
+      boundingBox: { x1: 10 + i * 50, y1: 20, x2: 50 + i * 50, y2: 80 },
+      suggestedItemCode: 'SERVO-SG90',
+    }));
+
+    vi.spyOn(visionService, 'detectFrameFile').mockResolvedValueOnce({
+      success: true,
+      frameId: 'frame_exceed_01',
+      inferenceTimeMs: 44.0,
+      detectionsCount: 5,
+      detections: mock5Servos,
+    });
+
+    render(
+      <CameraReturnModal
+        isOpen={true}
+        onClose={handleClose}
+        borrowRecord={mockBorrowRecord}
+        onApplyReturnRows={handleApply}
+      />
+    );
+
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+    const file = new File(['fake-bytes'], 'servos_5.jpg', { type: 'image/jpeg' });
+    fireEvent.change(input, { target: { files: [file] } });
+
+    await waitFor(() => {
+      // Must be staged with quantity clamped to remaining (3), NOT 5!
+      const qtyInput = screen.getByRole('spinbutton') as HTMLInputElement;
+      expect(qtyInput.value).toBe('3');
+
+      // Operator warning indicator displayed
+      expect(screen.getByText(/Phát hiện 5 cái \(Giới hạn trả 3\)/i)).toBeTruthy();
+    });
+  });
 });
+
