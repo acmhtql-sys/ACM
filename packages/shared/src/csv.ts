@@ -1,8 +1,8 @@
 /**
  * CSV Generation & Formula Injection Mitigation Utility
  * Compliant with OWASP CSV Injection Guidelines:
- * Neutralizes characters (=, +, -, @, \t, \r) that spreadsheet applications
- * interpret as formula invocations.
+ * Neutralizes characters (=, +, -, @, \t, \r, \n) that spreadsheet applications
+ * interpret as formula invocations, including when preceded by leading whitespace.
  */
 
 export function escapeCsvCell(val: unknown): string {
@@ -13,8 +13,10 @@ export function escapeCsvCell(val: unknown): string {
   let str = String(val);
 
   // OWASP CSV Formula Injection Mitigation:
-  // If text starts with =, +, -, @, tab, or carriage return, prepend a single quote (')
-  if (/^[=+\-@\t\r]/.test(str)) {
+  // If text starts with (or leading whitespace followed by) =, +, -, @, tab, newline, or carriage return,
+  // prepend a single quote (') to force spreadsheet applications (Excel, Calc, Google Sheets)
+  // to treat it as a literal string.
+  if (/^\s*[=+\-@\t\r\n]/.test(str)) {
     str = `'` + str;
   }
 
