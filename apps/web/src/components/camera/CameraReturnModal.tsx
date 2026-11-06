@@ -28,6 +28,15 @@ import {
   type VisionDetectResponse,
 } from '../../services/vision.service';
 import type { ReturnCondition, ReturnInputRow } from '../../pages/borrowReturnPartial';
+import { apiClient } from '../../services/api';
+
+export interface CatalogItem {
+  id: string;
+  code: string;
+  name: string;
+  unit?: string;
+  isActive?: boolean;
+}
 
 export interface BorrowDetailItem {
   id: string;
@@ -49,6 +58,7 @@ export interface CameraReturnModalProps {
   onClose: () => void;
   borrowRecord: BorrowRecord;
   onApplyReturnRows: (newRows: Record<string, ReturnInputRow>, suggestedNotes?: string) => void;
+  catalogItems?: CatalogItem[];
 }
 
 export interface StagedReturnItem {
@@ -64,7 +74,7 @@ export interface StagedReturnItem {
   detectedCount?: number;
 }
 
-export type DetectionMatchStatus = 'MATCHED_BORROW' | 'MATCHED_CATALOG_ONLY' | 'UNMAPPED';
+export type DetectionMatchStatus = 'MATCHED_BORROW' | 'MATCHED_CATALOG_ONLY' | 'UNMAPPED' | 'CATALOG_UNVERIFIED';
 
 export interface UniqueClassSummary {
   className: string;
@@ -113,6 +123,7 @@ export const CameraReturnModal: React.FC<CameraReturnModalProps> = ({
   onClose,
   borrowRecord,
   onApplyReturnRows,
+  catalogItems,
 }) => {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const imageRef = useRef<HTMLImageElement | null>(null);
@@ -127,6 +138,43 @@ export const CameraReturnModal: React.FC<CameraReturnModalProps> = ({
   const [permissionErrorMsg, setPermissionErrorMsg] = useState<string>('');
   const [isRecognizing, setIsRecognizing] = useState<boolean>(false);
   const [isServiceOnline, setIsServiceOnline] = useState<boolean | null>(null);
+  const [verifiedCatalog, setVerifiedCatalog] = useState<CatalogItem[]>(catalogItems || []);
+  const [catalogLookupStatus, setCatalogLookupStatus] = useState<'IDLE' | 'LOADING' | 'READY' | 'UNAVAILABLE'>(
+    catalogItems && catalogItems.length > 0 ? 'READY' : 'IDLE'
+  );
+
+  // Sync catalogItems prop or fetch from API
+  useEffect(() => {
+    if (!isOpen) return;
+    if (catalogItems && catalogItems.length > 0) {
+      setVerifiedCatalog(catalogItems);
+      setCatalogLookupStatus('READY');
+      return;
+    }
+
+    let isMounted = true;
+    setCatalogLookupStatus('LOADING');
+    apiClient
+      .get('/items?limit=500')
+      .then((res) => {
+        if (!isMounted) return;
+        if (res.data?.success && Array.isArray(res.data.data)) {
+          setVerifiedCatalog(res.data.data);
+          setCatalogLookupStatus('READY');
+        } else {
+          setCatalogLookupStatus('UNAVAILABLE');
+        }
+      })
+      .catch(() => {
+        if (isMounted) {
+          setCatalogLookupStatus('UNAVAILABLE');
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [isOpen, catalogItems]);
 
   const [rawDetections, setRawDetections] = useState<VisionDetection[]>([]);
   const [analyzedDetections, setAnalyzedDetections] = useState<AnalyzedDetection[]>([]);
@@ -329,6 +377,9 @@ export const CameraReturnModal: React.FC<CameraReturnModalProps> = ({
         } else if (det.matchStatus === 'MATCHED_CATALOG_ONLY') {
           strokeColor = '#3B82F6'; // Blue
           labelTag = ` [Khớp DM: ${det.suggestedItemCode}]`;
+        } else if (det.matchStatus === 'CATALOG_UNVERIFIED') {
+          strokeColor = '#8B5CF6'; // Purple
+          labelTag = ' [Chưa xác minh DM]';
         } else {
           strokeColor = '#F59E0B'; // Amber
           labelTag = ' [Chưa ánh xạ]';
@@ -366,19 +417,30 @@ export const CameraReturnModal: React.FC<CameraReturnModalProps> = ({
         return;
       }
 
-      // Analyze every detected object
+      // Analyze every detected object with catalog verification
       const analyzed: AnalyzedDetection[] = detectedList.map((det, index) => {
+        // Step 0: Check against verified active catalog from API
+        const catalogMatch = det.suggestedItemCode
+          ? verifiedCatalog.find(
+              (c) =>
+                c.isActive !== false &&
+                c.code.toUpperCase() === det.suggestedItemCode?.toUpperCase()
+            )
+          : null;
+
         // Step 1: Check match with borrow details
+        // Ground truth: Must match actual Item ID or verified Item Code.
+        // Fuzzy name is NOT used as the sole proof to auto-record returns.
         const match = outstandingDetails.find((d) => {
           const itemCode = d.item?.code || '';
-          const itemName = d.item?.name || '';
+          const itemId = d.itemId || d.item?.id || '';
+          if (catalogMatch && (itemId === catalogMatch.id || itemCode.toUpperCase() === catalogMatch.code.toUpperCase())) {
+            return true;
+          }
           if (
             det.suggestedItemCode &&
             itemCode.toUpperCase() === det.suggestedItemCode.toUpperCase()
           ) {
-            return true;
-          }
-          if (itemName.toLowerCase().includes(det.className.toLowerCase())) {
             return true;
           }
           return false;
@@ -400,19 +462,52 @@ export const CameraReturnModal: React.FC<CameraReturnModalProps> = ({
           };
         }
 
+        // Step 2: Not in current borrow request
         if (det.suggestedItemCode) {
+          // If catalog service is loading or unavailable, fail safe to CATALOG_UNVERIFIED
+          if (catalogLookupStatus === 'UNAVAILABLE' || catalogLookupStatus === 'LOADING') {
+            return {
+              detectionIndex: index + 1,
+              classId: det.classId,
+              className: det.className,
+              confidence: det.confidence,
+              boundingBox: det.boundingBox,
+              suggestedItemCode: det.suggestedItemCode,
+              matchStatus: 'CATALOG_UNVERIFIED',
+              statusLabel: catalogLookupStatus === 'LOADING'
+                ? 'Đang đồng bộ danh mục linh kiện...'
+                : 'Chưa thể xác minh danh mục: Dịch vụ tra cứu không khả dụng',
+            };
+          }
+
+          // Only assign MATCHED_CATALOG_ONLY when Item code is verified to exist and be active in catalog
+          if (catalogMatch) {
+            return {
+              detectionIndex: index + 1,
+              classId: det.classId,
+              className: det.className,
+              confidence: det.confidence,
+              boundingBox: det.boundingBox,
+              suggestedItemCode: catalogMatch.code,
+              matchStatus: 'MATCHED_CATALOG_ONLY',
+              statusLabel: `Khớp danh mục ACM: ${catalogMatch.code} - ${catalogMatch.name} (Không thuộc phiếu mượn này)`,
+            };
+          }
+
+          // If code does not exist in active catalog
           return {
             detectionIndex: index + 1,
             classId: det.classId,
             className: det.className,
             confidence: det.confidence,
             boundingBox: det.boundingBox,
-            suggestedItemCode: det.suggestedItemCode,
-            matchStatus: 'MATCHED_CATALOG_ONLY',
-            statusLabel: `Khớp danh mục ACM: ${det.suggestedItemCode} (Không thuộc phiếu mượn này)`,
+            suggestedItemCode: null,
+            matchStatus: 'UNMAPPED',
+            statusLabel: `Mã '${det.suggestedItemCode}' không tồn tại trong danh mục linh kiện hoạt động`,
           };
         }
 
+        // If no suggestedItemCode was provided by AI model
         return {
           detectionIndex: index + 1,
           classId: det.classId,
@@ -473,7 +568,7 @@ export const CameraReturnModal: React.FC<CameraReturnModalProps> = ({
         return updated;
       });
     },
-    [outstandingDetails, drawOverlay]
+    [outstandingDetails, drawOverlay, verifiedCatalog, catalogLookupStatus]
   );
 
   // Capture single frame and run AI inference
@@ -757,8 +852,11 @@ export const CameraReturnModal: React.FC<CameraReturnModalProps> = ({
     const matchedCatalog = analyzedDetections.filter(
       (d) => d.matchStatus === 'MATCHED_CATALOG_ONLY'
     ).length;
+    const unverified = analyzedDetections.filter(
+      (d) => d.matchStatus === 'CATALOG_UNVERIFIED'
+    ).length;
     const unmapped = analyzedDetections.filter((d) => d.matchStatus === 'UNMAPPED').length;
-    return { total, matchedBorrow, matchedCatalog, unmapped };
+    return { total, matchedBorrow, matchedCatalog, unverified, unmapped };
   }, [analyzedDetections]);
 
   if (!isOpen) return null;
@@ -1098,6 +1196,11 @@ export const CameraReturnModal: React.FC<CameraReturnModalProps> = ({
                     <span className="rounded bg-blue-100 px-1.5 py-0.5 font-bold text-blue-800">
                       {stats.matchedCatalog} khớp DM
                     </span>
+                    {stats.unverified > 0 && (
+                      <span className="rounded bg-purple-100 px-1.5 py-0.5 font-bold text-purple-800">
+                        {stats.unverified} chưa xác minh
+                      </span>
+                    )}
                     <span className="rounded bg-amber-100 px-1.5 py-0.5 font-bold text-amber-800">
                       {stats.unmapped} chưa ánh xạ
                     </span>
@@ -1334,6 +1437,11 @@ export const CameraReturnModal: React.FC<CameraReturnModalProps> = ({
                           {det.matchStatus === 'MATCHED_CATALOG_ONLY' && (
                             <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-bold text-blue-800">
                               Khớp DM khác
+                            </span>
+                          )}
+                          {det.matchStatus === 'CATALOG_UNVERIFIED' && (
+                            <span className="rounded-full bg-purple-100 px-2 py-0.5 text-[10px] font-bold text-purple-800">
+                              Chưa xác minh DM
                             </span>
                           )}
                           {det.matchStatus === 'UNMAPPED' && (

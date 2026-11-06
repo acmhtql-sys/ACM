@@ -35,6 +35,13 @@ describe('CameraReturnModal Test Suite (SUP-VISION-01, 02, 04, 05, 06, 08)', () 
     ],
   };
 
+  const mockCatalogItems = [
+    { id: 'item-uuid-servo', code: 'SERVO-SG90', name: 'Servo Motor SG90', isActive: true },
+    { id: 'item-uuid-dht22', code: 'DHT22-AM2302', name: 'Cảm biến DHT22', isActive: true },
+    { id: 'item-uuid-uno', code: 'ARD-UNO-R3', name: 'Arduino Uno R3', isActive: true },
+    { id: 'item-uuid-led', code: 'LED-5MM-RGB', name: 'LED 5mm RGB', isActive: true },
+  ];
+
   let mockTracks: any[];
   let mockStream: any;
 
@@ -379,6 +386,7 @@ describe('CameraReturnModal Test Suite (SUP-VISION-01, 02, 04, 05, 06, 08)', () 
         onClose={handleClose}
         borrowRecord={mockBorrowRecord}
         onApplyReturnRows={handleApply}
+        catalogItems={mockCatalogItems}
       />
     );
 
@@ -401,7 +409,7 @@ describe('CameraReturnModal Test Suite (SUP-VISION-01, 02, 04, 05, 06, 08)', () 
 
     await waitFor(() => {
       expect(screen.getByText(/Khớp DM khác/i)).toBeTruthy();
-      expect(screen.getByText(/Khớp danh mục ACM: LED-5MM-RGB \(Không thuộc phiếu mượn này\)/i)).toBeTruthy();
+      expect(screen.getByText(/Khớp danh mục ACM: LED-5MM-RGB.*Không thuộc phiếu mượn này/i)).toBeTruthy();
     });
   });
 
@@ -510,6 +518,7 @@ describe('CameraReturnModal Test Suite (SUP-VISION-01, 02, 04, 05, 06, 08)', () 
         onClose={handleClose}
         borrowRecord={mockBorrowRecord}
         onApplyReturnRows={handleApply}
+        catalogItems={mockCatalogItems}
       />
     );
 
