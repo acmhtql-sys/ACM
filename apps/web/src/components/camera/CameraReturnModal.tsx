@@ -139,37 +139,95 @@ export const CameraReturnModal: React.FC<CameraReturnModalProps> = ({
   const [isRecognizing, setIsRecognizing] = useState<boolean>(false);
   const [isServiceOnline, setIsServiceOnline] = useState<boolean | null>(null);
   const [verifiedCatalog, setVerifiedCatalog] = useState<CatalogItem[]>(catalogItems || []);
+  const [isCatalogComplete, setIsCatalogComplete] = useState<boolean>(Boolean(catalogItems && catalogItems.length > 0));
   const [catalogLookupStatus, setCatalogLookupStatus] = useState<'IDLE' | 'LOADING' | 'READY' | 'UNAVAILABLE'>(
     catalogItems && catalogItems.length > 0 ? 'READY' : 'IDLE'
   );
 
-  // Sync catalogItems prop or fetch from API
+  const catalogRef = useRef<{
+    items: CatalogItem[];
+    status: 'IDLE' | 'LOADING' | 'READY' | 'UNAVAILABLE';
+    complete: boolean;
+  }>({
+    items: catalogItems || [],
+    status: catalogItems && catalogItems.length > 0 ? 'READY' : 'IDLE',
+    complete: Boolean(catalogItems && catalogItems.length > 0),
+  });
+
+  const rawDetectionsRef = useRef<VisionDetection[]>([]);
+  const processDetectionsRef = useRef<(list: VisionDetection[]) => void>(() => {});
+
+  // Sync catalogItems prop or fetch from API with full pagination support
   useEffect(() => {
     if (!isOpen) return;
     if (catalogItems && catalogItems.length > 0) {
+      catalogRef.current = { items: catalogItems, status: 'READY', complete: true };
       setVerifiedCatalog(catalogItems);
+      setIsCatalogComplete(true);
       setCatalogLookupStatus('READY');
       return;
     }
 
+    catalogRef.current.status = 'LOADING';
+
     let isMounted = true;
     setCatalogLookupStatus('LOADING');
-    apiClient
-      .get('/items?limit=500')
-      .then((res) => {
+
+    const fetchAllCatalogPages = async () => {
+      try {
+        // Query first page with max allowed limit (100) per queryItemsSchema
+        const res = await apiClient.get('/items?page=1&limit=100');
         if (!isMounted) return;
+
         if (res.data?.success && Array.isArray(res.data.data)) {
-          setVerifiedCatalog(res.data.data);
+          let accumulatedItems: CatalogItem[] = res.data.data;
+          const meta = res.data.meta;
+          const totalPages = typeof meta?.totalPages === 'number' ? meta.totalPages : 1;
+          let complete = true;
+
+          // If multiple pages exist, retrieve remaining pages
+          if (totalPages > 1) {
+            const maxPageCap = Math.min(totalPages, 10);
+            for (let p = 2; p <= maxPageCap; p++) {
+              try {
+                const nextRes = await apiClient.get(`/items?page=${p}&limit=100`);
+                if (!isMounted) return;
+                if (nextRes.data?.success && Array.isArray(nextRes.data.data)) {
+                  accumulatedItems = accumulatedItems.concat(nextRes.data.data);
+                } else {
+                  complete = false;
+                  break;
+                }
+              } catch {
+                complete = false;
+                break;
+              }
+            }
+            if (totalPages > 10) {
+              complete = false;
+            }
+          }
+
+          catalogRef.current = { items: accumulatedItems, status: 'READY', complete };
+          setVerifiedCatalog(accumulatedItems);
+          setIsCatalogComplete(complete);
           setCatalogLookupStatus('READY');
+          if (rawDetectionsRef.current.length > 0) {
+            processDetectionsRef.current(rawDetectionsRef.current);
+          }
         } else {
           setCatalogLookupStatus('UNAVAILABLE');
+          setIsCatalogComplete(false);
         }
-      })
-      .catch(() => {
+      } catch {
         if (isMounted) {
           setCatalogLookupStatus('UNAVAILABLE');
+          setIsCatalogComplete(false);
         }
-      });
+      }
+    };
+
+    fetchAllCatalogPages();
 
     return () => {
       isMounted = false;
@@ -406,7 +464,12 @@ export const CameraReturnModal: React.FC<CameraReturnModalProps> = ({
   // Match AI detections to outstanding borrow details and catalog mappings
   const processDetections = useCallback(
     (detectedList: VisionDetection[]) => {
+      rawDetectionsRef.current = detectedList;
       setRawDetections(detectedList);
+
+      const activeCatalog = catalogRef.current.items.length > 0 ? catalogRef.current.items : verifiedCatalog;
+      const currentLookupStatus = catalogRef.current.status !== 'IDLE' ? catalogRef.current.status : catalogLookupStatus;
+      const currentComplete = catalogRef.current.complete;
 
       if (detectedList.length === 0) {
         setAnalyzedDetections([]);
@@ -421,7 +484,7 @@ export const CameraReturnModal: React.FC<CameraReturnModalProps> = ({
       const analyzed: AnalyzedDetection[] = detectedList.map((det, index) => {
         // Step 0: Check against verified active catalog from API
         const catalogMatch = det.suggestedItemCode
-          ? verifiedCatalog.find(
+          ? activeCatalog.find(
               (c) =>
                 c.isActive !== false &&
                 c.code.toUpperCase() === det.suggestedItemCode?.toUpperCase()
@@ -465,7 +528,7 @@ export const CameraReturnModal: React.FC<CameraReturnModalProps> = ({
         // Step 2: Not in current borrow request
         if (det.suggestedItemCode) {
           // If catalog service is loading or unavailable, fail safe to CATALOG_UNVERIFIED
-          if (catalogLookupStatus === 'UNAVAILABLE' || catalogLookupStatus === 'LOADING') {
+          if (currentLookupStatus === 'UNAVAILABLE' || currentLookupStatus === 'LOADING') {
             return {
               detectionIndex: index + 1,
               classId: det.classId,
@@ -474,7 +537,7 @@ export const CameraReturnModal: React.FC<CameraReturnModalProps> = ({
               boundingBox: det.boundingBox,
               suggestedItemCode: det.suggestedItemCode,
               matchStatus: 'CATALOG_UNVERIFIED',
-              statusLabel: catalogLookupStatus === 'LOADING'
+              statusLabel: currentLookupStatus === 'LOADING'
                 ? 'Đang đồng bộ danh mục linh kiện...'
                 : 'Chưa thể xác minh danh mục: Dịch vụ tra cứu không khả dụng',
             };
@@ -494,7 +557,21 @@ export const CameraReturnModal: React.FC<CameraReturnModalProps> = ({
             };
           }
 
-          // If code does not exist in active catalog
+          // If catalog was only partially fetched, fail safe to CATALOG_UNVERIFIED
+          if (!currentComplete) {
+            return {
+              detectionIndex: index + 1,
+              classId: det.classId,
+              className: det.className,
+              confidence: det.confidence,
+              boundingBox: det.boundingBox,
+              suggestedItemCode: det.suggestedItemCode,
+              matchStatus: 'CATALOG_UNVERIFIED',
+              statusLabel: `Chưa thể xác nhận mã '${det.suggestedItemCode}': Danh mục linh kiện chưa tải đủ`,
+            };
+          }
+
+          // If code does not exist in complete active catalog
           return {
             detectionIndex: index + 1,
             classId: det.classId,
@@ -568,8 +645,17 @@ export const CameraReturnModal: React.FC<CameraReturnModalProps> = ({
         return updated;
       });
     },
-    [outstandingDetails, drawOverlay, verifiedCatalog, catalogLookupStatus]
+    [outstandingDetails, drawOverlay, verifiedCatalog, catalogLookupStatus, isCatalogComplete]
   );
+
+  processDetectionsRef.current = processDetections;
+
+  // Re-process detections whenever catalog state resolves or changes
+  useEffect(() => {
+    if (rawDetections.length > 0) {
+      processDetections(rawDetections);
+    }
+  }, [verifiedCatalog, catalogLookupStatus, isCatalogComplete]);
 
   // Capture single frame and run AI inference
   const captureAndDetect = useCallback(async () => {

@@ -408,4 +408,238 @@ describe('CameraReturnModal AI Mapping Safety Suite (GATE-3-AI-SAFETY)', () => {
       ).toBeTruthy();
     });
   });
+  // TC-AI-SAFETY-08: Catalog đa trang (Pagination) -> Tải đầy đủ trang 1 và trang 2 để khớp mã
+  it('TC-AI-SAFETY-08 [Pagination support]: accumulates items across multiple pages and matches item from page 2', async () => {
+    const handleClose = vi.fn();
+    const handleApply = vi.fn();
+
+    // Mock page 1 and page 2
+    vi.spyOn(apiClient, 'get').mockImplementation(async (url: string) => {
+      if (url.includes('page=1')) {
+        return {
+          data: {
+            success: true,
+            data: [
+              { id: 'item-page1', code: 'PAGE1-ITEM', name: 'Linh kiện Trang 1', isActive: true },
+            ],
+            meta: { page: 1, limit: 100, totalItems: 2, totalPages: 2 },
+          },
+        };
+      }
+      if (url.includes('page=2')) {
+        return {
+          data: {
+            success: true,
+            data: [
+              { id: 'item-page2', code: 'PAGE2-ITEM', name: 'Linh kiện Trang 2', isActive: true },
+            ],
+            meta: { page: 2, limit: 100, totalItems: 2, totalPages: 2 },
+          },
+        };
+      }
+      return { data: { success: false } };
+    });
+
+    vi.spyOn(visionService, 'detectFrameFile').mockResolvedValueOnce({
+      success: true,
+      frameId: 'frame_page2_01',
+      inferenceTimeMs: 20.0,
+      detectionsCount: 1,
+      detections: [
+        {
+          classId: 77,
+          className: 'Page2_Sensor',
+          confidence: 0.9,
+          boundingBox: { x1: 10, y1: 10, x2: 90, y2: 90 },
+          suggestedItemCode: 'PAGE2-ITEM',
+        },
+      ],
+    });
+
+    render(
+      <CameraReturnModal
+        isOpen={true}
+        onClose={handleClose}
+        borrowRecord={mockBorrowRecord}
+        onApplyReturnRows={handleApply}
+      />
+    );
+
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+    const file = new File(['fake-bytes'], 'page2.jpg', { type: 'image/jpeg' });
+    fireEvent.change(input, { target: { files: [file] } });
+
+    await waitFor(() => {
+      // Must identify as MATCHED_CATALOG_ONLY from page 2!
+      expect(screen.getAllByText(/1 khớp DM/i).length).toBeGreaterThan(0);
+      expect(screen.getByText(/Linh kiện hoàn trả \(0\)/i)).toBeTruthy();
+    });
+
+    const detTab = screen.getByRole('button', { name: /Chi tiết AI nhận diện/i });
+    fireEvent.click(detTab);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Khớp DM khác/i)).toBeTruthy();
+      expect(screen.getByText(/PAGE2-ITEM - Linh kiện Trang 2/i)).toBeTruthy();
+    });
+  });
+
+  // TC-AI-SAFETY-09: Phân trang không tải đủ (Incomplete pagination) -> Fail-safe sang CATALOG_UNVERIFIED
+  it('TC-AI-SAFETY-09 [Incomplete pagination fail-safe]: fails safe to CATALOG_UNVERIFIED if subsequent page fails to load', async () => {
+    const handleClose = vi.fn();
+    const handleApply = vi.fn();
+
+    // Mock page 1 success (totalPages: 2), page 2 failure
+    vi.spyOn(apiClient, 'get').mockImplementation(async (url: string) => {
+      if (url.includes('page=1')) {
+        return {
+          data: {
+            success: true,
+            data: [
+              { id: 'item-page1', code: 'PAGE1-ITEM', name: 'Linh kiện Trang 1', isActive: true },
+            ],
+            meta: { page: 1, limit: 100, totalItems: 200, totalPages: 2 },
+          },
+        };
+      }
+      throw new Error('500 Error loading page 2');
+    });
+
+    vi.spyOn(visionService, 'detectFrameFile').mockResolvedValueOnce({
+      success: true,
+      frameId: 'frame_incomplete_01',
+      inferenceTimeMs: 25.0,
+      detectionsCount: 1,
+      detections: [
+        {
+          classId: 88,
+          className: 'Missing_Sensor',
+          confidence: 0.9,
+          boundingBox: { x1: 10, y1: 10, x2: 90, y2: 90 },
+          suggestedItemCode: 'UNFETCHED-CODE-XYZ',
+        },
+      ],
+    });
+
+    render(
+      <CameraReturnModal
+        isOpen={true}
+        onClose={handleClose}
+        borrowRecord={mockBorrowRecord}
+        onApplyReturnRows={handleApply}
+      />
+    );
+
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+    const file = new File(['fake-bytes'], 'missing.jpg', { type: 'image/jpeg' });
+    fireEvent.change(input, { target: { files: [file] } });
+
+    await waitFor(() => {
+      // Must NOT be staged
+      expect(screen.getByText(/Linh kiện hoàn trả \(0\)/i)).toBeTruthy();
+      // Must fail-safe to CATALOG_UNVERIFIED because catalog was not completely loaded
+      expect(screen.getAllByText(/1 chưa xác minh/i).length).toBeGreaterThan(0);
+    });
+
+    const detTab = screen.getByRole('button', { name: /Chi tiết AI nhận diện/i });
+    fireEvent.click(detTab);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Chưa xác minh DM/i)).toBeTruthy();
+      expect(screen.getByText(/Danh mục linh kiện chưa tải đủ/i)).toBeTruthy();
+    });
+  });
+
+  // TC-AI-SAFETY-10: Timeout mạng khi tra cứu Catalog -> Fail-safe sang CATALOG_UNVERIFIED
+  it('TC-AI-SAFETY-10 [Network Timeout fail-safe]: fails safe to CATALOG_UNVERIFIED when catalog lookup times out', async () => {
+    const handleClose = vi.fn();
+    const handleApply = vi.fn();
+
+    const timeoutErr = new Error('timeout of 5000ms exceeded');
+    (timeoutErr as any).code = 'ECONNABORTED';
+    vi.spyOn(apiClient, 'get').mockRejectedValueOnce(timeoutErr);
+
+    vi.spyOn(visionService, 'detectFrameFile').mockResolvedValueOnce({
+      success: true,
+      frameId: 'frame_timeout_01',
+      inferenceTimeMs: 22.0,
+      detectionsCount: 1,
+      detections: [
+        {
+          classId: 50,
+          className: 'ESP32_Timeout',
+          confidence: 0.93,
+          boundingBox: { x1: 15, y1: 15, x2: 85, y2: 85 },
+          suggestedItemCode: 'ESP32-UNKNOWN',
+        },
+      ],
+    });
+
+    render(
+      <CameraReturnModal
+        isOpen={true}
+        onClose={handleClose}
+        borrowRecord={mockBorrowRecord}
+        onApplyReturnRows={handleApply}
+      />
+    );
+
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+    const file = new File(['fake-bytes'], 'timeout.jpg', { type: 'image/jpeg' });
+    fireEvent.change(input, { target: { files: [file] } });
+
+    await waitFor(() => {
+      expect(screen.getByText(/Linh kiện hoàn trả \(0\)/i)).toBeTruthy();
+      expect(screen.getAllByText(/1 chưa xác minh/i).length).toBeGreaterThan(0);
+    });
+  });
+
+  // TC-AI-SAFETY-11: Tuyệt đối không tự động ghi giao dịch kho hoặc trả hàng
+  it('TC-AI-SAFETY-11 [No automatic mutation]: does not call apply callback until operator explicitly clicks button', async () => {
+    const handleClose = vi.fn();
+    const handleApply = vi.fn();
+
+    vi.spyOn(visionService, 'detectFrameFile').mockResolvedValueOnce({
+      success: true,
+      frameId: 'frame_auto_safe_01',
+      inferenceTimeMs: 18.0,
+      detectionsCount: 1,
+      detections: [
+        {
+          classId: 50,
+          className: 'ESP32',
+          confidence: 0.95,
+          boundingBox: { x1: 10, y1: 10, x2: 90, y2: 90 },
+          suggestedItemCode: 'ESP32-WROOM-32',
+        },
+      ],
+    });
+
+    render(
+      <CameraReturnModal
+        isOpen={true}
+        onClose={handleClose}
+        borrowRecord={mockBorrowRecord}
+        onApplyReturnRows={handleApply}
+        catalogItems={mockActiveCatalog}
+      />
+    );
+
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+    const file = new File(['fake-bytes'], 'esp.jpg', { type: 'image/jpeg' });
+    fireEvent.change(input, { target: { files: [file] } });
+
+    await waitFor(() => {
+      expect(screen.getByText(/Linh kiện hoàn trả \(1\)/i)).toBeTruthy();
+    });
+
+    // Verify handleApply has NOT been called automatically
+    expect(handleApply).not.toHaveBeenCalled();
+
+    // Only when operator clicks "Áp dụng vào phiếu hoàn trả"
+    const applyButton = screen.getByRole('button', { name: /Áp dụng vào phiếu hoàn trả/i });
+    fireEvent.click(applyButton);
+
+    expect(handleApply).toHaveBeenCalledTimes(1);
+  });
 });
