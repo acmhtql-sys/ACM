@@ -53,7 +53,7 @@ describe('CameraReturnModal AI Mapping Safety Suite (GATE-3-AI-SAFETY)', () => {
       writable: true,
     });
 
-    vi.spyOn(visionService, 'checkVisionHealth').mockResolvedValue(true);
+    vi.spyOn(visionService, 'checkVisionHealth').mockResolvedValue({ status: 'ok', service: 'acm-camera-return-service', modelVersion: '1.0.0', modelHash: 'c9b1f5d5', classesCount: 64, device: 'cpu' });
   });
 
   afterEach(() => {
