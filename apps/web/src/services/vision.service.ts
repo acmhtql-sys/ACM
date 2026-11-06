@@ -54,12 +54,18 @@ export async function checkVisionHealth(): Promise<VisionHealthResponse> {
   return res.json();
 }
 
+function getAuthHeaders(): Record<string, string> {
+  const token = localStorage.getItem('acm_token') || localStorage.getItem('token');
+  return token ? { Authorization: 'Bearer ' + token } : {};
+}
+
 export async function detectFrameBase64(imageBase64: string): Promise<VisionDetectResponse> {
   const url = `${getVisionServiceUrl()}/api/v1/vision/detect`;
   const res = await fetch(url, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
+      ...getAuthHeaders(),
     },
     body: JSON.stringify({ image: imageBase64 }),
     signal: AbortSignal.timeout(6000),
@@ -79,6 +85,9 @@ export async function detectFrameFile(file: File | Blob): Promise<VisionDetectRe
 
   const res = await fetch(url, {
     method: 'POST',
+    headers: {
+      ...getAuthHeaders(),
+    },
     body: formData,
     signal: AbortSignal.timeout(6000),
   });
