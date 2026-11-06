@@ -588,5 +588,231 @@ describe('CameraReturnModal Test Suite (SUP-VISION-01, 02, 04, 05, 06, 08)', () 
       expect(screen.getByText(/Phát hiện 5 cái \(Giới hạn trả 3\)/i)).toBeTruthy();
     });
   });
-});
 
+  // =========================================================================
+  // CAMERA AI SIMPLE RECOGNITION DISPLAY TEST SUITE (TC-SIMPLE-01..06)
+  // =========================================================================
+
+  describe('Camera AI Simple Recognition Display Suite', () => {
+    // TC-SIMPLE-01: 0 detection -> displays "Chưa nhận diện được"
+    it('TC-SIMPLE-01: displays "Chưa nhận diện được" when detections list is empty', async () => {
+      render(
+        <CameraReturnModal
+          isOpen={true}
+          onClose={vi.fn()}
+          borrowRecord={mockBorrowRecord}
+          onApplyReturnRows={vi.fn()}
+        />
+      );
+
+      // Verify the simple summary bar exists
+      expect(screen.getByTestId('ai-simple-recognition-bar')).toBeTruthy();
+      expect(screen.getByText(/AI đã nhận diện:/i)).toBeTruthy();
+      expect(screen.getByText(/Chưa nhận diện được/i)).toBeTruthy();
+    });
+
+    // TC-SIMPLE-02: 1 detection -> displays 1 friendly name chip
+    it('TC-SIMPLE-02: displays 1 friendly name chip when 1 item is detected', async () => {
+      vi.spyOn(visionService, 'detectFrameFile').mockResolvedValueOnce({
+        success: true,
+        frameId: 'frame_single_01',
+        inferenceTimeMs: 35.0,
+        detectionsCount: 1,
+        detections: [
+          {
+            classId: 59,
+            className: 'Servo',
+            confidence: 0.94,
+            boundingBox: { x1: 50, y1: 50, x2: 200, y2: 200 },
+            suggestedItemCode: 'SERVO-SG90',
+          },
+        ],
+      });
+
+      render(
+        <CameraReturnModal
+          isOpen={true}
+          onClose={vi.fn()}
+          borrowRecord={mockBorrowRecord}
+          onApplyReturnRows={vi.fn()}
+        />
+      );
+
+      const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+      const file = new File(['fake-bytes'], 'single_servo.jpg', { type: 'image/jpeg' });
+      fireEvent.change(input, { target: { files: [file] } });
+
+      await waitFor(() => {
+        const chip = screen.getByTestId('ai-chip-Servo');
+        expect(chip).toBeTruthy();
+        expect(chip.textContent).toContain('Servo Motor SG90');
+      });
+    });
+
+    // TC-SIMPLE-03: Multiple objects of same class -> does not repeat name, shows count badge
+    it('TC-SIMPLE-03: deduplicates multiple detections of same class into 1 chip with count badge', async () => {
+      vi.spyOn(visionService, 'detectFrameFile').mockResolvedValueOnce({
+        success: true,
+        frameId: 'frame_multi_same_01',
+        inferenceTimeMs: 40.0,
+        detectionsCount: 4,
+        detections: [
+          { classId: 59, className: 'Servo', confidence: 0.91, boundingBox: { x1: 10, y1: 10, x2: 50, y2: 50 }, suggestedItemCode: 'SERVO-SG90' },
+          { classId: 59, className: 'Servo', confidence: 0.92, boundingBox: { x1: 60, y1: 10, x2: 100, y2: 50 }, suggestedItemCode: 'SERVO-SG90' },
+          { classId: 59, className: 'Servo', confidence: 0.89, boundingBox: { x1: 110, y1: 10, x2: 150, y2: 50 }, suggestedItemCode: 'SERVO-SG90' },
+          { classId: 59, className: 'Servo', confidence: 0.95, boundingBox: { x1: 160, y1: 10, x2: 200, y2: 50 }, suggestedItemCode: 'SERVO-SG90' },
+        ],
+      });
+
+      render(
+        <CameraReturnModal
+          isOpen={true}
+          onClose={vi.fn()}
+          borrowRecord={mockBorrowRecord}
+          onApplyReturnRows={vi.fn()}
+        />
+      );
+
+      const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+      fireEvent.change(input, { target: { files: [new File(['fake'], 'servos.jpg', { type: 'image/jpeg' })] } });
+
+      await waitFor(() => {
+        const chips = screen.getAllByTestId('ai-chip-Servo');
+        expect(chips.length).toBe(1);
+        expect(chips[0].textContent).toContain('x4');
+      });
+    });
+
+    // TC-SIMPLE-04: 25 detections across multiple classes -> compact interface (max 4 chips + expand button)
+    it('TC-SIMPLE-04: displays at most 4 chips by default and shows "+ X loại khác" for 25 detections', async () => {
+      const classNames = ['Servo', 'Ultrasonic_sensor', 'Temp_hum_sensor', 'LED_lamp', 'gear_spur_plastic', 'bearing_ball', 'bracket_angle'];
+      const detections: visionService.VisionDetection[] = Array.from({ length: 25 }, (_, i) => {
+        const cls = classNames[i % classNames.length];
+        return {
+          classId: i,
+          className: cls,
+          confidence: 0.80,
+          boundingBox: { x1: (i * 20) % 400, y1: 20, x2: ((i * 20) % 400) + 30, y2: 60 },
+          suggestedItemCode: cls === 'Servo' ? 'SERVO-SG90' : cls === 'Ultrasonic_sensor' ? 'SR04-ULTRASONIC' : null,
+        };
+      });
+
+      vi.spyOn(visionService, 'detectFrameFile').mockResolvedValueOnce({
+        success: true,
+        frameId: 'frame_25_items',
+        inferenceTimeMs: 48.0,
+        detectionsCount: 25,
+        detections,
+      });
+
+      render(
+        <CameraReturnModal
+          isOpen={true}
+          onClose={vi.fn()}
+          borrowRecord={mockBorrowRecord}
+          onApplyReturnRows={vi.fn()}
+        />
+      );
+
+      const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+      fireEvent.change(input, { target: { files: [new File(['fake'], 'cluttered.jpg', { type: 'image/jpeg' })] } });
+
+      await waitFor(() => {
+        const expandBtn = screen.getByTestId('ai-expand-classes-toggle');
+        expect(expandBtn).toBeTruthy();
+        expect(expandBtn.textContent).toContain('+3 loại khác');
+
+        const chipContainer = screen.getByTestId('ai-recognition-chips');
+        const chips = chipContainer.querySelectorAll('button[data-testid^="ai-chip-"]');
+        expect(chips.length).toBe(4);
+      });
+
+      // Click to expand
+      const expandBtn = screen.getByTestId('ai-expand-classes-toggle');
+      fireEvent.click(expandBtn);
+
+      const chipContainer = screen.getByTestId('ai-recognition-chips');
+      const expandedChips = chipContainer.querySelectorAll('button[data-testid^="ai-chip-"]');
+      expect(expandedChips.length).toBe(7);
+      expect(expandBtn.textContent).toContain('Thu gọn');
+    });
+
+    // TC-SIMPLE-05: Chip selection highlights bounding box and shows "Xem tất cả" button
+    it('TC-SIMPLE-05: clicking a chip activates highlight and shows "Xem tất cả" reset button', async () => {
+      vi.spyOn(visionService, 'detectFrameFile').mockResolvedValueOnce({
+        success: true,
+        frameId: 'frame_highlight_test',
+        inferenceTimeMs: 32.0,
+        detectionsCount: 2,
+        detections: [
+          { classId: 59, className: 'Servo', confidence: 0.93, boundingBox: { x1: 10, y1: 10, x2: 50, y2: 50 }, suggestedItemCode: 'SERVO-SG90' },
+          { classId: 80, className: 'gear_spur_plastic', confidence: 0.75, boundingBox: { x1: 100, y1: 100, x2: 150, y2: 150 }, suggestedItemCode: null },
+        ],
+      });
+
+      render(
+        <CameraReturnModal
+          isOpen={true}
+          onClose={vi.fn()}
+          borrowRecord={mockBorrowRecord}
+          onApplyReturnRows={vi.fn()}
+        />
+      );
+
+      const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+      fireEvent.change(input, { target: { files: [new File(['fake'], 'two_items.jpg', { type: 'image/jpeg' })] } });
+
+      await waitFor(() => {
+        expect(screen.getByTestId('ai-chip-Servo')).toBeTruthy();
+        expect(screen.getByTestId('ai-chip-gear_spur_plastic')).toBeTruthy();
+      });
+
+      // Click on Servo chip to highlight
+      const servoChip = screen.getByTestId('ai-chip-Servo');
+      fireEvent.click(servoChip);
+
+      await waitFor(() => {
+        expect(screen.getByTestId('ai-clear-highlight')).toBeTruthy();
+      });
+
+      // Click reset button
+      fireEvent.click(screen.getByTestId('ai-clear-highlight'));
+      await waitFor(() => {
+        expect(screen.queryByTestId('ai-clear-highlight')).toBeNull();
+      });
+    });
+
+    // TC-SIMPLE-06: Unmapped class displays raw AI class name and does not auto-stage
+    it('TC-SIMPLE-06: unmapped class keeps raw AI class name in chip and prevents auto-staging', async () => {
+      vi.spyOn(visionService, 'detectFrameFile').mockResolvedValueOnce({
+        success: true,
+        frameId: 'frame_unmapped_01',
+        inferenceTimeMs: 25.0,
+        detectionsCount: 1,
+        detections: [
+          { classId: 99, className: 'bearing_ball_radial', confidence: 0.82, boundingBox: { x1: 50, y1: 50, x2: 100, y2: 100 }, suggestedItemCode: null },
+        ],
+      });
+
+      render(
+        <CameraReturnModal
+          isOpen={true}
+          onClose={vi.fn()}
+          borrowRecord={mockBorrowRecord}
+          onApplyReturnRows={vi.fn()}
+        />
+      );
+
+      const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+      fireEvent.change(input, { target: { files: [new File(['fake'], 'bearing.jpg', { type: 'image/jpeg' })] } });
+
+      await waitFor(() => {
+        const unmappedChip = screen.getByTestId('ai-chip-bearing_ball_radial');
+        expect(unmappedChip).toBeTruthy();
+        expect(unmappedChip.textContent).toContain('bearing_ball_radial');
+        expect(screen.getByText(/Chưa có linh kiện nào được nhận diện hoặc chọn hoàn trả/i)).toBeTruthy();
+      });
+    });
+  });
+
+});

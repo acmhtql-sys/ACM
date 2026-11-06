@@ -17,6 +17,8 @@ import {
   HelpCircle,
   Plus,
   Check,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 import {
   detectFrameBase64,
@@ -64,6 +66,36 @@ export interface StagedReturnItem {
 
 export type DetectionMatchStatus = 'MATCHED_BORROW' | 'MATCHED_CATALOG_ONLY' | 'UNMAPPED';
 
+export interface UniqueClassSummary {
+  className: string;
+  friendlyName: string;
+  count: number;
+  matchStatus: DetectionMatchStatus;
+  suggestedItemCode?: string | null;
+  matchedDetail?: BorrowDetailItem;
+}
+
+export const KNOWN_FRIENDLY_NAMES: Record<string, string> = {
+  Servo: 'Động cơ RC Servo (SG90)',
+  Ultrasonic_sensor: 'Cảm biến siêu âm (HC-SR04)',
+  Temp_hum_sensor: 'Cảm biến nhiệt ẩm (DHT22)',
+  LED_lamp: 'Đèn LED RGB',
+};
+
+export const getFriendlyClassName = (
+  className: string,
+  matchedDetail?: BorrowDetailItem,
+  suggestedItemCode?: string | null
+): string => {
+  if (matchedDetail?.item?.name) {
+    return matchedDetail.item.name;
+  }
+  if (KNOWN_FRIENDLY_NAMES[className]) {
+    return KNOWN_FRIENDLY_NAMES[className];
+  }
+  return className;
+};
+
 export interface AnalyzedDetection {
   detectionIndex: number;
   classId: number;
@@ -107,6 +139,39 @@ export const CameraReturnModal: React.FC<CameraReturnModalProps> = ({
   const [uploadedPreview, setUploadedPreview] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'staged' | 'detections'>('staged');
   const [detectionFilter, setDetectionFilter] = useState<'ALL' | DetectionMatchStatus>('ALL');
+  const [selectedClassHighlight, setSelectedClassHighlight] = useState<string | null>(null);
+  const [isExpandedClasses, setIsExpandedClasses] = useState<boolean>(false);
+
+    // Group analyzed detections by className for simple display bar (Requirement 2 & 3)
+  const uniqueDetectedClasses = useMemo<UniqueClassSummary[]>(() => {
+    if (!analyzedDetections || analyzedDetections.length === 0) return [];
+
+    const map = new Map<string, UniqueClassSummary>();
+    for (const det of analyzedDetections) {
+      const existing = map.get(det.className);
+      if (existing) {
+        existing.count += 1;
+        if (det.matchStatus === 'MATCHED_BORROW') {
+          existing.matchStatus = 'MATCHED_BORROW';
+          existing.matchedDetail = det.matchedDetail;
+          existing.friendlyName = getFriendlyClassName(det.className, det.matchedDetail, det.suggestedItemCode);
+        } else if (existing.matchStatus === 'UNMAPPED' && det.matchStatus === 'MATCHED_CATALOG_ONLY') {
+          existing.matchStatus = 'MATCHED_CATALOG_ONLY';
+          existing.suggestedItemCode = det.suggestedItemCode;
+        }
+      } else {
+        map.set(det.className, {
+          className: det.className,
+          friendlyName: getFriendlyClassName(det.className, det.matchedDetail, det.suggestedItemCode),
+          count: 1,
+          matchStatus: det.matchStatus,
+          suggestedItemCode: det.suggestedItemCode,
+          matchedDetail: det.matchedDetail,
+        });
+      }
+    }
+    return Array.from(map.values());
+  }, [analyzedDetections]);
 
   // Remaining borrow details that still have outstanding quantities
   const outstandingDetails = useMemo(() => {
@@ -773,9 +838,142 @@ export const CameraReturnModal: React.FC<CameraReturnModalProps> = ({
         {/* Main Content Layout: Left Camera / Right Staged & Detections Panels */}
         <div className="grid flex-1 grid-cols-1 md:grid-cols-12 overflow-hidden">
           {/* Left Column: Camera Viewport */}
-          <div className="relative flex flex-col items-center justify-center bg-slate-900 md:col-span-7 p-3">
+          <div className="relative flex flex-col items-stretch justify-start bg-slate-900 md:col-span-7 p-3 overflow-hidden">
+            {/* Simple AI Recognition Summary Bar (Directly Above Camera Viewport) */}
+            <div
+              data-testid="ai-simple-recognition-bar"
+              className="mb-2.5 w-full rounded-xl bg-slate-800/95 border border-slate-700/80 p-2.5 text-xs shadow-md"
+            >
+              <div className="flex flex-wrap items-center justify-between gap-1.5">
+                <div className="flex items-center space-x-1.5 text-slate-200 font-semibold shrink-0">
+                  <div className="flex h-5 w-5 items-center justify-center rounded-md bg-blue-500/20 text-blue-400">
+                    <Sparkles className="h-3.5 w-3.5" />
+                  </div>
+                  <span>AI đã nhận diện:</span>
+                </div>
+
+                {uniqueDetectedClasses.length > 0 && (
+                  <div className="hidden sm:flex items-center space-x-3 text-[10px] text-slate-400">
+                    <span className="flex items-center space-x-1">
+                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                      <span>Đủ điều kiện trả</span>
+                    </span>
+                    <span className="flex items-center space-x-1">
+                      <span className="h-1.5 w-1.5 rounded-full bg-blue-400" />
+                      <span>Khớp mã ACM</span>
+                    </span>
+                    <span className="flex items-center space-x-1">
+                      <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />
+                      <span>Chưa ánh xạ</span>
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {/* Chips container */}
+              <div
+                data-testid="ai-recognition-chips"
+                className="mt-2 flex flex-wrap items-center gap-1.5"
+              >
+                {uniqueDetectedClasses.length === 0 ? (
+                  <span
+                    data-testid="ai-empty-recognition"
+                    className="italic text-slate-400 text-[11px] py-0.5"
+                  >
+                    Chưa nhận diện được
+                  </span>
+                ) : (
+                  <>
+                    {(isExpandedClasses
+                      ? uniqueDetectedClasses
+                      : uniqueDetectedClasses.slice(0, 4)
+                    ).map((c) => {
+                      const isSelected = selectedClassHighlight === c.className;
+                      let badgeColors = 'border-amber-500/60 bg-amber-500/15 text-amber-200 hover:bg-amber-500/25';
+                      let dotColor = 'bg-amber-400';
+                      let statusText = 'Chưa ánh xạ';
+
+                      if (c.matchStatus === 'MATCHED_BORROW') {
+                        badgeColors = 'border-emerald-500/70 bg-emerald-500/20 text-emerald-200 hover:bg-emerald-500/30';
+                        dotColor = 'bg-emerald-400';
+                        statusText = 'Đủ điều kiện hoàn trả';
+                      } else if (c.matchStatus === 'MATCHED_CATALOG_ONLY') {
+                        badgeColors = 'border-blue-500/70 bg-blue-500/20 text-blue-200 hover:bg-blue-500/30';
+                        dotColor = 'bg-blue-400';
+                        statusText = `Khớp danh mục (${c.suggestedItemCode || ''})`;
+                      }
+
+                      return (
+                        <button
+                          key={c.className}
+                          type="button"
+                          data-testid={`ai-chip-${c.className}`}
+                          onClick={() => {
+                            setSelectedClassHighlight((prev) =>
+                              prev === c.className ? null : c.className
+                            );
+                          }}
+                          title={`${c.friendlyName} - ${statusText}. Bấm để ${
+                            isSelected ? 'bỏ lọc' : 'nổi bật bounding box'
+                          }`}
+                          className={`inline-flex items-center space-x-1.5 rounded-lg border px-2.5 py-1 text-xs font-medium transition cursor-pointer ${badgeColors} ${
+                            isSelected
+                              ? 'ring-2 ring-white ring-offset-1 ring-offset-slate-900 font-bold scale-105 shadow'
+                              : 'opacity-90'
+                          }`}
+                        >
+                          <span className={`h-1.5 w-1.5 rounded-full ${dotColor}`} />
+                          <span>{c.friendlyName}</span>
+                          {c.count > 1 && (
+                            <span className="ml-1 rounded-full bg-slate-900/50 px-1.5 py-0.2 text-[10px] font-bold">
+                              x{c.count}
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
+
+                    {/* Expand / Collapse Button if > 4 classes */}
+                    {uniqueDetectedClasses.length > 4 && (
+                      <button
+                        type="button"
+                        data-testid="ai-expand-classes-toggle"
+                        onClick={() => setIsExpandedClasses((prev) => !prev)}
+                        className="inline-flex items-center space-x-1 rounded-lg border border-slate-600 bg-slate-700/80 px-2 py-1 text-xs font-semibold text-slate-200 hover:bg-slate-600 transition"
+                      >
+                        {isExpandedClasses ? (
+                          <>
+                            <span>Thu gọn</span>
+                            <ChevronUp className="h-3 w-3" />
+                          </>
+                        ) : (
+                          <>
+                            <span>+{uniqueDetectedClasses.length - 4} loại khác</span>
+                            <ChevronDown className="h-3 w-3" />
+                          </>
+                        )}
+                      </button>
+                    )}
+
+                    {/* Reset filter button if a class is active */}
+                    {selectedClassHighlight && (
+                      <button
+                        type="button"
+                        data-testid="ai-clear-highlight"
+                        onClick={() => setSelectedClassHighlight(null)}
+                        className="ml-auto inline-flex items-center space-x-1 text-[11px] text-slate-400 hover:text-white underline cursor-pointer"
+                      >
+                        <Eye className="h-3 w-3" />
+                        <span>Xem tất cả</span>
+                      </button>
+                    )}
+                  </>
+                )}
+              </div>
+            </div>
+
             {/* Viewport container */}
-            <div className="relative flex h-full w-full items-center justify-center overflow-hidden rounded-xl bg-black border border-slate-800 shadow-inner">
+            <div className="relative flex flex-1 w-full min-h-[280px] items-center justify-center overflow-hidden rounded-xl bg-black border border-slate-800 shadow-inner">
               {uploadedPreview ? (
                 <>
                   <img
