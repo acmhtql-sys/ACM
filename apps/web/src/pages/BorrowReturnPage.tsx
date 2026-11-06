@@ -16,7 +16,6 @@ import {
 } from 'lucide-react';
 import { isCameraReturnEnabled } from '../config/features';
 import { CameraReturnModal } from '../components/camera/CameraReturnModal';
-import { DemoDataNotice } from '../components/DemoDataNotice';
 import { StatusBadge } from '../components/StatusBadge';
 import { apiClient } from '../services/api';
 import { useAuth } from '../hooks/useAuth';
@@ -565,8 +564,6 @@ export const BorrowReturnPage: React.FC = () => {
           </button>
         </div>
       </div>
-
-      <DemoDataNotice moduleName="Borrow & Return Management" />
 
       {/* Role Notice */}
       {!isOperator && (
