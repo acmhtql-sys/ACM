@@ -44,7 +44,7 @@ The earlier shorthand “nine UAT WIP files are missing from GitHub” is **not 
 |---|---|---|
 | Legacy UAT Git HEAD (now published remote) | `review/d8-uat-0847a730-baseline` @ `0847a73088b98d8b00fb6ac06f02b2f56d288b78` | Remote Git ref exists |
 | Stage4C inert review head | `review/d8-wr7e-stage4c-inert-20261029` @ `9e9d6078c6831107bfa1c51ffbc5f094ecdba314` | PR #16 Draft, 1 commit ahead of UAT HEAD, six changed paths |
-| RC5 + P0/Zod4 actual integration | `codex/d8-rc5-zod4-integration-20261107` @ `b5a45bcec0c00e8988754ea5deb5ee5152059001` at this document's update | Distinct code family; PR #48 Draft; no Stage4C merge |
+| RC5 + P0/Zod4 actual integration | `codex/d8-rc5-zod4-integration-20261107` @ `b5a45bcec0c00e8988754ea5deb5ee5152059001` (prior verified documentation checkpoint; use PR head for newer commits) | Distinct code family; PR #48 Draft; no Stage4C merge |
 | GitHub comparison | Stage4C review head vs PR #48: `ahead 54 / behind 199` | **DIVERGED**, NOT a safe direct merge or proof of complete WIP publication |
 
 **Six source paths in PR #16** (all verified in the remote compare): `apps/api/prisma/schema.prisma`, `apps/api/src/modules/borrow/borrow.return-operation-foundation.ts`, `apps/api/src/modules/borrow/borrow.router.ts`, `apps/api/src/modules/borrow/borrow.service.ts`, `apps/api/tests/borrow.return-operations.stage4c2a.unit.test.ts`, `apps/api/tests/borrow.return-operations.stage4c2b.schema-contract.unit.test.ts`.
