@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import request from 'supertest';
+import { gzipSync } from 'node:zlib';
 import { createApp } from '../src/app';
 
 // Exercise the real Express middleware stack against an in-process test server.
@@ -25,6 +26,17 @@ describe('P3-F: staging fail-closed HTTP acceptance (local, no DB)', () => {
       expect(res.body.method).toBe(method.toUpperCase());
     });
   }
+
+  it('rejects a compressed JSON request body with 415 before parsing', async () => {
+    const compressed = gzipSync(Buffer.from(JSON.stringify({ syntheticProbeOnly: true })));
+    const res = await request(app)
+      .post('/api/v1/__acm_security_probe_no_route__')
+      .set('Content-Type', 'application/json')
+      .set('Content-Encoding', 'gzip')
+      .send(compressed);
+    expect(res.status).toBe(415);
+    expect(res.body.success).toBe(false);
+  });
 
   it('blocks login without attempting to authenticate or create sessions', async () => {
     const res = await request(app).post('/api/v1/auth/login')
