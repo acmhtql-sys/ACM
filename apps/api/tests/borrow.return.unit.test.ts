@@ -18,6 +18,7 @@ import { env } from '../src/config/env';
 // Mock prisma client
 vi.mock('../src/config/database', () => {
   const mockTx = {
+    $queryRaw: vi.fn(),
     borrowRequest: {
       findUnique: vi.fn(),
       findMany: vi.fn(),
@@ -36,6 +37,7 @@ vi.mock('../src/config/database', () => {
       findMany: vi.fn(),
       create: vi.fn(),
       update: vi.fn(),
+      updateMany: vi.fn(),
     },
     stockReservation: {
       findMany: vi.fn(),
@@ -226,6 +228,8 @@ describe('ACM Phase 4 – Borrow & Return Management Test Suite', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    (prisma as any).__mockTx.$queryRaw.mockResolvedValue([{ id: borrowRequestId }]);
+    (prisma as any).__mockTx.stockBalance.updateMany.mockResolvedValue({ count: 1 });
     vi.mocked(prisma.user.findUnique).mockImplementation(async ({ where }: any) => {
       const users = [adminUser, labManagerUser, technicianUser, studentUser];
       const found = users.find((u) => u.id === where.id || u.email === where.email);
@@ -517,7 +521,7 @@ describe('ACM Phase 4 – Borrow & Return Management Test Suite', () => {
             item: { id: itemId, name: 'STM32F401' },
           },
         ],
-        reservations: [{ itemId, locationId }],
+        reservations: [{ itemId, locationId, quantity: 2, status: ReservationStatus.FULFILLED }],
       });
 
       mockTx.returnTransaction.findUnique.mockResolvedValue(null);
@@ -578,9 +582,9 @@ describe('ACM Phase 4 – Borrow & Return Management Test Suite', () => {
       );
 
       expect(res.borrowRequest.status).toBe(BorrowStatus.PARTIALLY_RETURNED);
-      expect(mockTx.stockBalance.update).toHaveBeenCalledWith(
+      expect(mockTx.stockBalance.updateMany).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { id: 'sb-1' },
+          where: { id: 'sb-1', borrowed: { gte: 1 } },
           data: {
             borrowed: { decrement: 1 },
             onHand: { increment: 1 },
@@ -614,7 +618,7 @@ describe('ACM Phase 4 – Borrow & Return Management Test Suite', () => {
             item: { id: itemId, name: 'STM32F401' },
           },
         ],
-        reservations: [{ itemId, locationId }],
+        reservations: [{ itemId, locationId, quantity: 2, status: ReservationStatus.FULFILLED }],
       });
 
       mockTx.returnTransaction.findUnique.mockResolvedValue(null);
@@ -677,9 +681,9 @@ describe('ACM Phase 4 – Borrow & Return Management Test Suite', () => {
 
       expect(res.borrowRequest.status).toBe(BorrowStatus.RETURNED);
       // Damaged condition: increments onHand and quarantined, decrements borrowed
-      expect(mockTx.stockBalance.update).toHaveBeenCalledWith(
+      expect(mockTx.stockBalance.updateMany).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { id: 'sb-1' },
+          where: { id: 'sb-1', borrowed: { gte: 1 } },
           data: {
             borrowed: { decrement: 1 },
             onHand: { increment: 1 },
@@ -716,7 +720,7 @@ describe('ACM Phase 4 – Borrow & Return Management Test Suite', () => {
             item: { id: itemId, name: 'STM32F401' },
           },
         ],
-        reservations: [{ itemId, locationId }],
+        reservations: [{ itemId, locationId, quantity: 1, status: ReservationStatus.FULFILLED }],
       });
 
       mockTx.returnTransaction.findUnique.mockResolvedValue(null);
@@ -770,9 +774,9 @@ describe('ACM Phase 4 – Borrow & Return Management Test Suite', () => {
 
       expect(res.borrowRequest.status).toBe(BorrowStatus.RETURNED);
       // LOST: only borrowed decrements, onHand is NOT incremented
-      expect(mockTx.stockBalance.update).toHaveBeenCalledWith(
+      expect(mockTx.stockBalance.updateMany).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { id: 'sb-1' },
+          where: { id: 'sb-1', borrowed: { gte: 1 } },
           data: {
             borrowed: { decrement: 1 },
           },
@@ -906,7 +910,7 @@ describe('ACM Phase 4 – Borrow & Return Management Test Suite', () => {
             item: { id: itemId, name: 'Arduino Uno R3' },
           },
         ],
-        reservations: [{ itemId, locationId }],
+        reservations: [{ itemId, locationId, quantity: 2, status: ReservationStatus.FULFILLED }],
       });
 
       await expect(
@@ -1251,7 +1255,7 @@ describe('ACM Phase 4 – Borrow & Return Management Test Suite', () => {
             item: { id: itemId, name: 'Cáp chuyển đổi UART' },
           },
         ],
-        reservations: [{ itemId, locationId }],
+        reservations: [{ itemId, locationId, quantity: 1, status: ReservationStatus.FULFILLED }],
       }));
 
       mockTx.returnTransaction.findUnique.mockResolvedValue(null);
