@@ -1,0 +1,35 @@
+# ACM Cloud P3 — read-only staging only. Do not deploy to real production.
+# Import this Blueprint only after review. No migrations or seed commands.
+services:
+  - type: web
+    name: acm-api-staging
+    runtime: node
+    plan: free
+    region: singapore
+    repo: https://github.com/acmhtql-sys/ACM_QLLK
+    branch: main
+    autoDeployTrigger: 'off'
+    buildCommand: npm ci && npm run build:shared && npm run prisma:generate && npm run build:api
+    startCommand: npm run start --workspace=@acm/api
+    healthCheckPath: /api/v1/health/readiness
+    envVars:
+      - key: NODE_VERSION
+        value: '22.22.0'
+      - key: NODE_ENV
+        value: production
+      - key: ACM_DEPLOYMENT_PROFILE
+        value: cloud_staging
+      - key: STAGING_READ_ONLY
+        value: 'true'
+      - key: ALLOW_STAGING_AUTH_LOGIN
+        value: 'false'
+      - key: API_PREFIX
+        value: /api/v1
+      - key: CORS_ORIGIN
+        value: https://acm-qllk-staging-web.vercel.app
+      - key: LOG_LEVEL
+        value: info
+      - key: JWT_SECRET
+        generateValue: true
+      - key: DATABASE_URL
+        sync: false
