@@ -104,5 +104,79 @@ print("D8_RETURN_CROSS_LOCATION_POLICY=DENY_409")
 # GitHub content operations, never by expanding the workflow token's scope.
 subprocess.run(["git","restore","--source=HEAD","--staged","--worktree","--",".github/workflows"],check=True)
 print("D8_WORKFLOWS_RETAINED_FROM_RC5_AND_ISOLATED_BRANCH")
+# Import the candidate's real PostgreSQL test, but preserve the RC5 contract.
+# A->B must fail 409 without writes; concurrent A->A returns must serialize.
+# Do not silently skip the new database test to get a green CI result.
+testp="apps/api/tests/borrow.return.concurrency.db.integration.test.ts"
+t=rd(testp)
+t=exactly(t,"import { createApp } from '../src/app';",
+  "import { createApp } from '../src/app';\nimport { computePasswordTag } from '../src/modules/auth/auth.security';",testp+" jwt binding")
+t=exactly(t,"D8-P0 isolated CI PostgreSQL return concurrency and A -> B ledger",
+  "D8 integration: real PostgreSQL return concurrency, same-source ledger and cross-location rejection",testp+" suite")
+t=exactly(t,"  let requestNumber = '';",
+  "  let requestNumber = '';\n  let adminPasswordHash = '';",testp+" fixture")
+t=exactly(t,"      role: UserRole.ADMIN,\n    };",
+  "      role: UserRole.ADMIN,\n    };\n    adminPasswordHash = admin!.passwordHash;",testp+" pwdTag fixture")
+t=exactly(t,"real row lock serializes concurrent full returns; A borrowed goes to zero, B onHand gains exactly 4",
+  "real row lock serializes same-source returns; cross-location writes fail closed",testp+" test")
+t=exactly(t,"locationId: created.destinationLocationId,\n        condition: AssetCondition.GOOD,",
+  "locationId: created.sourceLocationId,\n        condition: AssetCondition.GOOD,",testp+" success source")
+t=exactly(t,"    // Lock BorrowRequest using a third transaction to ensure both service",
+  """    // A->B must remain 409 and must not commit any return, key or stock write.
+    await expect(borrowService.returnBorrowRequest(
+      created.requestId,
+      { items: [{ ...input.items[0], locationId: created.destinationLocationId }] },
+      operator,
+      idempotencyKeyPrefix + 'X'
+    )).rejects.toMatchObject({ statusCode: 409 });
+    expect(await prisma.returnTransaction.count({
+      where: { borrowRequestId: created.requestId },
+    })).toBe(0);
+    const beforeLock = await prisma.stockBalance.findUnique({
+      where: { itemId_locationId: {
+        itemId: created.itemId, locationId: created.sourceLocationId,
+      } },
+    });
+    expect(beforeLock).toMatchObject({ onHand: 6, borrowed: 4 });
+    expect(await prisma.idempotencyRecord.count({
+      where: { key: idempotencyKeyPrefix + 'X' },
+    })).toBe(0);
+
+    // Lock BorrowRequest using a third transaction to ensure both service""",testp+" deny regression")
+t=exactly(t,"      id: operator.id,\n      email: operator.email,",
+  "      id: operator.id,\n      pwdTag: computePasswordTag(operator.id, adminPasswordHash),\n      email: operator.email,",testp+" strong JWT")
+if t.count("/return-idempotency/")!=2:
+  raise SystemExit("D8_UNEXPECTED_CANDIDATE_STATUS_CONTRACT")
+t=t.replace("/return-idempotency/","/return-status/")
+t=exactly(t,"""    expect(readStatus.body.data).toMatchObject({
+      status: 'COMPLETED',
+      confirmed: true,
+      returnNumber: winningReturn.result.returnNumber,
+    });""",
+  """    expect(readStatus.body.data).toMatchObject({
+      state: 'COMPLETED',
+      requiresReconciliation: false,
+      receipt: {
+        returnNumber: winningReturn.result.returnNumber,
+        borrowRequestId: created.requestId,
+      },
+    });""",testp+" RC5 read receipt")
+t=exactly(t,"expect(missingKey.status).toBe(428);",
+  "expect(missingKey.status).toBe(400);",testp+" RC5 missing key")
+t=exactly(t,"expect(origin).toMatchObject({ onHand: 6, borrowed: 0 });",
+  "expect(origin).toMatchObject({ onHand: 10, borrowed: 0 });",testp+" origin")
+t=exactly(t,"expect(destination).toMatchObject({ onHand: 4, borrowed: 0, quarantined: 0 });",
+  "expect(destination).toMatchObject({ onHand: 0, borrowed: 0, quarantined: 0 });",testp+" destination")
+t=exactly(t,"""      locationId: created.destinationLocationId,
+      quantityDelta: 4,
+      onHandBefore: 0,
+      onHandAfter: 4,""",
+  """      locationId: created.sourceLocationId,
+      quantityDelta: 4,
+      onHandBefore: 6,
+      onHandAfter: 10,""",testp+" movement")
+wr(testp,t)
+print("D8_PG_SYNTHETIC_CROSS_LOCATION_DENY_AND_SAME_SOURCE_LOCK_TEST=PREPARED")
+
 print("D8_VALIDATOR_EXPORTS",rd("packages/shared/src/validators.ts").count("export const "))
 print("D8_READY_FOR_ISOLATED_BUILDS=YES")
