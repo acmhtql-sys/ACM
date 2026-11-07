@@ -200,9 +200,10 @@ export const StockTransferModal: React.FC<StockTransferModalProps> = ({
     const success = fsm.resolveReconciliation();
 
     if (!success) {
+      // Never display an old 409 message as evidence that manual reconciliation was accepted.
+      // The client cannot provide authoritative proof or release the transaction lock.
       setReconcileError(
-        fsm.errorMessage ||
-          'Chức năng giải phóng đối soát thủ công từ giao diện người dùng đã bị vô hiệu hóa vì lý do an toàn. Cần dịch vụ xác minh có thẩm quyền từ máy chủ.'
+        'Chức năng giải phóng đối soát thủ công từ giao diện người dùng đã bị vô hiệu hóa vì lý do an toàn. Cần dịch vụ xác minh có thẩm quyền từ máy chủ.'
       );
     }
   };
