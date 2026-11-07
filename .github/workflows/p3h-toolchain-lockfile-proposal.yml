@@ -43,10 +43,10 @@ jobs:
             console.log('P3H_VERIFIED_VERSION',pkg,found);
             if(found!==version)throw new Error(pkg+' version mismatch: '+found);
           }
-          const tinypool=after.packages['node_modules/tinypool']?.version;
+          const pools=Object.entries(after.packages).filter(([p])=>p==='node_modules/tinypool'||p.endsWith('/node_modules/tinypool'));
           const undici=after.packages['node_modules/undici']?.version;
-          console.log('P3H_TRANSITIVE',JSON.stringify({tinypool,undici}));
-          if(!tinypool||Number(tinypool.split('.')[0])<2)throw Error('tinypool still vulnerable');
+          console.log('P3H_TRANSITIVE',JSON.stringify({tinypool:pools.map(([p,v])=>[p,v.version]),undici}));
+          if(pools.some(([,v])=>{const [major,minor,patch]=v.version.split('.').map(Number);return major<2||(major===2&&(minor<1||(minor===1&&patch<1)))}))throw Error('tinypool version still vulnerable');
           if(!undici || !undici.startsWith('8.12.'))throw Error('undici not updated to 8.12.x');
           const old=before.packages||{},fresh=after.packages||{};
           const changed=[...new Set([...Object.keys(old),...Object.keys(fresh)])].filter(k=>JSON.stringify(old[k])!==JSON.stringify(fresh[k]));
