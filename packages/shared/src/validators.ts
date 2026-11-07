@@ -47,7 +47,7 @@ export const booleanQueryParam = z.preprocess((val) => {
   if (val === 'true' || val === true) return true;
   if (val === 'false' || val === false) return false;
   return val; // Returns raw value so z.boolean throws error instead of silently passing undefined
-}, z.boolean({ invalid_type_error: 'Giá trị lọc phải là true hoặc false' }).optional());
+}, z.boolean({ error: 'Giá trị lọc phải là true hoặc false' }).optional());
 
 // Item create schema
 export const createItemSchema = z
@@ -94,7 +94,7 @@ export const updateItemSchema = z
 // Item status update schema (Soft deactivation / reactivation)
 export const updateItemStatusSchema = z
   .object({
-    isActive: z.boolean({ required_error: 'Trạng thái hoạt động là bắt buộc' }),
+    isActive: z.boolean({ error: 'Trạng thái hoạt động là bắt buộc' }),
     reason: z.string().max(255, 'Lý do thay đổi trạng thái tối đa 255 ký tự').optional(),
   })
   .strict();
@@ -153,7 +153,7 @@ export const updateLocationSchema = z
 
 export const updateLocationStatusSchema = z
   .object({
-    isActive: z.boolean({ required_error: 'Trạng thái hoạt động là bắt buộc' }),
+    isActive: z.boolean({ error: 'Trạng thái hoạt động là bắt buộc' }),
     reason: z.string().trim().max(255, 'Lý do thay đổi trạng thái tối đa 255 ký tự').optional(),
   })
   .strict();
@@ -402,23 +402,23 @@ export const adjustStockItemSchemaV2 = z
     itemId: z.string().uuid('ID linh kiện không hợp lệ'),
     locationId: z.string().uuid('ID vị trí kiểm kê không hợp lệ').optional(),
     expectedOnHand: z
-      .number({ required_error: 'Số lượng tồn sổ sách (expectedOnHand) là bắt buộc' })
+      .number({ error: 'Số lượng tồn sổ sách (expectedOnHand) là bắt buộc' })
       .int('Số lượng tồn sổ sách phải là số nguyên')
       .min(0, 'Số lượng tồn sổ sách không được âm'),
     expectedReserved: z
-      .number({ required_error: 'Số lượng đã giữ chỗ (expectedReserved) là bắt buộc' })
+      .number({ error: 'Số lượng đã giữ chỗ (expectedReserved) là bắt buộc' })
       .int('Số lượng đã giữ chỗ phải là số nguyên')
       .min(0, 'Số lượng đã giữ chỗ không được âm'),
     expectedQuarantined: z
-      .number({ required_error: 'Số lượng cách ly (expectedQuarantined) là bắt buộc' })
+      .number({ error: 'Số lượng cách ly (expectedQuarantined) là bắt buộc' })
       .int('Số lượng cách ly phải là số nguyên')
       .min(0, 'Số lượng cách ly không được âm'),
     expectedKitAllocated: z
-      .number({ required_error: 'Số lượng kit (expectedKitAllocated) là bắt buộc' })
+      .number({ error: 'Số lượng kit (expectedKitAllocated) là bắt buộc' })
       .int('Số lượng kit phải là số nguyên')
       .min(0, 'Số lượng kit không được âm'),
     actualOnHand: z
-      .number({ required_error: 'Số lượng kiểm đếm thực tế (actualOnHand) là bắt buộc' })
+      .number({ error: 'Số lượng kiểm đếm thực tế (actualOnHand) là bắt buộc' })
       .int('Số lượng kiểm đếm thực tế phải là số nguyên')
       .min(0, 'Số lượng kiểm đếm thực tế không được âm'),
     reason: z.string().trim().max(500, 'Lý do dòng điều chỉnh tối đa 500 ký tự').optional().nullable(),
@@ -430,7 +430,7 @@ export const adjustStockSchemaV2 = z
   .object({
     locationId: z.string().uuid('ID vị trí kiểm kê không hợp lệ').optional(),
     reason: z
-      .string({ required_error: 'Lý do điều chỉnh tồn kho là bắt buộc' })
+      .string({ error: 'Lý do điều chỉnh tồn kho là bắt buộc' })
       .trim()
       .min(5, 'Lý do điều chỉnh tồn kho phải có ít nhất 5 ký tự')
       .max(500, 'Lý do điều chỉnh tối đa 500 ký tự'),
