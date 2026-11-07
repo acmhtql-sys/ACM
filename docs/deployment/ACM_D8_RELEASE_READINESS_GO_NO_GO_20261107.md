@@ -44,7 +44,15 @@ PR **merge order only after all approvals**: #41 -> #40 -> #39 -> `main`, with c
 10. Rehearse backup/restore **onto a separate empty isolated DB**; record approved RPO/RTO, monitoring/on-call, rollback plan and deployment-owner approval.
 11. Only after all evidence and real human GO signoffs, plan a reviewed production deploy/cutover. Confirm actual payment impact before provisioning or changing billing.
 
-## 4. Acceptance log template — leave blank until witnessed
+## 4. Free-tier operational viability — additional explicit decision required
+
+- **Render Free web**: [Render official docs](https://render.com/docs/free) say Free instances are for testing/hobby projects and explicitly warn **not to use them for production**. They may spin down after 15 minutes idle and take about a minute to restart. Usage limits may suspend services or disable builds. Its filesystem is ephemeral, and there is no persistent disk on Free.
+- **Supabase Free**: [official pricing](https://supabase.com/pricing) lists **no automatic backups and no point-in-time recovery** on Free. [Supabase backup guidance](https://supabase.com/docs/guides/platform/backups) recommends regular off-site database exports for Free projects. **No tested export/restore or off-site retention is presently evidenced for ACM.**
+- The operator's prior instruction is **FREE ONLY / no paid upgrade**. That instruction is respected; it is *not* a claim that Free resources meet the uptime, backup, data protection or continuity requirements for real users.
+- Before any live data: business owner must set an approved availability target, RPO/RTO, backup frequency, independent restore-test evidence, external storage/custody and operating owner. If those targets cannot be met on the Free-only design, the owner must **reconsider the hosting architecture or explicitly authorize a budget alternative**. Never upgrade or bill automatically.
+- A read-only demo or isolated pilot with synthetic data may be acceptable under the existing protections, but **must not be described as production acceptance**.
+
+## 5. Acceptance log template — leave blank until witnessed
 
 | Item | Result PASS/FAIL/BLOCKED | Evidence URI + SHA | Witness name / role | Time (UTC) | Independent approval |
 |---|---|---|---|---|---|
@@ -60,7 +68,7 @@ PR **merge order only after all approvals**: #41 -> #40 -> #39 -> `main`, with c
 
 **Stop condition:** any missing or invalid signature, any P0/P1 bug, stock/receipt/audit imbalance, unknown DB identity, unsupported migration rollback, or paid-plan exposure means `NO_GO`. Keep `STAGING_READ_ONLY=true`, `ALLOW_STAGING_AUTH_LOGIN=false`, Render Free and auto-deploy off.
 
-## 5. Honest evidence classification
+## 6. Honest evidence classification
 
 - **Verified:** CI, mock browser, passive Staging HTTP negative tests, previously observed Render health.
 - **Not verified:** real business writer with audited PostgreSQL transactions, Stage4C migration/rollback proof, restore test, owners' signatures, real-data conversion, end-user pilot.
