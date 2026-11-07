@@ -22,8 +22,9 @@ services:
         value: cloud_staging
       - key: STAGING_READ_ONLY
         value: "true"
+      # Fail-closed in Cloud Staging: never enable login from a Blueprint sync.
       - key: ALLOW_STAGING_AUTH_LOGIN
-        value: "true"
+        value: "false"
       - key: JWT_EXPIRES_IN
         value: 1d
       - key: LOG_LEVEL
