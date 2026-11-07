@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import jwt from 'jsonwebtoken';
 import httpRequest from 'supertest';
 import { createApp } from '../src/app';
+import { computePasswordTag } from '../src/modules/auth/auth.security';
 import { env } from '../src/config/env';
 import { prisma } from '../src/config/database';
 import {
@@ -19,7 +20,7 @@ import { AssetCondition, BorrowStatus, ReservationStatus, UserRole } from '@acm/
  * We deliberately keep this separate from the mock suite: two separate
  * Prisma transactions contend for a real database lock on a synthetic row.
  */
-describe('D8-P0 isolated CI PostgreSQL return concurrency and A -> B ledger', () => {
+describe('D8 integration: same-source concurrency and cross-location rejection', () => {
   const suffix = randomUUID().replace(/-/g, '').slice(0, 12);
   const idempotencyKeyPrefix = `D8RET${suffix}`;
   const created = {
@@ -31,6 +32,7 @@ describe('D8-P0 isolated CI PostgreSQL return concurrency and A -> B ledger', ()
   };
   let operator: { id: string; email: string; fullName: string; role: UserRole };
   let requestNumber = '';
+  let adminPasswordHash = '';
 
   beforeAll(async () => {
     assertSafeTestDatabaseUrl(process.env.DATABASE_URL);
@@ -55,6 +57,7 @@ describe('D8-P0 isolated CI PostgreSQL return concurrency and A -> B ledger', ()
       fullName: admin!.fullName,
       role: UserRole.ADMIN,
     };
+    adminPasswordHash = admin!.passwordHash;
 
     const source = await prisma.location.create({
       data: { code: `D8-SRC-${suffix}`, name: 'D8 synthetic issuing warehouse' },
@@ -165,15 +168,36 @@ describe('D8-P0 isolated CI PostgreSQL return concurrency and A -> B ledger', ()
     }
   }, 20000);
 
-  it('real row lock serializes concurrent full returns; A borrowed goes to zero, B onHand gains exactly 4', async () => {
+  it('real row lock serializes same-source returns and denies A-to-B writes', async () => {
     const input = {
       items: [{
         borrowDetailId: created.detailId,
         returnedQuantity: 4,
-        locationId: created.destinationLocationId,
+        locationId: created.sourceLocationId,
         condition: AssetCondition.GOOD,
       }],
     };
+
+    // Cross-location return remains forbidden until custody/provenance approval.
+    // Verify rejection rolls back its idempotency claim and all business writes.
+    await expect(borrowService.returnBorrowRequest(
+      created.requestId,
+      { items: [{ ...input.items[0], locationId: created.destinationLocationId }] },
+      operator,
+      idempotencyKeyPrefix + 'X'
+    )).rejects.toMatchObject({ statusCode: 409 });
+    expect(await prisma.returnTransaction.count({
+      where: { borrowRequestId: created.requestId },
+    })).toBe(0);
+    const beforeLock = await prisma.stockBalance.findUnique({
+      where: { itemId_locationId: {
+        itemId: created.itemId, locationId: created.sourceLocationId,
+      } },
+    });
+    expect(beforeLock).toMatchObject({ onHand: 6, borrowed: 4 });
+    expect(await prisma.idempotencyRecord.count({
+      where: { key: idempotencyKeyPrefix + 'X' },
+    })).toBe(0);
 
     // Lock BorrowRequest using a third transaction to ensure both service
     // calls reach the database while the first row remains locked.
@@ -246,28 +270,32 @@ describe('D8-P0 isolated CI PostgreSQL return concurrency and A -> B ledger', ()
     const app = createApp();
     const token = jwt.sign({
       id: operator.id,
+      pwdTag: computePasswordTag(operator.id, adminPasswordHash),
       email: operator.email,
       role: operator.role,
       fullName: operator.fullName,
     }, env.JWT_SECRET, { expiresIn: '1h' });
 
     const readStatus = await httpRequest(app)
-      .get(`/api/v1/borrow-requests/${created.requestId}/return-idempotency/${winningKey}`)
+      .get(`/api/v1/borrow-requests/${created.requestId}/return-status/${winningKey}`)
       .set('Authorization', `Bearer ${token}`);
     expect(readStatus.status).toBe(200);
     expect(readStatus.body.data).toMatchObject({
-      status: 'COMPLETED',
-      confirmed: true,
-      returnNumber: winningReturn.result.returnNumber,
+      state: 'COMPLETED',
+      requiresReconciliation: false,
+      receipt: {
+        returnNumber: winningReturn.result.returnNumber,
+        borrowRequestId: created.requestId,
+      },
     });
     const anonymousStatus = await httpRequest(app)
-      .get(`/api/v1/borrow-requests/${created.requestId}/return-idempotency/${winningKey}`);
+      .get(`/api/v1/borrow-requests/${created.requestId}/return-status/${winningKey}`);
     expect(anonymousStatus.status).toBe(401);
     const missingKey = await httpRequest(app)
       .post(`/api/v1/borrow-requests/${created.requestId}/return`)
       .set('Authorization', `Bearer ${token}`)
       .send(input);
-    expect(missingKey.status).toBe(428);
+    expect(missingKey.status).toBe(400);
 
     const [origin, destination, request, detail, returnCount, movements, auditCount] = await Promise.all([
       prisma.stockBalance.findUnique({
@@ -290,18 +318,18 @@ describe('D8-P0 isolated CI PostgreSQL return concurrency and A -> B ledger', ()
         where: { entity: 'BorrowRequest', entityId: created.requestId, action: 'RETURN' },
       }),
     ]);
-    expect(origin).toMatchObject({ onHand: 6, borrowed: 0 });
-    expect(destination).toMatchObject({ onHand: 4, borrowed: 0, quarantined: 0 });
+    expect(origin).toMatchObject({ onHand: 10, borrowed: 0 });
+    expect(destination).toMatchObject({ onHand: 0, borrowed: 0, quarantined: 0 });
     expect(detail?.returnedQuantity).toBe(4);
     expect(request?.status).toBe(BorrowStatus.RETURNED);
     expect(returnCount).toBe(1);
     expect(auditCount).toBe(1);
     expect(movements).toHaveLength(1);
     expect(movements[0]).toMatchObject({
-      locationId: created.destinationLocationId,
+      locationId: created.sourceLocationId,
       quantityDelta: 4,
-      onHandBefore: 0,
-      onHandAfter: 4,
+      onHandBefore: 6,
+      onHandAfter: 10,
     });
   }, 20000);
 });
