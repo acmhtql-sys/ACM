@@ -103,16 +103,16 @@ test.describe('Phân hệ 6: Stock Transactions & Validation Guards (TX)', () =>
     await expect(modal).toBeVisible();
 
     // Line 0: Select Item 1 (ARD-UNO-R3) and Location 1 (BIN-A1-01)
-    await page.selectOption('[data-testid="select-item-0"]', 'itm-01');
-    await page.selectOption('[data-testid="select-location-0"]', 'loc-bn-01');
+    await page.selectOption('[data-testid="select-item-0"]', '10000000-0000-4000-8000-000000000001');
+    await page.selectOption('[data-testid="select-location-0"]', '20000000-0000-4000-8000-000000000004');
     await page.fill('[data-testid="input-qty-0"]', '5');
 
     // Add Line 1
     await page.click('[data-testid="btn-add-line"]');
 
     // Line 1: Select same Item 1 (ARD-UNO-R3) and same Location 1 (BIN-A1-01)
-    await page.selectOption('[data-testid="select-item-1"]', 'itm-01');
-    await page.selectOption('[data-testid="select-location-1"]', 'loc-bn-01');
+    await page.selectOption('[data-testid="select-item-1"]', '10000000-0000-4000-8000-000000000001');
+    await page.selectOption('[data-testid="select-location-1"]', '20000000-0000-4000-8000-000000000004');
     await page.fill('[data-testid="input-qty-1"]', '3');
 
     // Submit form
@@ -137,9 +137,9 @@ test.describe('Phân hệ 6: Stock Transactions & Validation Guards (TX)', () =>
     // Fill valid export reason
     await page.fill('[data-testid="export-reason-input"]', 'Xuất linh kiện phục vụ đề tài nghiên cứu Robot');
 
-    // Line 0: Select Item 1 (ARD-UNO-R3) with Available = 18 at loc-bn-01
-    await page.selectOption('[data-testid="select-item-0"]', 'itm-01');
-    await page.selectOption('[data-testid="select-location-0"]', 'loc-bn-01');
+    // Line 0: Select Item 1 (ARD-UNO-R3) with Available = 18 at 20000000-0000-4000-8000-000000000004
+    await page.selectOption('[data-testid="select-item-0"]', '10000000-0000-4000-8000-000000000001');
+    await page.selectOption('[data-testid="select-location-0"]', '20000000-0000-4000-8000-000000000004');
 
     // Enter quantity = 25 (exceeds available 18)
     await page.fill('[data-testid="input-qty-0"]', '25');
@@ -167,9 +167,9 @@ test.describe('Phân hệ 6: Stock Transactions & Validation Guards (TX)', () =>
     await page.fill('[data-testid="transfer-reason-input"]', 'Điều chuyển linh kiện sang trạm thực hành 2');
 
     // Line 0: Select Item 1, Source = BIN-A1-01, Target = BIN-A1-01 (identical)
-    await page.selectOption('[data-testid="select-item-0"]', 'itm-01');
-    await page.selectOption('[data-testid="select-from-location-0"]', 'loc-bn-01');
-    await page.selectOption('[data-testid="select-to-location-0"]', 'loc-bn-01');
+    await page.selectOption('[data-testid="select-item-0"]', '10000000-0000-4000-8000-000000000001');
+    await page.selectOption('[data-testid="select-from-location-0"]', '20000000-0000-4000-8000-000000000004');
+    await page.selectOption('[data-testid="select-to-location-0"]', '20000000-0000-4000-8000-000000000004');
     await page.fill('[data-testid="input-qty-0"]', '2');
 
     // Submit
@@ -193,18 +193,18 @@ test.describe('Phân hệ 6: Stock Transactions & Validation Guards (TX)', () =>
 
     await page.fill('[data-testid="transfer-reason-input"]', 'Điều chuyển linh kiện sang hai vị trí khác nhau');
 
-    // Line 0: Transfer 12 units of itm-01 from BIN-A1-01 to BIN-A1-02 (Available = 18)
-    await page.selectOption('[data-testid="select-item-0"]', 'itm-01');
-    await page.selectOption('[data-testid="select-from-location-0"]', 'loc-bn-01');
-    await page.selectOption('[data-testid="select-to-location-0"]', 'loc-bn-02');
+    // Line 0: Transfer 12 units of 10000000-0000-4000-8000-000000000001 from BIN-A1-01 to BIN-A1-02 (Available = 18)
+    await page.selectOption('[data-testid="select-item-0"]', '10000000-0000-4000-8000-000000000001');
+    await page.selectOption('[data-testid="select-from-location-0"]', '20000000-0000-4000-8000-000000000004');
+    await page.selectOption('[data-testid="select-to-location-0"]', '20000000-0000-4000-8000-000000000005');
     await page.fill('[data-testid="input-qty-0"]', '12');
 
-    // Add Line 1: Transfer 10 units of SAME itm-01 from SAME BIN-A1-01 to another location
+    // Add Line 1: Transfer 10 units of SAME 10000000-0000-4000-8000-000000000001 from SAME BIN-A1-01 to another location
     // Total transfer = 12 + 10 = 22 > 18 available!
     await page.click('[data-testid="btn-add-line"]');
-    await page.selectOption('[data-testid="select-item-1"]', 'itm-01');
-    await page.selectOption('[data-testid="select-from-location-1"]', 'loc-bn-01');
-    await page.selectOption('[data-testid="select-to-location-1"]', 'loc-sh-01');
+    await page.selectOption('[data-testid="select-item-1"]', '10000000-0000-4000-8000-000000000001');
+    await page.selectOption('[data-testid="select-from-location-1"]', '20000000-0000-4000-8000-000000000004');
+    await page.selectOption('[data-testid="select-to-location-1"]', '20000000-0000-4000-8000-000000000003');
     await page.fill('[data-testid="input-qty-1"]', '10');
 
     // Submit
@@ -229,9 +229,9 @@ test.describe('Phân hệ 6: Stock Transactions & Validation Guards (TX)', () =>
     // Fill valid reason
     await page.fill('[data-testid="adjustment-reason-input"]', 'Kiểm kê kho định kỳ cuối tuần');
 
-    // Line 0: Select itm-01 at loc-bn-01 (onHand = 25)
-    await page.selectOption('[data-testid="select-item-0"]', 'itm-01');
-    await page.selectOption('[data-testid="select-location-0"]', 'loc-bn-01');
+    // Line 0: Select 10000000-0000-4000-8000-000000000001 at 20000000-0000-4000-8000-000000000004 (onHand = 25)
+    await page.selectOption('[data-testid="select-item-0"]', '10000000-0000-4000-8000-000000000001');
+    await page.selectOption('[data-testid="select-location-0"]', '20000000-0000-4000-8000-000000000004');
 
     // Enter actual onHand = 25 (delta = 0)
     await page.fill('[data-testid="input-actual-onhand-0"]', '25');
@@ -257,10 +257,10 @@ test.describe('Phân hệ 6: Stock Transactions & Validation Guards (TX)', () =>
 
     await page.fill('[data-testid="adjustment-reason-input"]', 'Kiểm kê xử lý chênh lệch tồn kho');
 
-    // Line 0: Select itm-01 at loc-bn-01
+    // Line 0: Select 10000000-0000-4000-8000-000000000001 at 20000000-0000-4000-8000-000000000004
     // Committed = Reserved (3) + KitAllocated (2) + Quarantined (2) = 7
-    await page.selectOption('[data-testid="select-item-0"]', 'itm-01');
-    await page.selectOption('[data-testid="select-location-0"]', 'loc-bn-01');
+    await page.selectOption('[data-testid="select-item-0"]', '10000000-0000-4000-8000-000000000001');
+    await page.selectOption('[data-testid="select-location-0"]', '20000000-0000-4000-8000-000000000004');
 
     // Enter actual onHand = 3 (less than committed 7)
     await page.fill('[data-testid="input-actual-onhand-0"]', '3');
@@ -349,8 +349,8 @@ test.describe('Phân hệ 6: Stock Transactions & Validation Guards (TX)', () =>
 
     // Fill valid form inputs
     await page.fill('[data-testid="import-notes-input"]', 'Nhập linh kiện thí nghiệm đợt 1');
-    await page.selectOption('[data-testid="select-item-0"]', 'itm-01');
-    await page.selectOption('[data-testid="select-location-0"]', 'loc-bn-01');
+    await page.selectOption('[data-testid="select-item-0"]', '10000000-0000-4000-8000-000000000001');
+    await page.selectOption('[data-testid="select-location-0"]', '20000000-0000-4000-8000-000000000004');
     await page.fill('[data-testid="input-qty-0"]', '5');
     await page.fill('[data-testid="input-cost-0"]', '10000');
 
@@ -398,7 +398,7 @@ test.describe('Phân hệ 6: Stock Transactions & Validation Guards (TX)', () =>
     expect(req2.authorization).toBe(req1.authorization);
     expect(req2.body).toEqual(req1.body);
     expect(req2.body.items).toHaveLength(1);
-    expect(req2.body.items[0].itemId).toBe('itm-01');
+    expect(req2.body.items[0].itemId).toBe('10000000-0000-4000-8000-000000000001');
     expect(req2.body.items[0].quantity).toBe(5);
 
     // 10. Verify successful completion: modal is dismissed on success
@@ -458,8 +458,8 @@ test.describe('Phân hệ 6: Stock Transactions & Validation Guards (TX)', () =>
 
     // Fill form and submit
     await page.fill('[data-testid="import-notes-input"]', 'Phiếu nhập đối soát xung đột');
-    await page.selectOption('[data-testid="select-item-0"]', 'itm-02');
-    await page.selectOption('[data-testid="select-location-0"]', 'loc-bn-01');
+    await page.selectOption('[data-testid="select-item-0"]', '10000000-0000-4000-8000-000000000002');
+    await page.selectOption('[data-testid="select-location-0"]', '20000000-0000-4000-8000-000000000004');
     await page.fill('[data-testid="input-qty-0"]', '3');
 
     await page.click('[data-testid="btn-submit-import"]');
@@ -506,8 +506,8 @@ test.describe('Phân hệ 6: Stock Transactions & Validation Guards (TX)', () =>
     await expect(modal).toBeVisible();
 
     await page.fill('[data-testid="import-notes-input"]', 'Phiếu nhập đang xử lý concurrent');
-    await page.selectOption('[data-testid="select-item-0"]', 'itm-01');
-    await page.selectOption('[data-testid="select-location-0"]', 'loc-bn-01');
+    await page.selectOption('[data-testid="select-item-0"]', '10000000-0000-4000-8000-000000000001');
+    await page.selectOption('[data-testid="select-location-0"]', '20000000-0000-4000-8000-000000000004');
     await page.fill('[data-testid="input-qty-0"]', '2');
 
     await page.click('[data-testid="btn-submit-import"]');
@@ -556,8 +556,8 @@ test.describe('Phân hệ 6: Stock Transactions & Validation Guards (TX)', () =>
 
     // 2. Submit form to trigger 409 Conflict
     await page.fill('[data-testid="import-notes-input"]', 'Kiểm thử thoát đối soát');
-    await page.selectOption('[data-testid="select-item-0"]', 'itm-03');
-    await page.selectOption('[data-testid="select-location-0"]', 'loc-bn-02');
+    await page.selectOption('[data-testid="select-item-0"]', '10000000-0000-4000-8000-000000000003');
+    await page.selectOption('[data-testid="select-location-0"]', '20000000-0000-4000-8000-000000000005');
     await page.fill('[data-testid="input-qty-0"]', '1');
     await page.click('[data-testid="btn-submit-import"]');
 
