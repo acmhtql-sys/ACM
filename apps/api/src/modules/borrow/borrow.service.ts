@@ -815,6 +815,9 @@ export class BorrowService {
           }
         }
 
+      // D8-P0: serialize a BorrowRequest BEFORE reading returnedQuantity.
+      await tx.$queryRaw`SELECT "id" FROM "borrow_requests"
+        WHERE "id" = ${id}::uuid FOR UPDATE`;
       const req = await tx.borrowRequest.findUnique({
         where: { id },
         include: {
@@ -924,6 +927,10 @@ export class BorrowService {
 
         // Never create a new balance or silently cap the reduction in borrowed.
         // A mismatch is evidence of unreconciled physical or logical stock.
+        // D8-P0: source balance lock protects onHandBefore and borrowed.
+        await tx.$queryRaw`SELECT "id" FROM "stock_balances"
+          WHERE "itemId" = ${detail.itemId}::uuid
+          AND "locationId" = ${destinationLocationId}::uuid FOR UPDATE`;
         const bal = await tx.stockBalance.findUnique({
           where: {
             itemId_locationId: { itemId: detail.itemId, locationId: destinationLocationId },
