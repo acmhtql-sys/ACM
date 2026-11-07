@@ -216,13 +216,26 @@ async function runBorrowTransaction<T>(
     // SQLSTATE 40001 (serialization_failure) or 40P01 (deadlock_detected).
     // Map only those exact concurrency conditions to a safe HTTP 409.
     const prismaError = error && typeof error === 'object'
-      ? error as { code?: unknown; meta?: { code?: unknown } }
+      ? error as {
+          code?: unknown;
+          meta?: { code?: unknown; originalCode?: unknown };
+          message?: unknown;
+        }
       : null;
     const prismaCode = prismaError?.code;
-    const sqlState = prismaError?.meta?.code;
+    const sqlStates = [prismaError?.meta?.code, prismaError?.meta?.originalCode]
+      .map((value) => String(value ?? ''));
+    const rawMessage = typeof prismaError?.message === 'string'
+      ? prismaError.message : '';
+    // Prisma's raw-query SQLSTATE may be serialized in the error message
+    // rather than meta.code. Limit this fallback to the exact concurrency
+    // SQLSTATEs; never hide unrelated database failures.
+    const hasSerializationCode =
+      sqlStates.includes('40001') || sqlStates.includes('40P01') ||
+      /Raw query failed\. Code: \`(?:40001|40P01)\`/.test(rawMessage);
     if (
       prismaCode === 'P2034' ||
-      (prismaCode === 'P2010' && (sqlState === '40001' || sqlState === '40P01'))
+      (prismaCode === 'P2010' && hasSerializationCode)
     ) {
       throw new AppError(
         'Giao dịch kho đang được cập nhật đồng thời. Vui lòng tải lại tồn kho và đối soát trước khi thử lại',
