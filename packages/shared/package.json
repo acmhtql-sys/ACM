@@ -9,8 +9,8 @@
     "watch": "tsc --watch",
     "typecheck": "tsc --noEmit",
     "lint": "tsc --noEmit",
-    "test": "vitest run",
-    "test:unit": "vitest run"
+    "test": "vitest run src",
+    "test:unit": "vitest run src"
   },
   "dependencies": {
     "zod": "4.6.7"
