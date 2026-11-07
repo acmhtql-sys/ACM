@@ -334,6 +334,22 @@ test.describe('Phân hệ 6: Stock Transactions & Validation Guards (TX)', () =>
       return false;
     });
 
+    // GET-only status lookup: a second stock POST is never authorized by a 504.
+    let statusGetCount = 0;
+    registerCustomMockHandler('/api/v1/stock-transactions/idempotency/', async (route, req) => {
+      if (req.method() !== 'GET') return false;
+      statusGetCount++;
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          success: true,
+          data: { status: 'IN_PROGRESS' },
+        }),
+      });
+      return true;
+    });
+
     await page.goto('/transactions');
 
     // 1. Open Import Modal
@@ -383,29 +399,21 @@ test.describe('Phân hệ 6: Stock Transactions & Validation Guards (TX)', () =>
     expect(capturedRequests.length).toBe(1);
     expect(capturedRequests[0].idempotencyKey).toBe(initialKey);
 
-    // 7. User clicks manual retry ("Thử lại an toàn với cùng khóa")
-    const retryBtn = page.locator('[data-testid="btn-retry-ambiguous"]');
-    await expect(retryBtn).toBeVisible();
-    await retryBtn.click();
+    // 7. User can only query status via GET, never repeat the stock POST.
+    const statusCheckBtn = page.locator('[data-testid="btn-retry-ambiguous"]');
+    await expect(statusCheckBtn).toBeVisible();
+    await statusCheckBtn.click();
 
-    // 8. Verify exactly 2 requests dispatched in total
-    expect(capturedRequests.length).toBe(2);
+    // Backend is still processing: stay ambiguous and preserve the original key.
+    await expect(ambiguousBanner).toBeVisible();
+    await expect(page.locator('[data-testid="ambiguous-error-detail"]')).toContainText('IN_PROGRESS');
+    expect(statusGetCount).toBe(1);
+    expect(capturedRequests).toHaveLength(1);
+    expect(await initialKeyInput.inputValue()).toBe(initialKey);
+    await expect(page.locator('[data-testid="btn-confirm-submit-import"]')).toBeDisabled();
 
-    // 9. Exact verification: endpoint, key, payload, auth
-    const req1 = capturedRequests[0];
-    const req2 = capturedRequests[1];
-
-    expect(req2.url).toBe(req1.url);
-    expect(req2.idempotencyKey).toBe(req1.idempotencyKey);
-    expect(req2.authorization).toBe(req1.authorization);
-    expect(req2.body).toEqual(req1.body);
-    expect(req2.body.items).toHaveLength(1);
-    expect(req2.body.items[0].itemId).toBe('10000000-0000-4000-8000-000000000001');
-    expect(req2.body.items[0].quantity).toBe(5);
-
-    // 10. Verify successful completion: modal is dismissed on success
-    await expect(modal).not.toBeVisible();
-
+    // No client-side reissue and no successful dismissal without server proof.
+    await expect(modal).toBeVisible();
     assertZeroUnexpectedViolations();
   });
 
