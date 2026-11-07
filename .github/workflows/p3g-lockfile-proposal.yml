@@ -19,7 +19,7 @@ jobs:
         with:
           node-version: '22'
       - name: Generate review-only npm lockfile from package overrides
-        run: npm install --package-lock-only --ignore-scripts --no-fund --no-audit
+        run: npm update body-parser follow-redirects --package-lock-only --ignore-scripts --no-fund --no-audit
       - name: Check scope and emit lockfile for explicit review
         run: |
           node <<'NODE'
