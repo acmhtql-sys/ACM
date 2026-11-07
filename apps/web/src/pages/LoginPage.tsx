@@ -29,6 +29,8 @@ export const LoginPage: React.FC = () => {
       // Fail closed: network errors must never create a local authenticated session.
       if (err.response) {
         setError(err.response.data?.message || 'Email hoặc mật khẩu không chính xác');
+      } else if (err.code === 'ECONNABORTED' || err.code === 'ETIMEDOUT') {
+        setError('Máy chủ phản hồi quá chậm (có thể đang khởi động). Vui lòng thử lại sau.');
       } else {
         setError('Không thể kết nối máy chủ xác thực. Vui lòng thử lại sau.');
       }
