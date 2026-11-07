@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { randomUUID } from 'node:crypto';
 import jwt from 'jsonwebtoken';
-import request from 'supertest';
+import httpRequest from 'supertest';
 import { createApp } from '../src/app';
 import { env } from '../src/config/env';
 import { prisma } from '../src/config/database';
@@ -251,7 +251,7 @@ describe('D8-P0 isolated CI PostgreSQL return concurrency and A -> B ledger', ()
       fullName: operator.fullName,
     }, env.JWT_SECRET, { expiresIn: '1h' });
 
-    const readStatus = await request(app)
+    const readStatus = await httpRequest(app)
       .get(`/api/v1/borrow-requests/${created.requestId}/return-idempotency/${winningKey}`)
       .set('Authorization', `Bearer ${token}`);
     expect(readStatus.status).toBe(200);
@@ -260,10 +260,10 @@ describe('D8-P0 isolated CI PostgreSQL return concurrency and A -> B ledger', ()
       confirmed: true,
       returnNumber: winningReturn.result.returnNumber,
     });
-    const anonymousStatus = await request(app)
+    const anonymousStatus = await httpRequest(app)
       .get(`/api/v1/borrow-requests/${created.requestId}/return-idempotency/${winningKey}`);
     expect(anonymousStatus.status).toBe(401);
-    const missingKey = await request(app)
+    const missingKey = await httpRequest(app)
       .post(`/api/v1/borrow-requests/${created.requestId}/return`)
       .set('Authorization', `Bearer ${token}`)
       .send(input);
