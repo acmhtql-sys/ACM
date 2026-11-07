@@ -1,0 +1,32 @@
+name: ACM P3-G Zod 4 Compatibility Probe (no DB)
+on:
+  push:
+    branches:
+      - codex/p3g-zod4-compat-probe-20261107
+permissions:
+  contents: read
+jobs:
+  compatibility:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install baseline monorepo
+        run: npm ci --ignore-scripts --no-fund --no-audit
+      - name: Resolve Zod v4 patched release on isolated CI runner (not committed)
+        run: npm install zod@4.6.7 --save-exact --workspace=@acm/shared --workspace=@acm/api --ignore-scripts --no-audit --no-fund
+      - name: Check patched dependency and workspace resolution
+        run: |
+          node -e "const lock=require('./package-lock.json');let v=lock.packages['node_modules/zod']?.version; console.log('Proposed Zod version:',v); if(v!=='4.6.7')process.exit(1)"
+          npm ls zod --all
+      - name: Typecheck and build shared (Zod 4)
+        run: npm run build:shared
+      - name: Typecheck API (Zod 4)
+        run: npm run typecheck --workspace=@acm/api
+      - name: Build API (Zod 4)
+        run: npm run build:api
+      - name: Run unit tests only (no database, no secrets)
+        run: npm run test:unit
