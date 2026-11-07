@@ -116,7 +116,7 @@ test.describe('Phân hệ 6: Stock Transactions & Validation Guards (TX)', () =>
     await page.fill('[data-testid="input-qty-1"]', '3');
 
     // Submit form
-    await page.click('[data-testid="btn-submit-import"]');
+    await page.click('[data-testid="btn-review-import"]');
 
     // Expect client validation error to appear
     const errorContainer = page.locator('[data-testid="client-validation-errors"]');
@@ -145,7 +145,7 @@ test.describe('Phân hệ 6: Stock Transactions & Validation Guards (TX)', () =>
     await page.fill('[data-testid="input-qty-0"]', '25');
 
     // Submit form
-    await page.click('[data-testid="btn-submit-export"]');
+    await page.click('[data-testid="btn-review-export"]');
 
     // Expect client validation error
     const errorContainer = page.locator('[data-testid="client-validation-errors"]');
@@ -173,7 +173,7 @@ test.describe('Phân hệ 6: Stock Transactions & Validation Guards (TX)', () =>
     await page.fill('[data-testid="input-qty-0"]', '2');
 
     // Submit
-    await page.click('[data-testid="btn-submit-transfer"]');
+    await page.click('[data-testid="btn-review-transfer"]');
 
     // Expect client validation error
     const errorContainer = page.locator('[data-testid="client-validation-errors"]');
@@ -208,7 +208,7 @@ test.describe('Phân hệ 6: Stock Transactions & Validation Guards (TX)', () =>
     await page.fill('[data-testid="input-qty-1"]', '10');
 
     // Submit
-    await page.click('[data-testid="btn-submit-transfer"]');
+    await page.click('[data-testid="btn-review-transfer"]');
 
     // Expect Transfer Aggregate Guard error
     const errorContainer = page.locator('[data-testid="client-validation-errors"]');
@@ -355,7 +355,9 @@ test.describe('Phân hệ 6: Stock Transactions & Validation Guards (TX)', () =>
     await page.fill('[data-testid="input-cost-0"]', '10000');
 
     // 2. Submit Form
-    await page.click('[data-testid="btn-submit-import"]');
+    await page.click('[data-testid="btn-review-import"]');
+    await expect(page.locator('[data-testid="import-confirmation-step"]')).toBeVisible();
+    await page.click('[data-testid="btn-confirm-submit-import"]');
 
     // 3. Confirm transition to AMBIGUOUS_OUTCOME upon HTTP 504
     const ambiguousBanner = page.locator('[data-testid="ambiguous-state-banner"]');
@@ -371,7 +373,7 @@ test.describe('Phân hệ 6: Stock Transactions & Validation Guards (TX)', () =>
     await expect(page.locator('[data-testid="select-item-0"]')).toBeDisabled();
     await expect(page.locator('[data-testid="select-location-0"]')).toBeDisabled();
     await expect(page.locator('[data-testid="input-qty-0"]')).toBeDisabled();
-    await expect(page.locator('[data-testid="btn-submit-import"]')).toBeDisabled();
+    await expect(page.locator('[data-testid="btn-confirm-submit-import"]')).toBeDisabled();
 
     // 5. Verify Idempotency-Key is preserved (NOT rotated)
     const currentKey = await initialKeyInput.inputValue();
@@ -462,7 +464,9 @@ test.describe('Phân hệ 6: Stock Transactions & Validation Guards (TX)', () =>
     await page.selectOption('[data-testid="select-location-0"]', '20000000-0000-4000-8000-000000000004');
     await page.fill('[data-testid="input-qty-0"]', '3');
 
-    await page.click('[data-testid="btn-submit-import"]');
+    await page.click('[data-testid="btn-review-import"]');
+    await expect(page.locator('[data-testid="import-confirmation-step"]')).toBeVisible();
+    await page.click('[data-testid="btn-confirm-submit-import"]');
 
     // Confirm transition to RECONCILIATION_REQUIRED
     const reconcileBanner = page.locator('[data-testid="reconciliation-banner"]');
@@ -476,7 +480,7 @@ test.describe('Phân hệ 6: Stock Transactions & Validation Guards (TX)', () =>
     await expect(errorDetail).toContainText('Phát hiện xung đột Idempotency');
 
     // Form submission must remain strictly disabled
-    await expect(page.locator('[data-testid="btn-submit-import"]')).toBeDisabled();
+    await expect(page.locator('[data-testid="btn-confirm-submit-import"]')).toBeDisabled();
 
     // Key must NOT be auto-rotated
     expect(await keyInput.inputValue()).toBe(initialKey);
@@ -510,7 +514,9 @@ test.describe('Phân hệ 6: Stock Transactions & Validation Guards (TX)', () =>
     await page.selectOption('[data-testid="select-location-0"]', '20000000-0000-4000-8000-000000000004');
     await page.fill('[data-testid="input-qty-0"]', '2');
 
-    await page.click('[data-testid="btn-submit-import"]');
+    await page.click('[data-testid="btn-review-import"]');
+    await expect(page.locator('[data-testid="import-confirmation-step"]')).toBeVisible();
+    await page.click('[data-testid="btn-confirm-submit-import"]');
 
     // In-Progress must transition to AMBIGUOUS_OUTCOME, NOT CONFIRMED_FAILURE
     const ambiguousBanner = page.locator('[data-testid="ambiguous-state-banner"]');
@@ -559,7 +565,9 @@ test.describe('Phân hệ 6: Stock Transactions & Validation Guards (TX)', () =>
     await page.selectOption('[data-testid="select-item-0"]', '10000000-0000-4000-8000-000000000003');
     await page.selectOption('[data-testid="select-location-0"]', '20000000-0000-4000-8000-000000000005');
     await page.fill('[data-testid="input-qty-0"]', '1');
-    await page.click('[data-testid="btn-submit-import"]');
+    await page.click('[data-testid="btn-review-import"]');
+    await expect(page.locator('[data-testid="import-confirmation-step"]')).toBeVisible();
+    await page.click('[data-testid="btn-confirm-submit-import"]');
 
     // 3. Confirm in RECONCILIATION_REQUIRED
     const reconcileBanner = page.locator('[data-testid="reconciliation-banner"]');
@@ -590,7 +598,7 @@ test.describe('Phân hệ 6: Stock Transactions & Validation Guards (TX)', () =>
     // - Inputs are unlocked for editing in new DRAFT state
     await expect(page.locator('[data-testid="import-notes-input"]')).toBeEnabled();
     await expect(page.locator('[data-testid="select-item-0"]')).toBeEnabled();
-    await expect(page.locator('[data-testid="btn-submit-import"]')).toBeEnabled();
+    await expect(page.locator('[data-testid="btn-confirm-submit-import"]')).toBeEnabled();
 
     assertZeroUnexpectedViolations();
   });
