@@ -18,8 +18,11 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - name: Use npm 11 on isolated CI runner to avoid npm 10 Arborist regression
+        run: npm install --global npm@11 --no-fund --no-audit
       - name: Resolve proposed patched toolchain without running lifecycle scripts
         run: |
+          npm --version
           npm install --package-lock-only --ignore-scripts --no-audit --no-fund
           npm update undici --package-lock-only --ignore-scripts --no-audit --no-fund
       - name: Prove package resolution and audit risk
