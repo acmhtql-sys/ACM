@@ -28,6 +28,8 @@ jobs:
           if (!direct.length || direct.some(([,v])=>v.version!=='4.6.7')) throw Error('Zod 4.6.7 is not resolved for shared/API workspaces');
           NODE
           npm ls zod --all
+      - name: Generate Prisma Client (CI only, no DB connection)
+        run: npm run prisma:generate
       - name: Typecheck and build shared (Zod 4)
         run: npm run build:shared
       - name: Typecheck API (Zod 4)
