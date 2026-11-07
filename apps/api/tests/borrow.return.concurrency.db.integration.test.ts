@@ -242,9 +242,10 @@ describe('D8 integration: same-source concurrency and cross-location rejection',
     const rejections = outcomes.filter((x) => !x.ok);
     expect(successes).toHaveLength(1);
     expect(rejections).toHaveLength(1);
-    expect((rejections[0] as { ok: false; error: any }).error).toMatchObject({
-      statusCode: 400,
-    });
+    // Both outcomes fail closed: 400 when the return is already completed,
+    // or 409 when PostgreSQL serializable contention is exhausted.
+    const rejectedError = (rejections[0] as { ok: false; error: { statusCode: number } }).error;
+    expect([400, 409]).toContain(rejectedError.statusCode);
 
     // Replaying a committed return with the same key must return the original
     // receipt, even after the BorrowRequest itself has become RETURNED.
