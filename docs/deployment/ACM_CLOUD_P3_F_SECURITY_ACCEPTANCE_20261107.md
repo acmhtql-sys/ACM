@@ -9,14 +9,14 @@
 - Browser Preview login and backend: Render request log on 2026-11-07T06:34:41Z recorded `POST /api/v1/auth/login` returning **HTTP 403**; browser remained on login and displayed the read-only message. This is a verified single live login-negative test, not proof of all methods.
 - `GET /api/v1/health/readiness` returned 200 with `database: connected` after rotating staging DB credentials (operator updated secret in Render; none recorded in Git).
 - `apps/api/tests/p3f.security.http.unit.test.ts` exercises the actual Express stack against **in-process local tests**, using deliberately nonexistent paths for all mutation methods, plus authentication requirements on private read endpoints and method override attempts. No Supabase connection, credentials or real writes.
-- `scripts/p3f-live-readonly-acceptance.mjs` performs limited unauthenticated public HTTP probes on the **existing** Render staging service. Its POST/PUT/PATCH/DELETE tests only target `/api/v1/__acm_p3f_nonexistent_readonly_probe__`, so failure of the guard can return 404 but cannot invoke a business mutation. It also checks private GET = 401, liveness = 200, CORS Preview origin and method-override attacks. Actual result must be verified in the matching CI job before declaring LIVE-MATRIX PASS.
+- `scripts/p3f-live-readonly-acceptance.mjs` performs limited unauthenticated public HTTP probes on the **existing** Render staging service. Its POST/PUT/PATCH/DELETE tests only target `/api/v1/__acm_p3f_nonexistent_readonly_probe__`, so failure of the guard can return 404 but cannot invoke a business mutation. It also checks private GET = 401, liveness = 200, CORS Preview origin and method-override attacks. **Verified:** GitHub CI run #133 (`42349991483`) completed successfully. Job logs show POST/PUT/PATCH/DELETE = 403, method overrides = 403, private GETs = 401, liveness = 200, allowed Preview CORS and untrusted origin rejection. No business writes attempted.
 - GitHub Actions is modified to run a report-only `npm audit` (all and `--omit=dev`). It does not auto-fix, install new versions, merge or release.
 
 ## Blueprint drift finding and correction
 
 - Existing Render-managed source Blueprint branch `codex/cloud-staging-p2e-readonly-deploy-20261107` contained `ALLOW_STAGING_AUTH_LOGIN=true` despite effective runtime policy `false`.
 - Corrected **source** `render.yaml` to `ALLOW_STAGING_AUTH_LOGIN=false` in commit `ad7518438a0f530236410f272de83cc0ea31f1dd`; kept `STAGING_READ_ONLY=true`, `cloud_staging`, `autoDeployTrigger: off` and plan Free.
-- This source correction is **not** a claim that a Blueprint sync occurred. Do not sync automatically: confirm linked Blueprint and that `DATABASE_URL`/JWT secrets will remain protected.
+- This source correction is **not** a claim that a Blueprint sync occurred. Existing staging API branch source additionally received compressed-body parsing mitigations in commits `629a9d0` and `0e357af`; a Render deploy was triggered for this existing Free service, and its status must be confirmed independently. Do not sync automatically: confirm linked Blueprint and that `DATABASE_URL`/JWT secrets will remain protected.
 
 ## Dependency findings (npm audit from CI, not release-approved)
 
@@ -38,7 +38,7 @@
 
 ## Outstanding release blockers
 
-- [ ] Latest CI and safe live negative matrix both succeed (check recorded job evidence)
+- [x] GitHub CI #133 and safe live negative matrix both succeeded (see run `42349991483`)
 - [ ] Security review independent of PR author, including runtime changes
 - [ ] Triage/patch vulnerable dependencies with verified lockfile and regression tests (especially Zod migration)
 - [ ] Explicit public catalog stock-disclosure policy
