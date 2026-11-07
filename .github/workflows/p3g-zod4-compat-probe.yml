@@ -1,8 +1,8 @@
 name: ACM P3-G Zod 4 Compatibility Probe (no DB)
 on:
-  push:
+  pull_request:
     branches:
-      - codex/p3g-zod4-compat-probe-20261107
+      - codex/p3-staging-readonly-deployment-20261107
 permissions:
   contents: read
 jobs:
