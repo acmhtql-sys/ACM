@@ -1,3 +1,4 @@
+import { gzipSync } from 'node:zlib';
 /**
  * ACM P3-F live negative probes — run only against EXISTING read-only staging.
  *
@@ -65,4 +66,20 @@ if (rejectProbe.headers.get('access-control-allow-origin') === disallowed) {
   throw new Error('CORS reflected an unauthorized origin');
 }
 console.log('PASS CORS does not reflect an unauthorized origin');
+// Only probe an impossible route: compressed payload must fail before routing.
+const compressedResponse = await fetch(base + path, {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    'Content-Encoding': 'gzip',
+  },
+  body: gzipSync(Buffer.from('{"syntheticProbeOnly":true}')),
+  redirect: 'manual',
+  signal: AbortSignal.timeout(110000),
+});
+if (compressedResponse.status !== 415) {
+  throw new Error(`Compressed body must fail with HTTP 415, got ${compressedResponse.status}`);
+}
+console.log('PASS compressed JSON request body -> 415');
+
 console.log('P3-F live negative matrix PASS — no business writes attempted');
