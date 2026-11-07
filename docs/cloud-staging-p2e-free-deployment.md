@@ -18,7 +18,7 @@ This deployment plan is based on release commit `ab9bb67517ac2512839dbde4574242f
 
 The root `render.yaml` creates **one** Node Web Service on the **free** plan, region Singapore. Automatic deployment is **off**. It uses the exact feature branch and the monorepo root.
 
-- Build: `npm ci && npm run prisma:generate && npm run build:shared && npm run build:api`
+- Build: `npm ci --include=dev && npm run prisma:generate && npm run build:shared && npm run build:api`
 - Start: `npm run start --workspace=@acm/api`
 - Health: `GET /api/v1/health/readiness` – unlike `/health`, this returns 503 if DB is disconnected.
 - Cloud profile: `NODE_ENV=production`, `ACM_DEPLOYMENT_PROFILE=cloud_staging`, `STAGING_READ_ONLY=true`, `ALLOW_STAGING_AUTH_LOGIN=true`.
