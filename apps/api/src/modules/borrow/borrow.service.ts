@@ -211,10 +211,21 @@ async function runBorrowTransaction<T>(
       timeout: 15_000,
     });
   } catch (error: unknown) {
-    if (typeof error === 'object' && error !== null && 'code' in error &&
-        error.code === 'P2034') {
+    // Prisma usually surfaces Serializable conflicts as P2034, but a
+    // parameterized SELECT ... FOR UPDATE may report P2010 with PostgreSQL
+    // SQLSTATE 40001 (serialization_failure) or 40P01 (deadlock_detected).
+    // Map only those exact concurrency conditions to a safe HTTP 409.
+    const prismaError = error && typeof error === 'object'
+      ? error as { code?: unknown; meta?: { code?: unknown } }
+      : null;
+    const prismaCode = prismaError?.code;
+    const sqlState = prismaError?.meta?.code;
+    if (
+      prismaCode === 'P2034' ||
+      (prismaCode === 'P2010' && (sqlState === '40001' || sqlState === '40P01'))
+    ) {
       throw new AppError(
-        'Giao dịch kho đang được cập nhật đồng thời. Vui lòng tải lại tồn kho và thử lại',
+        'Giao dịch kho đang được cập nhật đồng thời. Vui lòng tải lại tồn kho và đối soát trước khi thử lại',
         409
       );
     }
