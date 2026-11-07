@@ -20,7 +20,13 @@ jobs:
         run: npm install zod@4.6.7 --save-exact --workspace=@acm/shared --workspace=@acm/api --ignore-scripts --no-audit --no-fund
       - name: Check patched dependency and workspace resolution
         run: |
-          node -e "const lock=require('./package-lock.json');let v=lock.packages['node_modules/zod']?.version; console.log('Proposed Zod version:',v); if(v!=='4.6.7')process.exit(1)"
+          node <<'NODE'
+          const lock=require('./package-lock.json');
+          const paths=Object.entries(lock.packages).filter(([k])=>k.endsWith('/node_modules/zod') || k==='node_modules/zod');
+          console.log('Resolved Zod installations:', JSON.stringify(paths.map(([p,v])=>[p,v.version])));
+          const direct=paths.filter(([p])=>p==='node_modules/zod'||p==='apps/api/node_modules/zod'||p==='packages/shared/node_modules/zod');
+          if (!direct.length || direct.some(([,v])=>v.version!=='4.6.7')) throw Error('Zod 4.6.7 is not resolved for shared/API workspaces');
+          NODE
           npm ls zod --all
       - name: Typecheck and build shared (Zod 4)
         run: npm run build:shared
