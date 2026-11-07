@@ -1,9 +1,8 @@
 name: ACM P3-G Lockfile Proposal (review only)
 
 on:
-  push:
-    branches:
-      - codex/p3-staging-readonly-deployment-20261107
+  pull_request:
+    branches: [main]
     paths:
       - package.json
       - .github/workflows/p3g-lockfile-proposal.yml
