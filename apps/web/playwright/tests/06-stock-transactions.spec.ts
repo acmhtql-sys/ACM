@@ -502,7 +502,7 @@ test.describe('Phân hệ 6: Stock Transactions & Validation Guards (TX)', () =>
 
     const errorMsg = page.locator('[data-testid="reconcile-error-msg"]');
     await expect(errorMsg).toBeVisible();
-    await expect(errorMsg).toContainText('tối thiểu 5 ký tự');
+    await expect(errorMsg).toContainText('đã bị vô hiệu hóa vì lý do an toàn');
     await expect(reconcileBanner).toBeVisible(); // Still in reconciliation state!
 
     // Attempt with note of length < 5 (e.g. "abc") -> Rejected
@@ -511,29 +511,42 @@ test.describe('Phân hệ 6: Stock Transactions & Validation Guards (TX)', () =>
     await expect(errorMsg).toBeVisible();
     await expect(reconcileBanner).toBeVisible(); // Still in reconciliation state!
 
-    // --- PHẦN B: 409 IN_PROGRESS -> AMBIGUOUS_OUTCOME (NOT CONFIRMED_FAILURE) ---
-    simulatedConflictType = 'IN_PROGRESS';
+    // Even a short user-entered note cannot serve as backend authority.
+    expect(callCount).toBe(1);
+    await expect(page.locator('[data-testid="btn-confirm-submit-import"]')).toBeDisabled();
+    assertZeroUnexpectedViolations();
+  });
+
+  test('E2E-TX-11B: 409 IN_PROGRESS remains ambiguous without duplicate POST', async ({ page }) => {
+    let postCount = 0;
+    registerCustomMockHandler('/api/v1/stock-transactions/import', async (route, req) => {
+      if (req.method() !== 'POST') return false;
+      postCount++;
+      await route.fulfill({
+        status: 409,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          success: false,
+          message: 'Yêu cầu với Idempotency-Key này đang được xử lý trên máy chủ. Vui lòng chờ.',
+        }),
+      });
+      return true;
+    });
     await page.goto('/transactions');
     await page.click('[data-testid="btn-open-import"]');
-    await expect(modal).toBeVisible();
-
     await page.fill('[data-testid="import-notes-input"]', 'Phiếu nhập đang xử lý concurrent');
     await page.selectOption('[data-testid="select-item-0"]', '10000000-0000-4000-8000-000000000001');
     await page.selectOption('[data-testid="select-location-0"]', '20000000-0000-4000-8000-000000000004');
     await page.fill('[data-testid="input-qty-0"]', '2');
-
     await page.click('[data-testid="btn-review-import"]');
     await expect(page.locator('[data-testid="import-confirmation-step"]')).toBeVisible();
     await page.click('[data-testid="btn-confirm-submit-import"]');
 
-    // In-Progress must transition to AMBIGUOUS_OUTCOME, NOT CONFIRMED_FAILURE
-    const ambiguousBanner = page.locator('[data-testid="ambiguous-state-banner"]');
-    await expect(ambiguousBanner).toBeVisible();
+    await expect(page.locator('[data-testid="ambiguous-state-banner"]')).toBeVisible();
+    await expect(page.locator('[data-testid="ambiguous-error-detail"]')).toContainText('đang được xử lý trên máy chủ');
     await expect(page.locator('[data-testid="import-error-banner"]')).not.toBeVisible();
-
-    const inProgressDetail = page.locator('[data-testid="ambiguous-error-detail"]');
-    await expect(inProgressDetail).toContainText('đang được xử lý trên máy chủ');
-
+    await expect(page.locator('[data-testid="btn-confirm-submit-import"]')).toBeDisabled();
+    expect(postCount).toBe(1);
     assertZeroUnexpectedViolations();
   });
 
