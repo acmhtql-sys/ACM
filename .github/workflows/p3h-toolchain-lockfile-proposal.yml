@@ -1,0 +1,59 @@
+name: ACM P3-H Toolchain Lockfile Proposal (no deployment)
+
+on:
+  pull_request:
+    branches:
+      - codex/p3g-zod4-compat-probe-20261107
+
+permissions:
+  contents: read
+
+jobs:
+  lockfile-proposal:
+    if: github.head_ref == 'codex/p3h-toolchain-security-probe-20261107'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Resolve proposed patched toolchain without running lifecycle scripts
+        run: |
+          npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+          npm update undici --package-lock-only --ignore-scripts --no-audit --no-fund
+      - name: Prove package resolution and audit risk
+        run: |
+          node <<'NODE'
+          const fs=require('node:fs');
+          const cp=require('node:child_process');
+          const before=JSON.parse(cp.execFileSync('git',['show','HEAD:package-lock.json'],{encoding:'utf8',maxBuffer:8*1024*1024}));
+          const afterRaw=fs.readFileSync('package-lock.json','utf8');
+          const after=JSON.parse(afterRaw);
+          const checks={
+            'node_modules/vitest':'4.1.12',
+            'node_modules/vite':'7.3.7',
+            'node_modules/@vitejs/plugin-react':'5.2.0'
+          };
+          for(const [pkg,version] of Object.entries(checks)){
+            const found=after.packages[pkg]?.version;
+            console.log('P3H_VERIFIED_VERSION',pkg,found);
+            if(found!==version)throw new Error(pkg+' version mismatch: '+found);
+          }
+          const tinypool=after.packages['node_modules/tinypool']?.version;
+          const undici=after.packages['node_modules/undici']?.version;
+          console.log('P3H_TRANSITIVE',JSON.stringify({tinypool,undici}));
+          if(!tinypool||Number(tinypool.split('.')[0])<2)throw Error('tinypool still vulnerable');
+          if(!undici || !undici.startsWith('8.12.'))throw Error('undici not updated to 8.12.x');
+          const old=before.packages||{},fresh=after.packages||{};
+          const changed=[...new Set([...Object.keys(old),...Object.keys(fresh)])].filter(k=>JSON.stringify(old[k])!==JSON.stringify(fresh[k]));
+          console.log('P3H_CHANGED_COUNT',changed.length);
+          console.log('P3H_CHANGED_PATHS',JSON.stringify(changed));
+          for(const k of changed)if(k.includes('apps/')||k.includes('packages/'))console.log('P3H_WORKSPACE',k,JSON.stringify(fresh[k]?.devDependencies||{}));
+          // This proposal changes only lockfile resolution: CI NEVER pushes or deploys.
+          console.log('P3H_LOCK_LENGTH',afterRaw.length);
+          for(let i=0;i<afterRaw.length;i+=3500)console.log('P3H_LOCK_CHUNK:'+Math.floor(i/3500)+':'+JSON.stringify(afterRaw.slice(i,i+3500)));
+          console.log('P3H_LOCK_DONE');
+          NODE
+          npm audit --json > "$RUNNER_TEMP/acm-p3h-audit.json" || true
+          node -e 'const a=require(process.env.RUNNER_TEMP+"/acm-p3h-audit.json"); console.log("P3H_AUDIT_TOTAL",JSON.stringify(a.metadata?.vulnerabilities||{})); console.log("P3H_AUDIT_HIGH_CRITICAL",JSON.stringify(Object.entries(a.vulnerabilities||{}).filter(([,v])=>["critical","high"].includes(v.severity)).map(([name,v])=>({name,severity:v.severity}))));'
