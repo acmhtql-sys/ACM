@@ -99,9 +99,9 @@ jobs:
         run: npm run test:integration
 
       - name: Verify live staging read-only guard (P3-F)
-        # Only the P3-F head branch push runs public, safe negative probes.
+        # Only PR #39 head branch runs public, safe negative probes.
         # Uses a nonexistent endpoint for all mutation methods; no credentials or real DB writes.
-        if: github.event_name == 'push' && github.ref == 'refs/heads/codex/p3-staging-readonly-deployment-20261107'
+        if: github.event_name == 'pull_request' && github.head_ref == 'codex/p3-staging-readonly-deployment-20261107'
         run: node scripts/p3f-live-readonly-acceptance.mjs
 
 
