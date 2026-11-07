@@ -67,6 +67,29 @@ describe('P3-F: staging fail-closed HTTP acceptance (local, no DB)', () => {
     }
   });
 
+  it('blocks anonymous catalog and stock reads in cloud_staging', async () => {
+    const oldProfile = process.env.ACM_DEPLOYMENT_PROFILE;
+    process.env.ACM_DEPLOYMENT_PROFILE = 'cloud_staging';
+    try {
+      for (const path of [
+        '/api/v1/items',
+        '/api/v1/items/nonexistent',
+        '/api/v1/items/barcode/nonexistent',
+        '/api/v1/categories',
+      ]) {
+        const res = await request(app).get(path);
+        expect(res.status).toBe(401);
+        expect(res.body.success).toBe(false);
+      }
+    } finally {
+      if (oldProfile === undefined) {
+        delete process.env.ACM_DEPLOYMENT_PROFILE;
+      } else {
+        process.env.ACM_DEPLOYMENT_PROFILE = oldProfile;
+      }
+    }
+  });
+
   it('permits only safe readiness GET without a token', async () => {
     const res = await request(app).get('/api/v1/health/liveness');
     expect(res.status).toBe(200);
