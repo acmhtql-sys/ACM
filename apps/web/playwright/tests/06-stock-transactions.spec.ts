@@ -550,11 +550,11 @@ test.describe('Phân hệ 6: Stock Transactions & Validation Guards (TX)', () =>
     assertZeroUnexpectedViolations();
   });
 
-  test('E2E-TX-12: [MOCK-ONLY – LIVE SAFETY GAP] Thoát trạng thái đối soát với ghi chú hợp lệ quay về DRAFT với key mới', async ({
+  test('E2E-TX-12: Client evidence cannot unlock reconciliation or rotate Idempotency-Key', async ({
     page,
   }) => {
-    // Note: Live Safety Gap acknowledged: in real production, a client note of >= 5 chars
-    // is NOT proof of unexecuted state on the backend. This test solely verifies client FSM UI transitions.
+    // Client-provided evidence is not authoritative. The safe state must remain locked.
+    // No real backend or database operation is performed in this browser test.
     registerCustomMockHandler('/api/v1/stock-transactions/import', async (route, req) => {
       if (req.method() === 'POST') {
         await route.fulfill({
@@ -607,19 +607,13 @@ test.describe('Phân hệ 6: Stock Transactions & Validation Guards (TX)', () =>
     // 6. Click "Xác nhận kết quả đối chiếu"
     await page.click('[data-testid="btn-resolve-reconciliation"]');
 
-    // 7. Verify UI transitions back to DRAFT:
-    // - Reconciliation banner disappears
-    await expect(reconcileBanner).not.toBeVisible();
-
-    // - Form generates a brand NEW Idempotency-Key
-    const newKey = await keyInput.inputValue();
-    expect(newKey).toBeTruthy();
-    expect(newKey).not.toBe(oldKey);
-
-    // - Inputs are unlocked for editing in new DRAFT state
-    await expect(page.locator('[data-testid="import-notes-input"]')).toBeEnabled();
-    await expect(page.locator('[data-testid="select-item-0"]')).toBeEnabled();
-    await expect(page.locator('[data-testid="btn-confirm-submit-import"]')).toBeEnabled();
+    // 7. Fail closed: do not trust unverified client-provided evidence.
+    await expect(reconcileBanner).toBeVisible();
+    await expect(page.locator('[data-testid="reconcile-error-msg"]')).toContainText('đã bị vô hiệu hóa vì lý do an toàn');
+    expect(await keyInput.inputValue()).toBe(oldKey);
+    await expect(page.locator('[data-testid="btn-confirm-submit-import"]')).toBeDisabled();
+    await expect(page.locator('[data-testid="btn-review-import"]')).toBeDisabled();
+    await expect(modal).toBeVisible();
 
     assertZeroUnexpectedViolations();
   });
