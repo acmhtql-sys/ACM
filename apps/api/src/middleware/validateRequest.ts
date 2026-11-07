@@ -12,10 +12,10 @@ export function validateRequest(schema: {
         req.body = await schema.body.parseAsync(req.body);
       }
       if (schema.query) {
-        req.query = await schema.query.parseAsync(req.query);
+        req.query = (await schema.query.parseAsync(req.query)) as unknown as Request['query'];
       }
       if (schema.params) {
-        req.params = await schema.params.parseAsync(req.params);
+        req.params = (await schema.params.parseAsync(req.params)) as unknown as Request['params'];
       }
       next();
     } catch (error) {
