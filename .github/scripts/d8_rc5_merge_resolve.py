@@ -98,11 +98,11 @@ for p,anchor in (
 # Existing RC5 only permits same-warehouse returns until explicit business
 # approval. Do not run candidate's A->B integration fixture as if accepted.
 print("D8_RETURN_CROSS_LOCATION_POLICY=DENY_409")
-p=".github/workflows/p3g-mock-browser-e2e.yml"
-if (R/p).exists():
-  a=rd(p)
-  anchor="      - codex/d8-p0-safe-return-ledger-20261107"
-  if anchor in a and "      - codex/cloud-staging-p2e-readonly-deploy-20261107" not in a:
-    wr(p,a.replace(anchor,anchor+"\n      - codex/cloud-staging-p2e-readonly-deploy-20261107"))
+# GitHub Actions GITHUB_TOKEN cannot push changes to workflow paths in this
+# repository. Keep all RC5 workflows unmodified in this isolated MERGE commit.
+# Specific CI/browsers gates are set up independently through authorized
+# GitHub content operations, never by expanding the workflow token's scope.
+subprocess.run(["git","restore","--source=HEAD","--staged","--worktree","--",".github/workflows"],check=True)
+print("D8_WORKFLOWS_RETAINED_FROM_RC5_AND_ISOLATED_BRANCH")
 print("D8_VALIDATOR_EXPORTS",rd("packages/shared/src/validators.ts").count("export const "))
 print("D8_READY_FOR_ISOLATED_BUILDS=YES")
