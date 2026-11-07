@@ -276,7 +276,7 @@ test.describe('Phân hệ 6: Stock Transactions & Validation Guards (TX)', () =>
 
   // --- POSITIVE FSM SUBMISSION TESTS (STEP 4B.4B+ ISOLATED MOCK ONLY) ---
 
-  test('E2E-TX-10: FSM Timeout & Ambiguous Outcome xử lý retry nguyên vẹn Idempotency-Key và Payload', async ({
+  test('E2E-TX-10: HTTP 504 giữ nguyên Idempotency-Key, chỉ cho GET status, tuyệt đối không POST lần hai', async ({
     page,
   }) => {
     interface CapturedReq {
@@ -382,7 +382,7 @@ test.describe('Phân hệ 6: Stock Transactions & Validation Guards (TX)', () =>
 
     const errorDetail = page.locator('[data-testid="ambiguous-error-detail"]');
     await expect(errorDetail).toBeVisible();
-    await expect(errorDetail).toContainText('Máy chủ phản hồi lỗi nội bộ (5xx)');
+    await expect(errorDetail).toContainText('Gateway Timeout (504)');
 
     // 4. Verify inputs are strictly locked (disabled)
     await expect(page.locator('[data-testid="import-notes-input"]')).toBeDisabled();
@@ -417,7 +417,7 @@ test.describe('Phân hệ 6: Stock Transactions & Validation Guards (TX)', () =>
     assertZeroUnexpectedViolations();
   });
 
-  test('E2E-TX-11: RECONCILIATION_REQUIRED khóa form, chặn ghi chú rỗng và xử lý 409 IN_PROGRESS an toàn', async ({
+  test('E2E-TX-11: 409 PAYLOAD_MISMATCH khóa form và không cho phép client tự giải phóng đối soát', async ({
     page,
   }) => {
     let callCount = 0;
@@ -485,7 +485,7 @@ test.describe('Phân hệ 6: Stock Transactions & Validation Guards (TX)', () =>
 
     const errorDetail = page.locator('[data-testid="reconciliation-error-detail"]');
     await expect(errorDetail).toBeVisible();
-    await expect(errorDetail).toContainText('Phát hiện xung đột Idempotency');
+    await expect(errorDetail).toContainText('Không được tái sử dụng khóa cho ý định nghiệp vụ mới');
 
     // Form submission must remain strictly disabled
     await expect(page.locator('[data-testid="btn-confirm-submit-import"]')).toBeDisabled();
