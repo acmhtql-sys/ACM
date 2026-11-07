@@ -26,8 +26,8 @@ jobs:
           const fs = require('fs');
           const cp = require('child_process');
           const before = JSON.parse(cp.execFileSync('git', ['show', 'HEAD:package-lock.json'], { encoding: 'utf8', maxBuffer: 2 * 1024 * 1024 }));
-          const afterRaw = fs.readFileSync('package-lock.json', 'utf8');
-          const after = JSON.parse(afterRaw);
+          const generated = fs.readFileSync('package-lock.json', 'utf8');
+          const after = JSON.parse(generated);
           const tracked = ['body-parser', 'follow-redirects'];
           for (const pkg of tracked) {
             const key = 'node_modules/' + pkg;
@@ -40,7 +40,14 @@ jobs:
           console.log('ACM_PATCH_CHANGED_PACKAGES:', JSON.stringify(changed));
           if (after.packages['node_modules/body-parser']?.version !== '1.20.9') throw Error('Unexpected body-parser version');
           if (after.packages['node_modules/follow-redirects']?.version !== '1.16.2') throw Error('Unexpected follow-redirects version');
-          if (changed.length > 20) throw Error('Overly broad lockfile resolution, review manually');
+          // npm may normalize platform-specific optional packages; keep those untouched.
+          const allowedNoise = /^node_modules\/(?:@esbuild\/|@rollup\/|@napi-rs\/lzma-|fsevents$)/;
+          const unexpected = changed.filter(k => !tracked.some(name => k === 'node_modules/' + name) && !allowedNoise.test(k));
+          if (unexpected.length) throw Error('Unexpected lockfile package changes: ' + unexpected.join(', '));
+          const minimalLock = structuredClone(before);
+          for (const name of tracked) minimalLock.packages['node_modules/' + name] = after.packages['node_modules/' + name];
+          const afterRaw = JSON.stringify(minimalLock, null, 2) + '\n';
+          console.log('ACM_PATCH_MINIMAL_CHANGED_PACKAGES:', JSON.stringify(tracked));
           // Logs are only used for a human/agent-reviewed commit to the Draft PR.
           // No secrets are referenced or emitted.
           for (let i = 0; i < afterRaw.length; i += 3500) {
