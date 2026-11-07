@@ -54,6 +54,17 @@ describe('LoginPage fail-closed authentication', () => {
     expect(localStorage.getItem('acm_token')).toBeNull();
   });
 
+  it('fails closed on slow API timeout without creating a session', async () => {
+    postMock.mockRejectedValue({ code: 'ECONNABORTED' });
+
+    render(<LoginPage />);
+    enterCredentials();
+
+    expect(await screen.findByText('Máy chủ phản hồi quá chậm (có thể đang khởi động). Vui lòng thử lại sau.')).toBeTruthy();
+    expect(loginMock).not.toHaveBeenCalled();
+    expect(navigateMock).not.toHaveBeenCalled();
+  });
+
   it('creates an authenticated session only after an API success response', async () => {
     const user = { id: 'synthetic-user-id', email: 'tester@example.test', fullName: 'Test User', role: 'STUDENT' };
     postMock.mockResolvedValue({ data: { success: true, data: { token: 'synthetic-api-token', user } } });
