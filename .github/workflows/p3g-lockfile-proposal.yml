@@ -1,0 +1,51 @@
+name: ACM P3-G Lockfile Proposal (review only)
+
+on:
+  push:
+    branches:
+      - codex/p3-staging-readonly-deployment-20261107
+    paths:
+      - package.json
+      - .github/workflows/p3g-lockfile-proposal.yml
+
+permissions:
+  contents: read
+
+jobs:
+  propose-lockfile:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Generate review-only npm lockfile from package overrides
+        run: npm install --package-lock-only --ignore-scripts --no-fund --no-audit
+      - name: Check scope and emit lockfile for explicit review
+        run: |
+          node <<'NODE'
+          const fs = require('fs');
+          const cp = require('child_process');
+          const before = JSON.parse(cp.execFileSync('git', ['show', 'HEAD:package-lock.json'], { encoding: 'utf8', maxBuffer: 2 * 1024 * 1024 }));
+          const afterRaw = fs.readFileSync('package-lock.json', 'utf8');
+          const after = JSON.parse(afterRaw);
+          const tracked = ['body-parser', 'follow-redirects'];
+          for (const pkg of tracked) {
+            const key = 'node_modules/' + pkg;
+            console.log('ACM_PATCH_PKG:', pkg, 'before', before.packages[key]?.version, 'after', after.packages[key]?.version);
+          }
+          const a = before.packages || {};
+          const b = after.packages || {};
+          const all = new Set([...Object.keys(a), ...Object.keys(b)]);
+          const changed = [...all].filter(k => JSON.stringify(a[k]) !== JSON.stringify(b[k]));
+          console.log('ACM_PATCH_CHANGED_PACKAGES:', JSON.stringify(changed));
+          if (after.packages['node_modules/body-parser']?.version !== '1.20.9') throw Error('Unexpected body-parser version');
+          if (after.packages['node_modules/follow-redirects']?.version !== '1.16.2') throw Error('Unexpected follow-redirects version');
+          if (changed.length > 20) throw Error('Overly broad lockfile resolution, review manually');
+          // Logs are only used for a human/agent-reviewed commit to the Draft PR.
+          // No secrets are referenced or emitted.
+          for (let i = 0; i < afterRaw.length; i += 3500) {
+            console.log('ACM_LOCK_CHUNK:' + String(i / 3500) + ':' + JSON.stringify(afterRaw.slice(i, i + 3500)));
+          }
+          console.log('ACM_LOCK_DONE:' + afterRaw.length);
+          NODE
