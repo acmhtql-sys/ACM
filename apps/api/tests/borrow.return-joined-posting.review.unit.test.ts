@@ -55,7 +55,7 @@ describe('Stage4C review-only joined posting plan — NO DB/HTTP/WRITER', () => 
       stockBalanceId: STOCK,
       after: { onHand: 15, borrowed: 1, quarantined: 7, reserved: 1, kitAllocated: 1 },
       availableBefore: 6, availableAfter: 6,
-      borrowDetailIds: [DETAIL_A, DETAIL_B],
+      borrowDetailIds: [DETAIL_B, DETAIL_A], // Canonical UUID lexical order: '3' before 'a'
     });
   });
 
