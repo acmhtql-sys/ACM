@@ -846,13 +846,13 @@ export class BorrowService {
         });
         throw new AppError('Kết quả giao dịch hoàn trả đã lưu không hợp lệ; cần đối soát', 409);
       };
-      if (!recordValid) reportCorruptCache('invalid_completed_record');
-      if (!cached) reportCorruptCache('invalid_cached_response');
+      if (!recordValid) return reportCorruptCache('invalid_completed_record');
+      if (!cached) return reportCorruptCache('invalid_cached_response');
       // Cache shape alone cannot authenticate a receipt number. Prove that
       // the exact return number belongs to this borrow in PostgreSQL.
       // This is read-only; no second return or transaction may start.
       if (!await hasAuthoritativeReturnReceipt(id, cached.returnNumber)) {
-        reportCorruptCache('return_receipt_not_found');
+        return reportCorruptCache('return_receipt_not_found');
       }
       return cached;
     }
