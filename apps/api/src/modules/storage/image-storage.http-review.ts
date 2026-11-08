@@ -20,7 +20,7 @@ import {
   MAX_ITEM_IMAGE_BYTES,
 } from './image-storage.contract';
 
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const ALLOWED_MIMES: readonly string[] = ['image/png', 'image/jpeg', 'image/webp'];
 
 const readItemId = (value: unknown): string => {
