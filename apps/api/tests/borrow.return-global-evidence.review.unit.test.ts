@@ -118,7 +118,7 @@ describe('Stage4C G03 global evidence namespace — review-only policy', () => {
     // authorize issuing a previously unseen global physical evidence code.
   });
 
-  it('G03-R13: a confirmed idempotent replay is not another operation record', () => {
+  it('G03-R13: a snapshot rejects duplicate operation rows; replay remains unproven', () => {
     // The original operation is stored once. Reading the same receipt/key
     // twice is a read, NOT a second operation row/code allocation.
     expect(() => check([example(idC, borrowB, 'ACM-REPLAY')])).not.toThrow();
