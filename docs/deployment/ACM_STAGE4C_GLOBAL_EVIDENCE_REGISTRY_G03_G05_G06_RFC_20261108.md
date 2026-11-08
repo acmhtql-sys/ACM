@@ -19,7 +19,7 @@ Nếu có **hai nguồn cấp mã**: `ReturnTransaction.returnNumber` của RC5 
 
 ## 2. Phương án đề nghị thẩm định: một Evidence Code Registry làm điểm cấp mã
 
-**Proposal A — ưu tiên để DBA thẩm định, chưa được phê duyệt.** Thêm model/bảng `evidence_code_registry` dùng để **giữ chỗ mã một lần và không xóa**, tách khỏi việc COMMIT thực tế:
+**Proposal A — ưu tiên để DBA thẩm định, chưa được phê duyệt.** Thêm model/bảng `evidence_code_registry` dùng để **giữ chỗ mã một lần và không xóa**, tách khỏi việc COMMIT thực tế. **Issuer phải là dịch vụ ACM được ủy quyền; PREPARE không được tự nhập một mã bất kỳ để chiếm giữ namespace vĩnh viễn.** Phương án cụ thể (server tự phát mã hoặc chỉ nhận mã có trong inventory ACM đã phát) còn cần DBA/owner/AppSec duyệt:
 
 | Trường khái niệm | Mục đích/ràng buộc đề nghị |
 |---|---|
@@ -28,17 +28,19 @@ Nếu có **hai nguồn cấp mã**: `ReturnTransaction.returnNumber` của RC5 
 | `canonical_ref TEXT NOT NULL` | `lower(original_ref)` được **database bảo đảm**, global `UNIQUE`; DBA chọn DB-generated column hoặc `CHECK (canonical_ref = lower(original_ref))` sau khi kiểm chứng collation và Prisma drift |
 | `issued_at`, `issued_by_id`, `issuer_source` | Phân biệt `RC5_LEGACY` và `STAGE4C_OPERATION` khi nguồn mã đã được xác minh; FK/role/time provenance |
 | `retired_at / cancellation evidence` (nếu có) | Chỉ ghi trạng thái lịch sử; **KHÔNG nhả UNIQUE**, `DELETE`/reuse mã không được phép |
-| `operation_id` hoặc quan hệ ngược | Một mã cấp gắn tối đa **một** operation; yêu cầu DBA quyết định quan hệ và tránh FK cycle; registry không được tự xác nhận giao nhận vật lý |
+| `operation_id` (không đặt FK ở registry trong phương án khuyến nghị) | Đề xuất **chỉ một chiều FK**: `BorrowReturnOperation.evidence_registry_id NOT NULL UNIQUE` → `evidence_code_registry.id` `ON DELETE RESTRICT`. Không tạo FK ngược registry → operation tránh vòng; legacy ownership là luồng xử lý riêng theo quyết định DBA/owner |
 
 **Tại sao registry?** Code đã cấp trong PREPARED hoặc CANCELLED phải còn được giữ dù chưa có `ReturnTransaction`. Một unique `lower(return_transactions.returnNumber)` không bao phủ mã này. Một unique `lower(borrow_return_operations.physicalEvidenceRef)` không bao phủ legacy receipts. Registry thống nhất namespace trong DB thay vì giả định application-side `findFirst` có khả năng chặn race.
+
+**AppSec — chống chiếm mã và oracle:** Mã chứng từ phải **được ACM cấp**, không phải client tự chọn rồi PREPARE sẽ chiếm mã vĩnh viễn. Thiết kế ưu tiên server cấp mã sau xác thực/phân quyền/kiểm tra rate limit; hoặc chỉ claim mã từ danh sách đã được issuer ACM cấp riêng và đã xác minh. Cần audit mọi nỗ lực claim bị từ chối, hạn chế tần suất theo user/operation và ngăn bulk reservation. 409 chung chỉ che lab/borrow sở hữu, không ngăn oracle “mã đã tồn tại”; đối với mã chưa cấp và mã đã chiếm, phản hồi/timing nên được thiết kế tránh phân biệt khi không có quyền đọc, không tiết lộ trạng thái mã, không phản chiếu raw ref. **Chưa có issuer/claim API được duyệt hay mở**; mọi kiểm tra trên snapshot thuần chỉ là kiểm tra chính sách.
 
 **Phương án thay thế DBA có thể đánh giá:** dùng một bảng phát hành duy nhất hiện có nếu DBA chứng minh (a) có thể reserve trước COMMIT, (b) không mất mã sau CANCELLED, (c) bao phủ RC5 legacy đã phát, (d) uniqueness toàn hệ thống case-insensitive ngay cả khi 2 session/2 node. Phương án expression unique trên riêng operations **không đủ** nếu RC5 và Stage4C chia sẻ namespace.
 
 ### Cẩn trọng với lựa chọn canonical
 
 - `CHECK(canonical_ref = lower(canonical_ref))` **SAI mục tiêu**, vì không ràng buộc canonical với `original_ref`: `'ACM-001'→'acm-999'` vẫn qua CHECK yếu.
-- Nếu ứng dụng tính `lower`, DB phải **xác thực lại** `canonical_ref = lower(original_ref)` hoặc tự tạo cột generated. DBA quyết định cách tương thích PostgreSQL 17, Prisma migration, collation xác định và `ASCII-only` input.
-- `UNIQUE` phải bao phủ **mọi trạng thái** (kể cả CANCELLED), không dùng partial unique `WHERE state <> 'CANCELLED'`.
+- Nếu ứng dụng tính `lower`, DB phải **xác thực lại** `canonical_ref = lower(original_ref)` hoặc tự tạo cột generated. **Quan trọng: PostgreSQL `lower()` có thể chịu ảnh hưởng LC_CTYPE/collation**; `ACM-I` so với `acm-i` có rủi ro trong locale khác ASCII như Turkish. DBA cần kiểm chứng lựa chọn `COLLATE "C"` hoặc một cơ chế ASCII deterministic tương đương cho biểu thức/cột canonical và constraint; format của `original_ref` vẫn phải CHECK ASCII BIZ-01. Cần thẩm định Prisma migration drift trước khi chốt phương án.
+- `UNIQUE` phải bao phủ **mọi trạng thái** (kể cả CANCELLED), không dùng partial unique `WHERE state <> 'CANCELLED'`. **Giữ mã vĩnh viễn không được dựa duy nhất vào FK RESTRICT**: DBA cần đánh giá quyền hạn ứng dụng (INSERT-ONLY), cơ chế chống UPDATE/DELETE (`BEFORE UPDATE/DELETE` trigger hoặc policy tương đương), audit append-only; không cho phép sửa `original_ref`/`canonical_ref`/identity để tái sử dụng. Một bản restore cũ có thể bỏ sót các mã cấp sau backup, vì vậy cần quy trình reconciliation sổ mã trước khi mở cấp mã sau restore.
 - Nếu hai bảng có dữ liệu legacy, **không tự động đoán mapping** dựa theo timestamp, ghi chú, người nhận hoặc định dạng số. Cần kiểm toán nguồn mã và quyết định owner/DBA trước backfill có kiểm soát.
 
 ## 3. G05/G06 — durable exact-once claim, 365 ngày và chứng từ bất biến
@@ -71,6 +73,7 @@ Trong **một Prisma serializable/PG17 transaction**, theo thứ tự lock đư�
 3. **Reviewer chốt G05/G06:** UUID/FK composite, scope key, auth, retention, receipt immutable, `CANCELLED` reserve forever; mô tả chi tiết delete/update policies và mapping old records.
 4. **DBA duyệt source+hash DDL trên #11**; owner + reviewer khác người duyệt PG17 CREATE #12; SQL/backup/restore phải được duyệt **riêng** tại #13. Không gộp “đồng ý tiếp tục dự án” thành các phê duyệt này.
 5. **Chỉ sau đủ gate:** tạo PG17 cô lập mới, inventory/collision **read-only**, khôi phục nguồn synthetic theo chứng cứ, migration + guarded rollback, E2E/race/backup-restore và bốn vai trò UAT theo #26. Không đụng cloud/staging/Windows PostgreSQL đang chạy.
+   **Restore-code safety G11:** không bật chức năng phát mã ngay sau khi restore từ bản sao cũ. So sánh issuance registry ở bản phục hồi với audit/ledger nguồn độc lập được lưu an toàn ngoài thời điểm backup, truy tìm mọi mã đã phát sau thời điểm backup, đối soát/khóa tái cấp từng mã trước khi trả lại quyền cấp mã; nếu không chứng minh đủ thì giữ hệ thống ở `RELEASE_NO_GO`.
 6. **AppSec:** review oracle 409 chung, 23505/P2002/40001/P2034 và trạng thái transaction (không gộp nhầm commit-unknown thành retry), role/IDOR, rate limit, raw code/PII log, tài liệu rollback/cutover.
 
 ## 5. Ma trận acceptance có thể kiểm chứng
