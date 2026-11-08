@@ -11,13 +11,7 @@
 ### Đã chốt về nghiệp vụ
 
 - Mã chứng từ do ACM cấp phải **duy nhất trên TOÀN HỆ THỐNG**, không phân biệt hoa/thường: `GLOBAL_ACM + CASE_INSENSITIVE`, kể cả khác borrow/lab.
-- BIZ-01 format ASCII giữ nguyên: `^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}# ACM D8 — Stage4C ↔ RC5: DBA schema-gap decision packet
-
-**Ngày kiểm tra:** 2026-11-08 · **Mục đích:** REVIEW ONLY · **Kết luận:** `RELEASE_NO_GO`
-
-**Tài liệu này KHÔNG phải SQL, migration, lệnh tạo PostgreSQL, bằng chứng khảo sát database thật, hoặc phê duyệt DBA.** Không chạy `prisma migrate`, `initdb`, seed, rollback, lệnh SQL, thay đổi Render/Supabase hay mở writer từ tài liệu này. Mọi chữ ký ở cuối cố ý để trống.
-
-. Mã hiển thị giữ nguyên chữ gốc; `ACM-001` và `acm-001` thuộc cùng khóa đối chiếu.
+- BIZ-01 format ASCII giữ nguyên: `^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$`. Mã hiển thị giữ nguyên chữ gốc; `ACM-001` và `acm-001` thuộc cùng khóa đối chiếu.
 - Một mã đã phát **không được tái sử dụng sau CANCELLED**. Mọi trạng thái đã cấp mã đều chiếm namespace; tuyệt đối không loại `CANCELLED` khỏi unique index.
 - **Mỗi lần trả/operation phải có một mã riêng**, bao gồm nhiều đợt trả của cùng một phiếu. Replay cùng key/payload/actor đã xác minh chỉ đọc lại **cùng mã/chứng từ cũ**, không tạo operation khác.
 - Lỗi trùng được chuẩn hóa **409 chung**, không trả tên constraint/field, không tiết lộ mã thuộc phiếu hoặc lab nào. [PR #88](https://github.com/acmhtql-sys/ACM_QLLK/pull/88) đã thêm bảo vệ handler P2002 chung, vẫn cần writer-specific AppSec review.
