@@ -95,7 +95,7 @@ export function planQuarantineFirstPhysicalReturn(
   };
   const availableAfter = availableForReview(after);
   if (availableAfter !== availableBefore ||
-      after.onHand + after.borrowed !== balance.onHand + balance.borrowed) {
+      after.onHand - balance.onHand !== balance.borrowed - after.borrowed) {
     throw new AppError('Vi phạm nguyên tắc bảo toàn tồn kho khi tiếp nhận', 409);
   }
   return {
