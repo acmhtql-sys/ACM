@@ -21,6 +21,37 @@ describe('Stage4C / RC5 release fence — source-only, zero database/network', (
     expect(prisma).not.toMatch(/^model BorrowReturnOperation\s*\{/m);
   });
 
+  it('DBA-01B: G03 owner packet preserves the full ASCII regex and a single header', () => {
+    const packet = source('../../../docs/deployment/ACM_D8_STAGE4C_DBA_SCHEMA_GAP_DECISION_PACKET_20261108.md');
+    const approvedLine = '- BIZ-01 format ASCII giữ nguyên: `^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}import { readFileSync } from 'node:fs';
+import { describe, expect, it } from 'vitest';
+import {
+  assertLegacyReturnWriteAllowed,
+  rejectUnreleasedReturnOperations,
+} from '../src/modules/borrow/borrow.return-operation-foundation';
+
+/**
+ * Static guard for the explicitly UNRELEASED Stage4C candidate.
+ * It must be intentionally reviewed/updated only AFTER signed DBA/SQL
+ * authorization and actual writer + independent UAT acceptance.
+ * No database connection, external network or HTTP server is used here.
+ */
+const source = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf8');
+
+describe('Stage4C / RC5 release fence — source-only, zero database/network', () => {
+  it('DBA-01: keeps the 19-model RC5 Prisma schema until a signed consolidated migration', () => {
+    const prisma = source('../prisma/schema.prisma');
+    const models = [...prisma.matchAll(/^model\s+\w+\s*\{/gm)];
+    expect(models).toHaveLength(19);
+    expect(prisma).not.toMatch(/^model BorrowReturnOperation\s*\{/m);
+  });
+
+.';
+    expect(packet).toContain(approvedLine);
+    expect(packet.split('# ACM D8 — Stage4C ↔ RC5: DBA schema-gap decision packet')).toHaveLength(2);
+    expect(packet).toContain('**G03 trạng thái: `NEEDS-DESIGN`**');
+  });
+
   it('DBA-02: does not expose a live unapproved return-operations route', () => {
     const router = source('../src/modules/borrow/borrow.router.ts');
     expect(router).not.toContain("'/return-operations'");
