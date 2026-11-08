@@ -68,5 +68,5 @@ export async function hasAuthoritativeReturnReceipt(
     where: { borrowRequestId, returnNumber },
     select: { id: true },
   });
-  return receipt !== null;
+  return typeof receipt?.id === 'string' && receipt.id.length > 0;
 }
