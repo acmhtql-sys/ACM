@@ -64,6 +64,7 @@ const baseBorrow = {
   requestNumber: 'BR-20261023-0001',
   borrowerId: '66666666-6666-6666-6666-666666666666',
   status: BorrowStatus.HANDED_OVER,
+  purpose: 'synthetic RC5 idempotency fixture',
   expectedBorrowDate: new Date('2026-10-22T00:00:00Z'),
   expectedReturnDate: new Date('2026-10-29T00:00:00Z'),
   details: [{
