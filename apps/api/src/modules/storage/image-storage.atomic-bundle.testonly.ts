@@ -7,7 +7,7 @@
  * This is NOT a database transaction, authenticated audit, or verified
  * power-loss durable commit (directory metadata may not be fsynced).
  */
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import type { ItemImageUpload, StoredItemImage, ItemImageRead } from './image-storage.contract';
@@ -184,8 +184,7 @@ export class TestOnlyImageAuditBundle {
     }
 
     // Pending file is owned by this attempt, never silently clobbered.
-    const pending = path.join(this.root, id + '.' + createHash('sha256')
-      .update(String(Math.random()) + now).digest('hex').slice(0, 16) + '.pending');
+    const pending = path.join(this.root, id + '.' + randomUUID() + '.pending');
     const final = path.join(this.root, id + '.json');
     const handle = await fs.open(pending, 'wx', 0o600);
     try {
