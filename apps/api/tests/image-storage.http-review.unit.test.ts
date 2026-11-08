@@ -6,6 +6,7 @@ import { AppError } from '../src/shared/AppError';
 import { createLocalItemImageReviewRouter, isLocalImageHttpReviewEnabled } from '../src/modules/storage/image-storage.http-review';
 import { TestOnlyMemoryItemImageStorage } from '../src/modules/storage/image-storage.memory';
 import { MAX_ITEM_IMAGE_BYTES } from '../src/modules/storage/image-storage.contract';
+import type { ItemImageAuditEvent } from '../src/modules/storage/image-storage.audit.contract';
 
 // This suite isolates HTTP parsing/provider behavior with a synthetic principal.
 // Mandatory REAL JWT/live-role authentication is verified separately against
@@ -27,7 +28,7 @@ describe('L4 UNMOUNTED image review router (synthetic HTTP only)', () => {
   beforeEach(() => {
     store = new TestOnlyMemoryItemImageStorage(); // only constructed under NODE_ENV=test
     active = vi.fn(async (id: string) => id===A || id===B);
-    audit = vi.fn(async () => undefined);
+    audit = vi.fn(async (_event: ItemImageAuditEvent) => undefined);
     vi.stubEnv('NODE_ENV','development');
     vi.stubEnv('ACM_DEPLOYMENT_PROFILE','local_dev');
     vi.stubEnv('ACM_LOCAL_IMAGE_STORAGE_ENABLED','true');
