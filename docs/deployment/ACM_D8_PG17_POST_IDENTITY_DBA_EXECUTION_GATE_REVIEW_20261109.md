@@ -17,7 +17,20 @@
 | Static config & HBA | [Issue #12 security evidence](https://github.com/acmhtql-sys/ACM_QLLK/issues/12#issuecomment-6729480763) | `port=55433`, `listen_addresses='127.0.0.1'`; `postgresql.auto.conf` 0 active directives; six HBA entries use `scram-sha-256`; không chứng minh tất cả cấu hình runtime |
 | Windows ACL & existing service | Cùng bằng chứng Issue #12 | PGDATA/`postgresql.conf`/`pg_hba.conf`: owner local `ACER`, SYSTEM/Administrators/ACER FullControl inherited; `AreAccessRulesProtected=False`; existing `postgresql-x64-17` Running |
 
-**Còn mở ở cổng bảo mật:** `postgresql.conf` báo **21 active directives**, nhưng lần kiểm tra đã gửi chỉ hiển thị một số khóa; cần rà toàn bộ cấu hình có thể nạp qua `include`, `include_dir`, `include_if_exists` và các đường dẫn cấu hình đã chuyển hướng; soát quyền kế thừa từ cha, ACL hiệu dụng và quyền truy cập ngoài máy theo quy trình chỉ đọc đã được duyệt. Các rule `::1/128` trong HBA **không** chứng minh có listener TCP IPv6. Không tuyên bố security-isolation PASS cuối cùng.
+**Còn mở ở cổng bảo mật (bổ sung quan sát 09/11):** bước rà **tên** của toàn bộ 21 directive trong `postgresql.conf` không tìm thấy `include`, `include_dir`, `include_if_exists`, `config_file` hoặc `hba_file` được khai báo trực tiếp; `postgresql.auto.conf` trước đó có 0 directive active. Tuy nhiên, đây là tìm kiếm tĩnh trên tệp chính, **không xác nhận cấu hình runtime/đường dẫn config thực**. Phải xác minh `max_connections` có **hai lần khai báo** và ACL cha có SID capability chưa xác định đầy đủ, sau đó mới cân nhắc đánh dấu cổng bảo mật. Các HBA rule `::1/128` không chứng minh có listener TCP IPv6. Không tuyên bố security-isolation PASS cuối cùng.
+
+
+## 1A. Bổ sung quan sát 2026-11-09 — directive inventory và ACL thư mục cha
+
+Người vận hành chỉ **đọc tệp và ACL**, không kết nối SQL hay sửa hệ thống. Kết quả đã được sao chép từ PowerShell, không phải phép thử trên máy người vận hành do GitHub thực hiện.
+
+- **21 dòng active** trong `postgresql.conf`, theo tên: `datestyle`, `default_text_search_config`, `dynamic_shared_memory_type`, `lc_messages`, `lc_monetary`, `lc_numeric`, `lc_time`, `listen_addresses`, `log_connections`, `log_directory`, `log_disconnections`, `log_file_mode`, `log_timezone`, `logging_collector`, `max_connections` (**2 lần**), `max_wal_size`, `min_wal_size`, `port`, `shared_buffers`, `timezone`. Phép kiểm tra **không thấy tên** chỉ thị include/redirection trong tệp chính.
+- **Duplicate `max_connections`**: cần xem thứ tự + giá trị hai dòng, xác nhận có hiệu lực theo PostgreSQL runtime bằng phương pháp được phê duyệt riêng nếu cần. Không tự sửa `postgresql.conf`, restart hay khẳng định con số runtime chỉ từ danh sách tên.
+- **ACL thư mục cha** `%LOCALAPPDATA%`: owner `DESKTOP-T4JBFIE\\ACER`; FullControl hiển thị cho `NT AUTHORITY\\SYSTEM`, `BUILTIN\\Administrators`, `DESKTOP-T4JBFIE\\ACER`, cùng một ACE khác là SID bắt đầu `S-1-15-3-1024-...` với cột FileSystemRights bị PowerShell rút gọn (hiện `...le, Synchronize`). **Không suy luận SID này là an toàn hay nguy hiểm từ dòng bị cắt**. Cần xem toàn bộ `IdentityReference`, `FileSystemRights`, `AccessControlType`, `InheritanceFlags`, `PropagationFlags`, `IsInherited` trên *parent* và *PGDATA/file*; những lần trước PGDATA/config/HBA chỉ hiển thị 3 ACE FullControl **được kế thừa**, `AreAccessRulesProtected=False`. ACE ở cha có thể không truyền xuống con (tùy inheritance flags); chưa chứng minh quyền thực tế của SID đó trong thư mục cluster.
+- **Existing Windows service**: `postgresql-x64-17` vẫn `Running` ở thời điểm người vận hành kiểm tra.
+- **Verdict**: `STATIC_FILE_INVENTORY_PASS_WITH_TWO_OPEN_OBSERVATIONS`, `ACL_INHERITANCE_NOT_FULLY_RESOLVED`, `NO_SQL_EXECUTION`, `RELEASE_NO_GO`.
+
+**Hành động tiếp theo chỉ đọc:** (a) xem hai `max_connections` cùng số dòng; (b) hiển thị đầy đủ ACE/flags cha + PGDATA + hai config file, không thay đổi ACL; (c) nếu khác biệt, STOP và yêu cầu AppSec/Owner review; (d) không đọc ra mật khẩu, không chạy DDL/migration hay đổi config.
 
 ## 2. Baseline source — không đồng nhất với schema cuối
 
