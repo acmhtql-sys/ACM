@@ -1,4 +1,4 @@
-﻿import { PrismaClient, Prisma } from '@prisma/client';
+import { PrismaClient, Prisma } from '@prisma/client';
 import { AppError } from '../../shared/AppError';
 import { UserRole } from '@acm/shared';
 import { AuthenticatedUser } from '../../middleware/auth';
@@ -6,10 +6,7 @@ import {
   assertPhysicalEvidenceReference,
   type ReturnOperationLineSnapshot,
 } from './borrow.return-operation-foundation';
-import {
-  assertNoPendingStage4COperation,
-  assertStage4CActionAllowed,
-} from './borrow.return-commit-preflight.policy';
+
 
 export interface PrepareStage4CReturnInput {
   borrowRequestId: string;
