@@ -544,60 +544,61 @@ export const BorrowReturnPage: React.FC = () => {
 
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div className="flex flex-col justify-between space-y-4 sm:flex-row sm:items-center sm:space-y-0">
         <div>
-          <h1 className="text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">
+          <h1 className="text-xl font-extrabold tracking-tight text-slate-900 sm:text-2xl">
             Quản lý Mượn & Trả (Borrow & Return)
           </h1>
-          <p className="mt-1 text-xs text-slate-500">
+          <p className="mt-1 text-xs text-slate-500 font-medium">
             Quy trình đăng ký, duyệt giữ chỗ (Reserved), bàn giao kho và xác nhận hoàn trả linh kiện an toàn
           </p>
         </div>
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center space-x-2.5">
           <button
             onClick={fetchBorrows}
             disabled={loading}
-            className="inline-flex items-center space-x-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
+            className="inline-flex items-center space-x-2 rounded-xl border border-slate-200/90 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 shadow-card hover:bg-slate-50 transition-colors disabled:opacity-50"
           >
-            <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`h-3.5 w-3.5 text-slate-500 ${loading ? 'animate-spin' : ''}`} />
             <span>Làm mới</span>
           </button>
           {/* Issue #93: Nút tạo phiếu mượn có bảo vệ Staging Read-only */}
-<div className="inline-block relative group">
-  <button
-    type="button"
-    disabled={import.meta.env.VITE_STAGING_READ_ONLY === 'true'}
-    className={`px-4 py-2 rounded-lg font-medium flex items-center gap-2 ${
-      import.meta.env.VITE_STAGING_READ_ONLY === 'true'
-        ? 'bg-gray-200 text-gray-500 cursor-not-allowed border border-gray-300'
-        : 'bg-blue-600 text-white hover:bg-blue-700 shadow-sm'
-    }`}
-    onClick={() => {
-      if (import.meta.env.VITE_STAGING_READ_ONLY === 'true') return;
-      setIsCreateModalOpen(true);
-    }}
-  >
-    <Plus className="w-4 h-4" />
-    <span>Tạo phiếu mượn mới</span>
-    {import.meta.env.VITE_STAGING_READ_ONLY === 'true' && (
-      <span className="text-xs bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded font-normal">
-        Chỉ đọc
-      </span>
-    )}
-  </button>
-  {import.meta.env.VITE_STAGING_READ_ONLY === 'true' && (
-    <div className="absolute left-0 top-full mt-1.5 hidden group-hover:block w-72 p-2 bg-slate-800 text-white text-xs rounded-md shadow-lg z-50">
-      Chức năng tạm khóa trên Cloud Staging để bảo vệ tồn kho (STAGING_READ_ONLY=true).
-    </div>
-  )}
-</div>
+          <div className="inline-block relative group">
+            <button
+              type="button"
+              disabled={import.meta.env.VITE_STAGING_READ_ONLY === 'true'}
+              className={`px-4 py-2 rounded-xl text-xs font-semibold flex items-center space-x-2 transition-all ${
+                import.meta.env.VITE_STAGING_READ_ONLY === 'true'
+                  ? 'bg-slate-200 text-slate-500 cursor-not-allowed border border-slate-300'
+                  : 'bg-blue-600 text-white hover:bg-blue-700 shadow-sm shadow-blue-500/20'
+              }`}
+              onClick={() => {
+                if (import.meta.env.VITE_STAGING_READ_ONLY === 'true') return;
+                setIsCreateModalOpen(true);
+              }}
+            >
+              <Plus className="w-4 h-4" />
+              <span>Tạo phiếu mượn mới</span>
+              {import.meta.env.VITE_STAGING_READ_ONLY === 'true' && (
+                <span className="text-[10px] bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded font-normal">
+                  Chỉ đọc
+                </span>
+              )}
+            </button>
+            {import.meta.env.VITE_STAGING_READ_ONLY === 'true' && (
+              <div className="absolute left-0 top-full mt-1.5 hidden group-hover:block w-72 p-2 bg-slate-800 text-white text-xs rounded-xl shadow-lg z-50">
+                Chức năng tạm khóa trên Cloud Staging để bảo vệ tồn kho (STAGING_READ_ONLY=true).
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
       {/* Role Notice */}
       {!isOperator && (
-        <div className="p-3 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-800 flex items-center space-x-2">
-          <ShieldAlert className="h-4 w-4 shrink-0 text-amber-600" />
+        <div className="p-4 rounded-2xl bg-amber-50/80 border border-amber-200/80 text-xs text-amber-800 flex items-start space-x-3 shadow-card">
+          <ShieldAlert className="h-4 w-4 shrink-0 text-amber-600 mt-0.5" />
           <span>
             Bạn đang đăng nhập với vai trò <strong>{user?.role || 'Chưa đăng nhập'}</strong> (Chế độ xem chỉ đọc). Thao tác phê duyệt, bàn giao kho và nhận hoàn trả yêu cầu vai trò Thủ kho (Lab Manager) hoặc Kỹ thuật viên (Technician).
           </span>
@@ -606,24 +607,24 @@ export const BorrowReturnPage: React.FC = () => {
 
       {/* Pending Reconciliation Global Banner */}
       {(pendingReturns.length > 0 || lostReturnGuards.length > 0) && (
-        <div className="p-3.5 rounded-lg bg-indigo-50 border border-indigo-200 text-xs text-indigo-900 space-y-2">
-          <div className="flex items-center space-x-2 font-semibold">
+        <div className="p-4 rounded-2xl bg-indigo-50/80 border border-indigo-200 text-xs text-indigo-900 space-y-2.5 shadow-card">
+          <div className="flex items-center space-x-2 font-bold">
             <AlertCircle className="h-4 w-4 text-indigo-600 shrink-0" />
             <span>
               Phát hiện {pendingReturns.length + lostReturnGuards.length} giao dịch hoàn trả đang chờ đối soát kết quả với máy chủ:
             </span>
           </div>
-          <div className="space-y-1.5 pl-6">
+          <div className="space-y-2 pl-6">
             {pendingReturns.map((p) => (
               <div key={p.key} className="flex items-center justify-between">
                 <span>
-                  Phiếu <strong>{p.borrowId}</strong> (Khóa: <code className="font-mono">{p.key}</code>)
+                  Phiếu <strong>{p.borrowId}</strong> (Khóa: <code className="font-mono bg-white px-1.5 py-0.5 rounded border border-indigo-200">{p.key}</code>)
                 </span>
                 <button
                   type="button"
                   onClick={() => handleReconcile(p.borrowId, p.key)}
                   disabled={actionLoading === p.borrowId}
-                  className="rounded bg-indigo-600 px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-indigo-700 disabled:opacity-50"
+                  className="rounded-xl bg-indigo-600 px-3 py-1.5 text-[11px] font-semibold text-white hover:bg-indigo-700 disabled:opacity-50 shadow-xs transition-colors"
                 >
                   {actionLoading === p.borrowId ? 'Đang đối soát...' : 'Kiểm tra đối soát'}
                 </button>
@@ -632,13 +633,13 @@ export const BorrowReturnPage: React.FC = () => {
             {lostReturnGuards.map((g) => (
               <div key={g.key} className="flex items-center justify-between">
                 <span>
-                  Dấu chặn phiên trước: Phiếu <strong>{g.borrowId}</strong> (Khóa: <code className="font-mono">{g.key}</code>)
+                  Dấu chặn phiên trước: Phiếu <strong>{g.borrowId}</strong> (Khóa: <code className="font-mono bg-white px-1.5 py-0.5 rounded border border-indigo-200">{g.key}</code>)
                 </span>
                 <button
                   type="button"
                   onClick={() => handleReconcile(g.borrowId, g.key)}
                   disabled={actionLoading === g.borrowId}
-                  className="rounded bg-indigo-600 px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-indigo-700 disabled:opacity-50"
+                  className="rounded-xl bg-indigo-600 px-3 py-1.5 text-[11px] font-semibold text-white hover:bg-indigo-700 disabled:opacity-50 shadow-xs transition-colors"
                 >
                   {actionLoading === g.borrowId ? 'Đang đối soát...' : 'Kiểm tra đối soát'}
                 </button>
@@ -651,12 +652,12 @@ export const BorrowReturnPage: React.FC = () => {
       {/* Status banner */}
       {statusMessage && (
         <div
-          className={`p-3 rounded-lg text-xs font-medium flex items-center justify-between ${
+          className={`p-3.5 rounded-2xl text-xs font-semibold flex items-center justify-between shadow-card ${
             statusMessage.type === 'success'
-              ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+              ? 'bg-emerald-50 text-emerald-800 border border-emerald-200/80'
               : statusMessage.type === 'warning'
-              ? 'bg-amber-50 text-amber-800 border border-amber-200'
-              : 'bg-rose-50 text-rose-800 border border-rose-200'
+              ? 'bg-amber-50 text-amber-800 border border-amber-200/80'
+              : 'bg-rose-50 text-rose-800 border border-rose-200/80'
           }`}
         >
           <span>{statusMessage.text}</span>
@@ -670,9 +671,9 @@ export const BorrowReturnPage: React.FC = () => {
       )}
 
       {/* Filter & Search Bar */}
-      <div className="flex flex-col space-y-3 sm:flex-row sm:items-center sm:justify-between sm:space-y-0">
-        {/* Tabs */}
-        <div className="flex flex-wrap gap-1 border-b border-slate-200 pb-px">
+      <div className="flex flex-col space-y-3 lg:flex-row lg:items-center lg:justify-between lg:space-y-0 gap-3">
+        {/* Modern Segmented Pill Tabs */}
+        <div className="flex flex-wrap gap-1 bg-slate-100/90 p-1 rounded-2xl border border-slate-200/80">
           {[
             { key: 'ALL', label: 'Tất cả' },
             { key: 'PENDING', label: 'Chờ duyệt (Pending)' },
@@ -689,46 +690,46 @@ export const BorrowReturnPage: React.FC = () => {
             <button
               key={t.key}
               onClick={() => setActiveTab(t.key)}
-              className={`border-b-2 px-3 py-2 text-xs font-semibold transition-colors flex items-center space-x-1 ${
+              className={`px-3 py-1.5 text-xs font-semibold rounded-xl transition-all flex items-center space-x-1.5 ${
                 activeTab === t.key
-                  ? 'border-blue-600 text-blue-600'
-                  : 'border-transparent text-slate-500 hover:text-slate-800'
-              } ${t.alert ? 'text-red-600 font-bold' : ''}`}
+                  ? 'bg-white text-blue-600 shadow-xs font-bold'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
+              } ${t.alert ? 'text-rose-600 font-bold' : ''}`}
             >
               <span>{t.label}</span>
               {t.alert && (
-                <span className="h-2 w-2 rounded-full bg-red-500 inline-block animate-ping" />
+                <span className="h-2 w-2 rounded-full bg-rose-500 inline-block animate-ping" />
               )}
             </button>
           ))}
         </div>
 
         {/* Search */}
-        <div className="relative w-full sm:w-64">
-          <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-slate-400" />
+        <div className="relative w-full sm:w-72">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
           <input
             type="text"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             placeholder="Tìm theo mã phiếu, người mượn..."
-            className="w-full rounded-lg border border-slate-200 bg-white py-1.5 pl-8 pr-3 text-xs text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none"
+            className="w-full rounded-xl border border-slate-200/90 bg-white py-2 pl-9 pr-3 text-xs text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/15 shadow-card"
           />
         </div>
       </div>
 
       {/* Table */}
-      <div className="rounded-xl border border-slate-200/80 bg-white shadow-sm overflow-hidden">
+      <div className="rounded-2xl border border-slate-200/80 bg-white shadow-card overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
-            <thead className="border-b border-slate-200/80 bg-slate-50 font-semibold text-slate-600">
+            <thead className="border-b border-slate-200/80 bg-slate-50/70 text-[11px] font-bold uppercase tracking-wider text-slate-500">
               <tr>
-                <th className="py-3 px-4">Mã phiếu</th>
-                <th className="py-3 px-4">Người mượn</th>
-                <th className="py-3 px-4">Trạng thái</th>
-                <th className="py-3 px-4">Mục đích mượn</th>
-                <th className="py-3 px-4">Ngày hẹn mượn - trả</th>
-                <th className="py-3 px-4 text-center">Số loại linh kiện</th>
-                <th className="py-3 px-4 text-center">Thao tác xử lý</th>
+                <th className="py-3.5 px-4">Mã phiếu</th>
+                <th className="py-3.5 px-4">Người mượn</th>
+                <th className="py-3.5 px-4">Trạng thái</th>
+                <th className="py-3.5 px-4">Mục đích mượn</th>
+                <th className="py-3.5 px-4">Ngày hẹn mượn - trả</th>
+                <th className="py-3.5 px-4 text-center">Số loại linh kiện</th>
+                <th className="py-3.5 px-4 text-center">Thao tác xử lý</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-slate-700">

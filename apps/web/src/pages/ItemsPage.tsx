@@ -241,25 +241,30 @@ export const ItemsPage: React.FC = () => {
     <div className="space-y-6">
       <ToastContainer toasts={toasts} onDismiss={removeToast} />
 
-      {/* Header */}
+      {/* Modern SaaS Header */}
       <div className="flex flex-col justify-between space-y-4 sm:flex-row sm:items-center sm:space-y-0">
         <div>
-          <h1 className="text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">
-            Quản lý Linh kiện & Thiết bị (Items)
-          </h1>
+          <div className="flex items-center space-x-2">
+            <h1 className="text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">
+              Quản lý Linh kiện & Thiết bị
+            </h1>
+            <span className="inline-flex items-center rounded-full bg-brand-50 px-2.5 py-0.5 text-xs font-semibold text-brand-700 border border-brand-200/60">
+              {meta.totalItems} mục
+            </span>
+          </div>
           <p className="mt-1 text-xs text-slate-500">
             Danh mục phần cứng phòng Lab, theo dõi số lượng khả dụng và cảnh báo tồn kho an toàn
           </p>
         </div>
 
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center space-x-2.5">
           <button
             onClick={() => fetchItems()}
             disabled={loading}
             title="Làm mới dữ liệu"
-            className="rounded-lg border border-slate-200 bg-white p-2 text-slate-600 hover:bg-slate-50 transition-colors"
+            className="inline-flex items-center justify-center rounded-xl border border-slate-200/80 bg-white p-2.5 text-slate-600 shadow-soft hover:bg-slate-50 hover:text-slate-900 focus:outline-none focus:ring-2 focus:ring-brand-500/20 transition-all"
           >
-            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin text-blue-600' : ''}`} />
+            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin text-brand-600' : ''}`} />
           </button>
 
           {canManage && (
@@ -269,41 +274,43 @@ export const ItemsPage: React.FC = () => {
                 setFormModalMode('create');
                 setFormModalOpen(true);
               }}
-              className="inline-flex items-center space-x-1.5 rounded-lg bg-blue-600 px-3.5 py-2 text-xs font-semibold text-white shadow-sm shadow-blue-500/20 hover:bg-blue-700 transition-colors"
+              className="inline-flex items-center space-x-1.5 rounded-xl bg-brand-600 px-4 py-2.5 text-xs font-semibold text-white shadow-soft hover:bg-brand-700 active:scale-[0.99] focus:outline-none focus:ring-2 focus:ring-brand-500/20 transition-all"
             >
-              <Plus className="h-3.5 w-3.5" />
+              <Plus className="h-4 w-4" />
               <span>Thêm linh kiện mới</span>
             </button>
           )}
         </div>
       </div>
 
-      {/* Filter and Search Bar */}
-      <div className="rounded-xl border border-slate-200/80 bg-white p-4 shadow-xs space-y-3">
+      {/* Filter and Search Bar Card */}
+      <div className="rounded-2xl border border-slate-200/80 bg-white p-4.5 shadow-card space-y-3.5">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
           {/* Search Box */}
           <div className="relative flex-1 max-w-md">
-            <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+            <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
               placeholder="Tìm theo mã SKU hoặc tên linh kiện..."
-              className="w-full rounded-lg border border-slate-200 bg-slate-50/50 py-1.5 pl-9 pr-3 text-xs text-slate-800 placeholder-slate-400 focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 transition-colors"
+              className="w-full rounded-xl border border-slate-200 bg-slate-50/50 py-2 pl-9.5 pr-3.5 text-xs text-slate-800 placeholder-slate-400 focus:border-brand-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-500/20 transition-all"
             />
           </div>
 
           {/* Quick Active Filters & Counter */}
           <div className="flex items-center space-x-2 text-xs text-slate-500 shrink-0">
-            <span>Tổng số: <strong className="font-semibold text-slate-900">{meta.totalItems}</strong> linh kiện</span>
+            <span>Hiển thị trang <strong className="font-semibold text-slate-800">{meta.page}</strong> / {meta.totalPages || 1}</span>
+            <span className="text-slate-300">•</span>
+            <span>Tổng cộng <strong className="font-semibold text-slate-900">{meta.totalItems}</strong> linh kiện</span>
           </div>
         </div>
 
         {/* Filters Row */}
-        <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-100">
-          <div className="flex items-center space-x-1 text-xs text-slate-500 mr-1">
-            <Filter className="h-3.5 w-3.5" />
-            <span className="font-medium">Bộ lọc:</span>
+        <div className="flex flex-wrap items-center gap-2 pt-3 border-t border-slate-100">
+          <div className="flex items-center space-x-1.5 text-xs text-slate-500 mr-1">
+            <Filter className="h-3.5 w-3.5 text-slate-400" />
+            <span className="font-medium text-slate-600">Bộ lọc:</span>
           </div>
 
           {/* Category Filter */}
@@ -313,7 +320,7 @@ export const ItemsPage: React.FC = () => {
               setSelectedCategory(e.target.value);
               setPage(1);
             }}
-            className="rounded-lg border border-slate-200 bg-slate-50/50 py-1 px-2.5 text-xs text-slate-700 focus:bg-white focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            className="rounded-xl border border-slate-200 bg-slate-50/50 py-1.5 px-3 text-xs text-slate-700 focus:bg-white focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 transition-all cursor-pointer"
           >
             <option value="">Tất cả danh mục</option>
             {categories.map((c) => (
@@ -330,7 +337,7 @@ export const ItemsPage: React.FC = () => {
               setSelectedType(e.target.value);
               setPage(1);
             }}
-            className="rounded-lg border border-slate-200 bg-slate-50/50 py-1 px-2.5 text-xs text-slate-700 focus:bg-white focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            className="rounded-xl border border-slate-200 bg-slate-50/50 py-1.5 px-3 text-xs text-slate-700 focus:bg-white focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 transition-all cursor-pointer"
           >
             <option value="">Tất cả loại (Item Type)</option>
             <option value={ItemType.CONSUMABLE}>Tiêu hao (CONSUMABLE)</option>
@@ -346,7 +353,7 @@ export const ItemsPage: React.FC = () => {
                 setSelectedStatus(e.target.value);
                 setPage(1);
               }}
-              className="rounded-lg border border-slate-200 bg-slate-50/50 py-1 px-2.5 text-xs text-slate-700 focus:bg-white focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="rounded-xl border border-slate-200 bg-slate-50/50 py-1.5 px-3 text-xs text-slate-700 focus:bg-white focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 transition-all cursor-pointer"
             >
               <option value="all">Tất cả trạng thái</option>
               <option value="active">Đang hoạt động (Active)</option>
@@ -361,7 +368,7 @@ export const ItemsPage: React.FC = () => {
               setSelectedStockStatus(e.target.value);
               setPage(1);
             }}
-            className="rounded-lg border border-slate-200 bg-slate-50/50 py-1 px-2.5 text-xs text-slate-700 focus:bg-white focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            className="rounded-xl border border-slate-200 bg-slate-50/50 py-1.5 px-3 text-xs text-slate-700 focus:bg-white focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 transition-all cursor-pointer"
           >
             <option value="all">Tất cả tình trạng tồn</option>
             <option value={StockStatus.IN_STOCK}>Sẵn sàng (IN_STOCK)</option>
@@ -376,13 +383,13 @@ export const ItemsPage: React.FC = () => {
               setIsLowStockFilter(!isLowStockFilter);
               setPage(1);
             }}
-            className={`inline-flex items-center space-x-1 rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors ${
+            className={`inline-flex items-center space-x-1.5 rounded-xl border px-3 py-1.5 text-xs font-medium transition-all ${
               isLowStockFilter
-                ? 'border-amber-300 bg-amber-50 text-amber-800'
-                : 'border-slate-200 bg-slate-50/50 text-slate-600 hover:bg-slate-100'
+                ? 'border-amber-300 bg-amber-50/80 text-amber-800 shadow-xs'
+                : 'border-slate-200 bg-slate-50/50 text-slate-600 hover:bg-slate-100 hover:text-slate-900'
             }`}
           >
-            <AlertTriangle className={`h-3 w-3 ${isLowStockFilter ? 'text-amber-600' : 'text-slate-400'}`} />
+            <AlertTriangle className={`h-3.5 w-3.5 ${isLowStockFilter ? 'text-amber-600' : 'text-slate-400'}`} />
             <span>Cảnh báo thiếu hàng</span>
           </button>
 
@@ -390,68 +397,68 @@ export const ItemsPage: React.FC = () => {
           {(debouncedSearch || selectedCategory || selectedType || selectedStatus !== 'all' || selectedStockStatus !== 'all' || isLowStockFilter) && (
             <button
               onClick={handleResetFilters}
-              className="inline-flex items-center space-x-1 text-xs text-rose-600 hover:text-rose-700 ml-auto font-medium"
+              className="inline-flex items-center space-x-1.5 text-xs text-rose-600 hover:text-rose-700 ml-auto font-medium transition-colors"
             >
-              <RotateCcw className="h-3 w-3" />
+              <RotateCcw className="h-3.5 w-3.5" />
               <span>Xóa bộ lọc</span>
             </button>
           )}
         </div>
       </div>
 
-      {/* Items Table */}
-      <div className="rounded-xl border border-slate-200/80 bg-white shadow-xs overflow-hidden">
+      {/* Items Table Card */}
+      <div className="rounded-2xl border border-slate-200/80 bg-white shadow-card overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
-            <thead className="border-b border-slate-200/80 bg-slate-50 font-semibold text-slate-600">
+            <thead className="border-b border-slate-200/80 bg-slate-50/75 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
               <tr>
                 <th
                   onClick={() => handleSort(ItemSortField.CODE)}
-                  className="py-3 px-4 cursor-pointer hover:bg-slate-100 transition-colors group"
+                  className="py-3.5 px-4 cursor-pointer hover:bg-slate-100/75 transition-colors group"
                 >
                   Mã SKU {renderSortIcon(ItemSortField.CODE)}
                 </th>
                 <th
                   onClick={() => handleSort(ItemSortField.NAME)}
-                  className="py-3 px-4 cursor-pointer hover:bg-slate-100 transition-colors group"
+                  className="py-3.5 px-4 cursor-pointer hover:bg-slate-100/75 transition-colors group"
                 >
                   Tên linh kiện / Thiết bị {renderSortIcon(ItemSortField.NAME)}
                 </th>
-                <th className="py-3 px-4">Danh mục</th>
-                <th className="py-3 px-4">Loại Item</th>
-                <th className="py-3 px-4 text-center">Đơn vị</th>
-                <th className="py-3 px-4 text-right">Tồn vật lý</th>
-                <th className="py-3 px-4 text-right">Khả dụng</th>
+                <th className="py-3.5 px-4">Danh mục</th>
+                <th className="py-3.5 px-4">Loại Item</th>
+                <th className="py-3.5 px-4 text-center">Đơn vị</th>
+                <th className="py-3.5 px-4 text-right">Tồn vật lý</th>
+                <th className="py-3.5 px-4 text-right">Khả dụng</th>
                 <th
                   onClick={() => handleSort(ItemSortField.MIN_STOCK_ALERT)}
-                  className="py-3 px-4 text-center cursor-pointer hover:bg-slate-100 transition-colors group"
+                  className="py-3.5 px-4 text-center cursor-pointer hover:bg-slate-100/75 transition-colors group"
                 >
                   Ngưỡng {renderSortIcon(ItemSortField.MIN_STOCK_ALERT)}
                 </th>
-                <th className="py-3 px-4 text-center">Tồn kho</th>
-                <th className="py-3 px-4 text-center">Trạng thái</th>
-                <th className="py-3 px-4 text-center">Thao tác</th>
+                <th className="py-3.5 px-4 text-center">Tồn kho</th>
+                <th className="py-3.5 px-4 text-center">Trạng thái</th>
+                <th className="py-3.5 px-4 text-center">Thao tác</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-slate-700">
               {loading ? (
                 <tr>
-                  <td colSpan={11} className="py-12 text-center text-slate-400">
-                    <div className="flex flex-col items-center justify-center space-y-2">
-                      <div className="h-6 w-6 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" />
-                      <span>Đang tải danh sách linh kiện...</span>
+                  <td colSpan={11} className="py-14 text-center text-slate-400">
+                    <div className="flex flex-col items-center justify-center space-y-2.5">
+                      <div className="h-7 w-7 animate-spin rounded-full border-2 border-brand-600 border-t-transparent" />
+                      <span className="text-xs text-slate-500">Đang tải danh sách linh kiện...</span>
                     </div>
                   </td>
                 </tr>
               ) : error ? (
                 <tr>
-                  <td colSpan={11} className="py-12 text-center text-rose-500">
-                    <div className="flex flex-col items-center justify-center space-y-2">
-                      <AlertTriangle className="h-6 w-6" />
-                      <span>{error}</span>
+                  <td colSpan={11} className="py-14 text-center text-rose-500">
+                    <div className="flex flex-col items-center justify-center space-y-2.5">
+                      <AlertTriangle className="h-7 w-7" />
+                      <span className="text-xs">{error}</span>
                       <button
                         onClick={() => fetchItems()}
-                        className="rounded-lg bg-slate-100 px-3 py-1.5 text-xs text-slate-700 hover:bg-slate-200"
+                        className="rounded-xl bg-slate-100 px-3.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-200 transition-colors"
                       >
                         Thử lại
                       </button>
@@ -460,12 +467,14 @@ export const ItemsPage: React.FC = () => {
                 </tr>
               ) : items.length === 0 ? (
                 <tr>
-                  <td colSpan={11} className="py-12 text-center text-slate-400">
-                    <div className="flex flex-col items-center justify-center space-y-2">
-                      <Layers className="h-8 w-8 text-slate-300" />
-                      <span className="font-medium text-slate-600">Không tìm thấy linh kiện nào</span>
-                      <span className="text-slate-400 text-[11px]">
-                        Thử thay đổi từ khóa tìm kiếm hoặc xóa các điều kiện lọc.
+                  <td colSpan={11} className="py-16 text-center text-slate-400">
+                    <div className="flex flex-col items-center justify-center space-y-2.5">
+                      <div className="h-12 w-12 rounded-2xl bg-slate-50 border border-slate-200/60 flex items-center justify-center text-slate-400">
+                        <Layers className="h-6 w-6" />
+                      </div>
+                      <span className="font-medium text-slate-700 text-sm">Không tìm thấy linh kiện nào</span>
+                      <span className="text-slate-400 text-xs max-w-sm">
+                        Thử thay đổi từ khóa tìm kiếm hoặc xóa các điều kiện lọc để hiển thị toàn bộ linh kiện.
                       </span>
                     </div>
                   </td>
@@ -474,14 +483,14 @@ export const ItemsPage: React.FC = () => {
                 items.map((item) => (
                   <tr
                     key={item.id}
-                    className={`hover:bg-slate-50/70 transition-colors ${
-                      item.isLowStock ? 'bg-amber-50/20' : ''
-                    } ${!item.isActive ? 'opacity-70 bg-slate-50/50' : ''}`}
+                    className={`hover:bg-slate-50/75 transition-colors ${
+                      item.isLowStock ? 'bg-amber-50/30' : ''
+                    } ${!item.isActive ? 'opacity-70 bg-slate-50/40' : ''}`}
                   >
                     {/* SKU Code */}
-                    <td className="py-3 px-4 font-mono font-semibold text-blue-600">
-                      <div className="flex items-center space-x-1.5">
-                        <Barcode className="h-3.5 w-3.5 text-slate-400" />
+                    <td className="py-3 px-4 font-mono font-semibold">
+                      <div className="inline-flex items-center space-x-1.5 bg-slate-100/80 px-2 py-0.5 rounded-md border border-slate-200/60 text-slate-800">
+                        <Barcode className="h-3 w-3 text-slate-400" />
                         <span>{item.code}</span>
                       </div>
                     </td>
@@ -490,7 +499,7 @@ export const ItemsPage: React.FC = () => {
                     <td className="py-3 px-4">
                       <div className="font-medium text-slate-900">{item.name}</div>
                       {item.description && (
-                        <div className="text-[11px] text-slate-400 truncate max-w-xs">
+                        <div className="text-[11px] text-slate-400 truncate max-w-xs mt-0.5">
                           {item.description}
                         </div>
                       )}
@@ -507,7 +516,7 @@ export const ItemsPage: React.FC = () => {
                     </td>
 
                     {/* Unit */}
-                    <td className="py-3 px-4 text-center text-slate-500">{item.unit}</td>
+                    <td className="py-3 px-4 text-center text-slate-500 font-medium">{item.unit}</td>
 
                     {/* Total On-hand */}
                     <td className="py-3 px-4 text-right font-semibold text-slate-800">
@@ -519,20 +528,20 @@ export const ItemsPage: React.FC = () => {
                       {item.isLowStock ? (
                         <span
                           title={`Khả dụng (${item.available}) < Ngưỡng an toàn (${item.minStockAlert})`}
-                          className="inline-flex items-center space-x-1 rounded-full bg-amber-100 px-2 py-0.5 font-bold text-amber-800"
+                          className="inline-flex items-center space-x-1 rounded-full bg-amber-50 border border-amber-200 px-2.5 py-0.5 font-bold text-amber-700"
                         >
                           <AlertTriangle className="h-3 w-3 text-amber-600" />
                           <span>{item.available}</span>
                         </span>
                       ) : (
-                        <span className="inline-flex rounded-full bg-emerald-50 px-2 py-0.5 font-bold text-emerald-700">
+                        <span className="inline-flex rounded-full bg-emerald-50 border border-emerald-200/60 px-2.5 py-0.5 font-bold text-emerald-700">
                           {item.available}
                         </span>
                       )}
                     </td>
 
                     {/* Min Alert */}
-                    <td className="py-3 px-4 text-center text-slate-400 font-mono">
+                    <td className="py-3 px-4 text-center text-slate-400 font-mono text-xs">
                       &lt; {item.minStockAlert}
                     </td>
 
@@ -551,7 +560,7 @@ export const ItemsPage: React.FC = () => {
 
                     {/* Actions */}
                     <td className="py-3 px-4 text-center">
-                      <div className="flex items-center justify-center space-x-1.5">
+                      <div className="flex items-center justify-center space-x-1">
                         {/* View Detail */}
                         <button
                           onClick={() => {
@@ -559,7 +568,7 @@ export const ItemsPage: React.FC = () => {
                             setDetailModalOpen(true);
                           }}
                           title="Xem chi tiết & tồn kho vị trí"
-                          className="rounded-md p-1.5 text-slate-500 hover:bg-blue-50 hover:text-blue-600 transition-colors"
+                          className="rounded-lg p-1.5 text-slate-500 hover:bg-brand-50 hover:text-brand-600 transition-colors"
                         >
                           <Eye className="h-3.5 w-3.5" />
                         </button>
@@ -573,7 +582,7 @@ export const ItemsPage: React.FC = () => {
                               setFormModalOpen(true);
                             }}
                             title="Chỉnh sửa thông tin"
-                            className="rounded-md p-1.5 text-slate-500 hover:bg-amber-50 hover:text-amber-600 transition-colors"
+                            className="rounded-lg p-1.5 text-slate-500 hover:bg-amber-50 hover:text-amber-600 transition-colors"
                           >
                             <Pencil className="h-3.5 w-3.5" />
                           </button>
@@ -587,7 +596,7 @@ export const ItemsPage: React.FC = () => {
                               setStatusModalOpen(true);
                             }}
                             title={item.isActive ? 'Vô hiệu hóa linh kiện' : 'Kích hoạt lại linh kiện'}
-                            className={`rounded-md p-1.5 transition-colors ${
+                            className={`rounded-lg p-1.5 transition-colors ${
                               item.isActive
                                 ? 'text-slate-400 hover:bg-rose-50 hover:text-rose-600'
                                 : 'text-slate-400 hover:bg-emerald-50 hover:text-emerald-600'
@@ -602,7 +611,7 @@ export const ItemsPage: React.FC = () => {
                           <button
                             onClick={() => handleDeleteItem(item)}
                             title="Xóa linh kiện (nếu tồn kho bằng 0 và chưa có giao dịch)"
-                            className="rounded-md p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition-colors"
+                            className="rounded-lg p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition-colors"
                           >
                             <Trash2 className="h-3.5 w-3.5" />
                           </button>
@@ -626,14 +635,14 @@ export const ItemsPage: React.FC = () => {
                 setLimit(Number(e.target.value));
                 setPage(1);
               }}
-              className="rounded-md border border-slate-200 bg-white py-1 px-2 text-xs text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="rounded-lg border border-slate-200 bg-white py-1 px-2.5 text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-500/20 cursor-pointer"
             >
               <option value={10}>10</option>
               <option value={20}>20</option>
               <option value={50}>50</option>
             </select>
             <span>
-              Trang <strong className="text-slate-900">{meta.page}</strong> / {meta.totalPages || 1}
+              Trang <strong className="text-slate-900 font-semibold">{meta.page}</strong> / {meta.totalPages || 1}
             </span>
           </div>
 
@@ -641,7 +650,7 @@ export const ItemsPage: React.FC = () => {
             <button
               onClick={() => setPage((p) => Math.max(1, p - 1))}
               disabled={!meta.hasPrevPage || loading}
-              className="inline-flex items-center space-x-1 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-40 transition-colors"
+              className="inline-flex items-center space-x-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-1.5 text-xs font-medium text-slate-700 shadow-soft hover:bg-slate-50 disabled:opacity-40 transition-all cursor-pointer disabled:cursor-not-allowed"
             >
               <ChevronLeft className="h-3.5 w-3.5" />
               <span>Trước</span>
@@ -649,7 +658,7 @@ export const ItemsPage: React.FC = () => {
             <button
               onClick={() => setPage((p) => p + 1)}
               disabled={!meta.hasNextPage || loading}
-              className="inline-flex items-center space-x-1 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-40 transition-colors"
+              className="inline-flex items-center space-x-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-1.5 text-xs font-medium text-slate-700 shadow-soft hover:bg-slate-50 disabled:opacity-40 transition-all cursor-pointer disabled:cursor-not-allowed"
             >
               <span>Sau</span>
               <ChevronRight className="h-3.5 w-3.5" />

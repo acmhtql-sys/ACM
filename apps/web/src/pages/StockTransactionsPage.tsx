@@ -303,10 +303,14 @@ export const StockTransactionsPage: React.FC = () => {
       {/* Top Header */}
       <div className="flex flex-col justify-between space-y-4 sm:flex-row sm:items-center sm:space-y-0">
         <div>
-          <h1 className="text-xl font-bold tracking-tight text-slate-900 sm:text-2xl flex items-center space-x-2">
-            <FileText className="h-6 w-6 text-blue-600" />
-            <span>Giao dịch Kho (Stock Transactions)</span>
-          </h1>
+          <div className="flex items-center space-x-2.5">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand-50 text-brand-600 border border-brand-200/60">
+              <FileText className="h-5 w-5" />
+            </div>
+            <h1 className="text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">
+              Giao dịch Kho (Stock Transactions)
+            </h1>
+          </div>
           <p className="mt-1 text-xs text-slate-500">
             Lịch sử và nhật ký biến động kho đối với các phiếu nhập, xuất, chuyển kho và kiểm kê
           </p>
@@ -317,7 +321,7 @@ export const StockTransactionsPage: React.FC = () => {
           <div className="flex flex-wrap items-center gap-2" data-testid="write-actions-toolbar">
             {!writeEnabled && (
               <div
-                className="inline-flex items-center space-x-1.5 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-[11px] font-medium text-amber-800"
+                className="inline-flex items-center space-x-1.5 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] font-medium text-amber-800 shadow-xs"
                 data-testid="read-only-safety-badge"
                 title="Chế độ giám sát Read-Only S2C-2: Thao tác ghi bị khóa để bảo đảm toàn vẹn dữ liệu"
               >
@@ -328,9 +332,9 @@ export const StockTransactionsPage: React.FC = () => {
             <button
               onClick={() => handleOpenModal(setIsImportOpen)}
               disabled={!writeEnabled}
-              className={`inline-flex items-center space-x-1.5 rounded-lg px-3 py-2 text-xs font-semibold shadow-sm transition ${
+              className={`inline-flex items-center space-x-1.5 rounded-xl px-3.5 py-2 text-xs font-semibold shadow-soft transition-all ${
                 writeEnabled
-                  ? 'bg-blue-600 text-white shadow-blue-500/20 hover:bg-blue-700 cursor-pointer'
+                  ? 'bg-brand-600 text-white hover:bg-brand-700 active:scale-[0.99] cursor-pointer'
                   : 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed opacity-60'
               }`}
               title={writeEnabled ? 'Nhập kho' : 'Thao tác ghi kho đang tạm khóa (Chế độ Read-Only S2C-2)'}
@@ -342,9 +346,9 @@ export const StockTransactionsPage: React.FC = () => {
             <button
               onClick={() => handleOpenModal(setIsExportOpen)}
               disabled={!writeEnabled}
-              className={`inline-flex items-center space-x-1.5 rounded-lg px-3 py-2 text-xs font-semibold shadow-sm transition ${
+              className={`inline-flex items-center space-x-1.5 rounded-xl px-3.5 py-2 text-xs font-semibold shadow-soft transition-all ${
                 writeEnabled
-                  ? 'bg-amber-600 text-white shadow-amber-500/20 hover:bg-amber-700 cursor-pointer'
+                  ? 'bg-amber-600 text-white hover:bg-amber-700 active:scale-[0.99] cursor-pointer'
                   : 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed opacity-60'
               }`}
               title={writeEnabled ? 'Xuất kho' : 'Thao tác ghi kho đang tạm khóa (Chế độ Read-Only S2C-2)'}
@@ -356,9 +360,9 @@ export const StockTransactionsPage: React.FC = () => {
             <button
               onClick={() => handleOpenModal(setIsTransferOpen)}
               disabled={!writeEnabled}
-              className={`inline-flex items-center space-x-1.5 rounded-lg px-3 py-2 text-xs font-semibold shadow-sm transition ${
+              className={`inline-flex items-center space-x-1.5 rounded-xl px-3.5 py-2 text-xs font-semibold shadow-soft transition-all ${
                 writeEnabled
-                  ? 'bg-purple-600 text-white shadow-purple-500/20 hover:bg-purple-700 cursor-pointer'
+                  ? 'bg-purple-600 text-white hover:bg-purple-700 active:scale-[0.99] cursor-pointer'
                   : 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed opacity-60'
               }`}
               title={writeEnabled ? 'Điều chuyển' : 'Thao tác ghi kho đang tạm khóa (Chế độ Read-Only S2C-2)'}
@@ -370,9 +374,9 @@ export const StockTransactionsPage: React.FC = () => {
             <button
               onClick={() => handleOpenModal(setIsAdjustmentOpen)}
               disabled={!writeEnabled || !isAdjustmentEnabled}
-              className={`inline-flex items-center space-x-1.5 rounded-lg px-3 py-2 text-xs font-semibold shadow-sm transition ${
+              className={`inline-flex items-center space-x-1.5 rounded-xl px-3.5 py-2 text-xs font-semibold shadow-soft transition-all ${
                 writeEnabled && isAdjustmentEnabled
-                  ? 'bg-yellow-600 text-white shadow-yellow-500/20 hover:bg-yellow-700 cursor-pointer'
+                  ? 'bg-amber-600 text-white hover:bg-amber-700 active:scale-[0.99] cursor-pointer'
                   : 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed opacity-60'
               }`}
               title={
@@ -392,20 +396,20 @@ export const StockTransactionsPage: React.FC = () => {
       </div>
 
       {/* Two-Tab Navigation */}
-      <div className="flex border-b border-slate-200 text-xs font-medium" data-testid="stock-view-tabs">
+      <div className="flex flex-wrap gap-1 rounded-2xl border border-slate-200/80 bg-white p-1.5 shadow-card text-xs font-semibold text-slate-600 sm:w-fit" data-testid="stock-view-tabs">
         <button
           onClick={() => handleTabChange('transactions')}
-          className={`flex items-center space-x-2 py-3 px-4 border-b-2 font-semibold transition ${
+          className={`flex items-center space-x-2 rounded-xl px-4 py-2 transition-all cursor-pointer ${
             activeTab === 'transactions'
-              ? 'border-blue-600 text-blue-600'
-              : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300'
+              ? 'bg-brand-50 text-brand-700 border border-brand-200/60 shadow-xs'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
           }`}
           data-testid="tab-transactions"
         >
           <FileText className="h-4 w-4" />
           <span>Lịch sử Chứng từ (Transactions)</span>
           {txMeta && txMeta.totalItems > 0 && (
-            <span className="ml-1.5 rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-bold text-blue-700">
+            <span className="ml-1.5 rounded-full bg-brand-100 px-2 py-0.5 text-[10px] font-bold text-brand-700">
               {txMeta.totalItems}
             </span>
           )}
@@ -413,10 +417,10 @@ export const StockTransactionsPage: React.FC = () => {
 
         <button
           onClick={() => handleTabChange('movements')}
-          className={`flex items-center space-x-2 py-3 px-4 border-b-2 font-semibold transition ${
+          className={`flex items-center space-x-2 rounded-xl px-4 py-2 transition-all cursor-pointer ${
             activeTab === 'movements'
-              ? 'border-blue-600 text-blue-600'
-              : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300'
+              ? 'bg-brand-50 text-brand-700 border border-brand-200/60 shadow-xs'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
           }`}
           data-testid="tab-movements"
         >
@@ -430,18 +434,18 @@ export const StockTransactionsPage: React.FC = () => {
         </button>
       </div>
 
-      {/* Filter and Search Bar */}
-      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm space-y-3">
+      {/* Filter and Search Bar Card */}
+      <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-card space-y-3">
         <div className={`grid grid-cols-1 sm:grid-cols-2 ${activeTab === 'transactions' ? 'lg:grid-cols-5' : 'lg:grid-cols-4'} gap-3`}>
           {/* Search Input */}
           <div className="relative">
-            <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
             <input
               type="text"
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
               placeholder={activeTab === 'transactions' ? 'Tìm mã phiếu, ghi chú...' : 'Tìm lý do, mã tham chiếu...'}
-              className="w-full rounded-lg border border-slate-200 pl-9 pr-3 py-2 text-xs text-slate-800 focus:border-blue-500 focus:outline-none"
+              className="w-full rounded-xl border border-slate-200 bg-slate-50/50 pl-9.5 pr-3 py-2 text-xs text-slate-800 placeholder-slate-400 transition-all focus:border-brand-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-500/20"
               data-testid="search-tx-input"
             />
           </div>
@@ -451,7 +455,7 @@ export const StockTransactionsPage: React.FC = () => {
             <select
               value={selectedType || ''}
               onChange={(e) => updateParam('type', e.target.value || undefined)}
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-800 focus:border-blue-500 focus:outline-none"
+              className="w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3 py-2 text-xs text-slate-800 transition-all focus:border-brand-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-500/20 cursor-pointer"
               data-testid="filter-type-select"
             >
               <option value="">-- Tất cả loại phiếu --</option>
@@ -468,7 +472,7 @@ export const StockTransactionsPage: React.FC = () => {
               <select
                 value={selectedStatus || ''}
                 onChange={(e) => updateParam('status', e.target.value || undefined)}
-                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-800 focus:border-blue-500 focus:outline-none"
+                className="w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3 py-2 text-xs text-slate-800 transition-all focus:border-brand-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-500/20 cursor-pointer"
                 data-testid="filter-status-select"
               >
                 <option value="">-- Tất cả trạng thái --</option>
@@ -484,7 +488,7 @@ export const StockTransactionsPage: React.FC = () => {
               type="date"
               value={startDate}
               onChange={(e) => updateParam('startDate', e.target.value || undefined)}
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-800 focus:border-blue-500 focus:outline-none"
+              className="w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3 py-2 text-xs text-slate-800 transition-all focus:border-brand-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-500/20 cursor-pointer"
               data-testid="filter-start-date"
             />
           </div>
@@ -495,7 +499,7 @@ export const StockTransactionsPage: React.FC = () => {
               type="date"
               value={endDate}
               onChange={(e) => updateParam('endDate', e.target.value || undefined)}
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-800 focus:border-blue-500 focus:outline-none"
+              className="w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3 py-2 text-xs text-slate-800 transition-all focus:border-brand-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-500/20 cursor-pointer"
               data-testid="filter-end-date"
             />
           </div>
@@ -504,7 +508,7 @@ export const StockTransactionsPage: React.FC = () => {
 
       {/* Main Table Content: TAB 1 (Transactions) */}
       {activeTab === 'transactions' && (
-        <div className="rounded-xl border border-slate-200/80 bg-white shadow-sm overflow-hidden">
+        <div className="rounded-2xl border border-slate-200/80 bg-white shadow-card overflow-hidden">
           {transactionsQuery.isLoading ? (
             <div className="p-6">
               <TableSkeleton rows={8} />

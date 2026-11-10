@@ -197,9 +197,14 @@ export const ReportsPage: React.FC = () => {
       {/* Header */}
       <div className="flex flex-col justify-between space-y-4 sm:flex-row sm:items-center sm:space-y-0">
         <div>
-          <h1 className="text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">
-            Báo cáo & Thống kê (Reports & Analytics)
-          </h1>
+          <div className="flex items-center space-x-2.5">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand-50 text-brand-600 border border-brand-200/60">
+              <FileSpreadsheet className="h-5 w-5" />
+            </div>
+            <h1 className="text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">
+              Báo cáo & Thống kê (Reports & Analytics)
+            </h1>
+          </div>
           <p className="mt-1 text-xs text-slate-500">
             Tổng hợp dữ liệu tồn kho, phân bổ linh kiện và vận hành mượn trả thời gian thực
           </p>
@@ -208,21 +213,21 @@ export const ReportsPage: React.FC = () => {
         <button
           onClick={() => fetchReportData()}
           disabled={loading}
-          className="inline-flex items-center space-x-1.5 rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
+          className="inline-flex items-center space-x-1.5 rounded-xl border border-slate-200/80 bg-white px-3.5 py-2.5 text-xs font-semibold text-slate-700 shadow-soft hover:bg-slate-50 hover:text-slate-900 transition-all cursor-pointer"
         >
-          <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin text-blue-600' : 'text-slate-500'}`} />
+          <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin text-brand-600' : 'text-slate-500'}`} />
           <span>Làm mới</span>
         </button>
       </div>
 
       {/* Tabs */}
-      <div className="flex space-x-2 border-b border-slate-200 pb-2">
+      <div className="flex flex-wrap gap-1 rounded-2xl border border-slate-200/80 bg-white p-1.5 shadow-card text-xs font-semibold text-slate-600 sm:w-fit">
         <button
           onClick={() => setActiveTab('inventory')}
-          className={`flex items-center space-x-2 rounded-lg px-3.5 py-2 text-xs font-semibold transition-colors ${
+          className={`flex items-center space-x-2 rounded-xl px-4 py-2 transition-all cursor-pointer ${
             activeTab === 'inventory'
-              ? 'bg-blue-50 text-blue-700'
-              : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+              ? 'bg-brand-50 text-brand-700 border border-brand-200/60 shadow-xs'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
           }`}
         >
           <FileSpreadsheet className="h-4 w-4" />
@@ -231,10 +236,10 @@ export const ReportsPage: React.FC = () => {
 
         <button
           onClick={() => setActiveTab('borrowReturn')}
-          className={`flex items-center space-x-2 rounded-lg px-3.5 py-2 text-xs font-semibold transition-colors ${
+          className={`flex items-center space-x-2 rounded-xl px-4 py-2 transition-all cursor-pointer ${
             activeTab === 'borrowReturn'
-              ? 'bg-blue-50 text-blue-700'
-              : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+              ? 'bg-brand-50 text-brand-700 border border-brand-200/60 shadow-xs'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
           }`}
         >
           <Clock className="h-4 w-4" />
@@ -243,10 +248,10 @@ export const ReportsPage: React.FC = () => {
 
         <button
           onClick={() => setActiveTab('lowStock')}
-          className={`flex items-center space-x-2 rounded-lg px-3.5 py-2 text-xs font-semibold transition-colors ${
+          className={`flex items-center space-x-2 rounded-xl px-4 py-2 transition-all cursor-pointer ${
             activeTab === 'lowStock'
-              ? 'bg-blue-50 text-blue-700'
-              : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+              ? 'bg-brand-50 text-brand-700 border border-brand-200/60 shadow-xs'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
           }`}
         >
           <AlertTriangle className="h-4 w-4" />
@@ -256,14 +261,14 @@ export const ReportsPage: React.FC = () => {
 
       {/* Error banner */}
       {error && (
-        <div className="flex items-center justify-between rounded-lg border border-rose-200 bg-rose-50 p-3 text-xs text-rose-800">
-          <div className="flex items-center space-x-2">
-            <AlertTriangle className="h-4 w-4 text-rose-600" />
+        <div className="flex items-center justify-between rounded-xl border border-rose-200/80 bg-rose-50 p-3.5 text-xs text-rose-800 shadow-xs">
+          <div className="flex items-center space-x-2.5 font-medium">
+            <AlertTriangle className="h-4 w-4 text-rose-600 shrink-0" />
             <span>{error}</span>
           </div>
           <button
             onClick={() => fetchReportData()}
-            className="font-semibold text-rose-700 underline hover:text-rose-900"
+            className="font-semibold text-rose-700 underline hover:text-rose-900 cursor-pointer"
           >
             Thử lại
           </button>
@@ -275,27 +280,27 @@ export const ReportsPage: React.FC = () => {
         <div className="space-y-4">
           <div className="flex flex-col justify-between space-y-3 sm:flex-row sm:items-center sm:space-y-0">
             <div className="relative w-full sm:w-72">
-              <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-slate-400" />
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
               <input
                 type="text"
                 placeholder="Tìm mã, tên, danh mục..."
                 value={inventorySearch}
                 onChange={(e) => setInventorySearch(e.target.value)}
-                className="w-full rounded-lg border border-slate-200 bg-white py-1.5 pl-9 pr-3 text-xs placeholder-slate-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                className="w-full rounded-xl border border-slate-200 bg-white py-2 pl-9.5 pr-3 text-xs placeholder-slate-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 transition-all"
               />
             </div>
 
             <button
               onClick={exportInventoryCsv}
               disabled={filteredInventory.length === 0}
-              className="inline-flex items-center space-x-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm hover:bg-slate-50 disabled:opacity-50"
+              className="inline-flex items-center space-x-1.5 rounded-xl border border-slate-200/80 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 shadow-soft hover:bg-slate-50 hover:text-slate-900 disabled:opacity-50 transition-all cursor-pointer"
             >
               <Download className="h-3.5 w-3.5 text-slate-500" />
               <span>Xuất CSV Kiểm kê</span>
             </button>
           </div>
 
-          <div className="overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-sm">
+          <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-card">
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
                 <thead className="border-b border-slate-200 bg-slate-50 text-[11px] font-semibold text-slate-600">

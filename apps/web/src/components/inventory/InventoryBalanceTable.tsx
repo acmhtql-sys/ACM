@@ -88,18 +88,18 @@ export const InventoryBalanceTable: React.FC<InventoryBalanceTableProps> = ({
 
   return (
     <div className="space-y-4">
-      {/* Search and Filters Toolbar */}
-      <div className="flex flex-col gap-3 rounded-xl border border-slate-200/80 bg-white p-4 shadow-sm md:flex-row md:items-center md:justify-between">
+      {/* Search and Filters Toolbar Card */}
+      <div className="flex flex-col gap-3 rounded-2xl border border-slate-200/80 bg-white p-4 shadow-card md:flex-row md:items-center md:justify-between">
         <div className="flex flex-1 flex-col gap-3 sm:flex-row sm:items-center">
           {/* Search Input */}
           <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
               placeholder="Tìm kiếm theo mã, tên linh kiện hoặc vị trí..."
               value={searchInput}
               onChange={(e) => onSearchChange(e.target.value)}
-              className="w-full rounded-lg border border-slate-200 py-2 pl-9 pr-3 text-xs text-slate-900 transition-colors focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="w-full rounded-xl border border-slate-200 bg-slate-50/50 py-2 pl-9.5 pr-3.5 text-xs text-slate-800 placeholder-slate-400 transition-all focus:border-brand-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-500/20"
             />
           </div>
 
@@ -108,7 +108,7 @@ export const InventoryBalanceTable: React.FC<InventoryBalanceTableProps> = ({
             <select
               value={selectedLocationId}
               onChange={(e) => onLocationChange(e.target.value)}
-              className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 transition-colors focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="rounded-xl border border-slate-200 bg-slate-50/50 px-3.5 py-2 text-xs font-medium text-slate-700 transition-all focus:border-brand-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-500/20 cursor-pointer"
             >
               <option value="">Tất cả vị trí kho</option>
               {locations.map((loc) => (
@@ -120,14 +120,14 @@ export const InventoryBalanceTable: React.FC<InventoryBalanceTableProps> = ({
           </div>
 
           {/* Low Stock Checkbox */}
-          <label className="inline-flex cursor-pointer items-center space-x-2 rounded-lg border border-slate-200 bg-slate-50/50 px-3 py-2 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-100/60">
+          <label className="inline-flex cursor-pointer items-center space-x-2 rounded-xl border border-slate-200 bg-slate-50/50 px-3.5 py-2 text-xs font-semibold text-slate-700 transition-all hover:bg-slate-100/70">
             <input
               type="checkbox"
               checked={isLowStockOnly}
               onChange={(e) => onLowStockToggle(e.target.checked)}
-              className="h-3.5 w-3.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+              className="h-3.5 w-3.5 rounded border-slate-300 text-brand-600 focus:ring-brand-500 cursor-pointer"
             />
-            <span className="flex items-center space-x-1">
+            <span className="flex items-center space-x-1.5">
               <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />
               <span>Cảnh báo tồn thấp</span>
             </span>
@@ -139,10 +139,10 @@ export const InventoryBalanceTable: React.FC<InventoryBalanceTableProps> = ({
           <button
             onClick={onRefresh}
             disabled={isLoading}
-            className="inline-flex items-center space-x-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm transition-all hover:bg-slate-50 disabled:opacity-50"
+            className="inline-flex items-center space-x-1.5 rounded-xl border border-slate-200/80 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 shadow-soft transition-all hover:bg-slate-50 hover:text-slate-900 disabled:opacity-50 cursor-pointer"
             title="Làm mới số dư"
           >
-            <RefreshCw className={`h-3.5 w-3.5 text-slate-500 ${isLoading ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`h-3.5 w-3.5 text-slate-500 ${isLoading ? 'animate-spin text-brand-600' : ''}`} />
             <span className="hidden sm:inline">Làm mới</span>
           </button>
         </div>
@@ -175,16 +175,16 @@ export const InventoryBalanceTable: React.FC<InventoryBalanceTableProps> = ({
           }}
         />
       ) : (
-        <div className="overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-sm">
+        <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-card">
           {/* Desktop Table */}
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
-              <thead className="border-b border-slate-200/80 bg-slate-50 font-semibold text-slate-600">
+              <thead className="border-b border-slate-200/80 bg-slate-50/75 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
                 <tr>
-                  <th className="py-3 px-4">Linh kiện / Thiết bị</th>
-                  <th className="py-3 px-4">Vị trí lưu trữ</th>
+                  <th className="py-3.5 px-4">Linh kiện / Thiết bị</th>
+                  <th className="py-3.5 px-4">Vị trí lưu trữ</th>
                   <th
-                    className="cursor-pointer py-3 px-3 text-right transition-colors hover:bg-slate-100"
+                    className="cursor-pointer py-3.5 px-3 text-right transition-colors hover:bg-slate-100/75"
                     onClick={() => onSortChange(StockBalanceSortField.ON_HAND)}
                   >
                     <div className="flex items-center justify-end">
@@ -192,12 +192,12 @@ export const InventoryBalanceTable: React.FC<InventoryBalanceTableProps> = ({
                       {renderSortIcon(StockBalanceSortField.ON_HAND)}
                     </div>
                   </th>
-                  <th className="py-3 px-3 text-right">Reserved (Giữ chỗ)</th>
-                  <th className="py-3 px-3 text-right">Quarantined (Lỗi)</th>
-                  <th className="py-3 px-3 text-right">Kit (Gán Kit)</th>
-                  <th className="py-3 px-3 text-right text-slate-500">Borrowed (Ngoài kho)</th>
+                  <th className="py-3.5 px-3 text-right">Reserved (Giữ chỗ)</th>
+                  <th className="py-3.5 px-3 text-right">Quarantined (Lỗi)</th>
+                  <th className="py-3.5 px-3 text-right">Kit (Gán Kit)</th>
+                  <th className="py-3.5 px-3 text-right text-slate-500">Borrowed (Ngoài kho)</th>
                   <th
-                    className="cursor-pointer bg-emerald-50/50 py-3 px-4 text-right font-bold text-emerald-800 transition-colors hover:bg-emerald-100/50"
+                    className="cursor-pointer bg-emerald-50/40 py-3.5 px-4 text-right font-bold text-emerald-800 transition-colors hover:bg-emerald-100/50"
                     onClick={() => onSortChange(StockBalanceSortField.AVAILABLE)}
                   >
                     <div className="flex items-center justify-end">
@@ -205,23 +205,23 @@ export const InventoryBalanceTable: React.FC<InventoryBalanceTableProps> = ({
                       {renderSortIcon(StockBalanceSortField.AVAILABLE)}
                     </div>
                   </th>
-                  <th className="py-3 px-4 text-center">Trạng thái</th>
+                  <th className="py-3.5 px-4 text-center">Trạng thái</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-slate-700">
                 {balances.map((b) => (
-                  <tr key={b.id} className="transition-colors hover:bg-slate-50/60">
+                  <tr key={b.id} className="transition-colors hover:bg-slate-50/75">
                     {/* Item Information */}
                     <td className="py-3 px-4">
                       <div className="font-semibold text-slate-900">
                         {b.item?.name || (b as any).itemName || 'N/A'}
                       </div>
                       <div className="mt-0.5 flex items-center space-x-2">
-                        <span className="font-mono text-[11px] font-semibold text-blue-600">
+                        <span className="font-mono text-[11px] font-semibold text-brand-700 bg-brand-50 px-1.5 py-0.2 rounded border border-brand-200/50">
                           {b.item?.code || (b as any).itemCode || 'N/A'}
                         </span>
                         <span className="text-[10px] text-slate-400">•</span>
-                        <span className="text-[10px] text-slate-500">
+                        <span className="text-[10px] text-slate-500 font-medium">
                           {b.item?.unit || (b as any).itemUnit || 'cái'}
                         </span>
                         {(b.item?.type || (b as any).itemType) && (
@@ -239,9 +239,9 @@ export const InventoryBalanceTable: React.FC<InventoryBalanceTableProps> = ({
                         {b.location?.name || (b as any).locationName || 'N/A'}
                       </div>
                       <div className="mt-0.5 flex items-center space-x-1.5 font-mono text-[10px] text-slate-400">
-                        <span>{b.location?.code || (b as any).locationCode || 'N/A'}</span>
+                        <span className="text-slate-600 font-semibold">{b.location?.code || (b as any).locationCode || 'N/A'}</span>
                         {(b.location?.type || (b as any).locationType) && (
-                          <span className="rounded bg-slate-100 px-1 py-0.2 text-[9px] font-semibold text-slate-600">
+                          <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[9px] font-semibold text-slate-600">
                             {b.location?.type || (b as any).locationType}
                           </span>
                         )}
@@ -252,13 +252,13 @@ export const InventoryBalanceTable: React.FC<InventoryBalanceTableProps> = ({
                     <td className="py-3 px-3 text-right font-mono font-semibold text-slate-900">
                       {formatNum(b.onHand)}
                     </td>
-                    <td className="py-3 px-3 text-right font-mono text-amber-600">
+                    <td className="py-3 px-3 text-right font-mono text-amber-600 font-medium">
                       {formatNum(b.reserved)}
                     </td>
-                    <td className="py-3 px-3 text-right font-mono text-rose-600">
+                    <td className="py-3 px-3 text-right font-mono text-rose-600 font-medium">
                       {formatNum(b.quarantined)}
                     </td>
-                    <td className="py-3 px-3 text-right font-mono text-indigo-600">
+                    <td className="py-3 px-3 text-right font-mono text-indigo-600 font-medium">
                       {formatNum(b.kitAllocated)}
                     </td>
                     <td className="py-3 px-3 text-right font-mono text-slate-500 bg-slate-50/40">
@@ -266,7 +266,7 @@ export const InventoryBalanceTable: React.FC<InventoryBalanceTableProps> = ({
                     </td>
 
                     {/* Available Column */}
-                    <td className="py-3 px-4 text-right font-mono font-extrabold text-emerald-700 bg-emerald-50/40">
+                    <td className="py-3 px-4 text-right font-mono font-bold text-emerald-700 bg-emerald-50/30">
                       {formatNum(b.available)}
                     </td>
 
@@ -281,7 +281,7 @@ export const InventoryBalanceTable: React.FC<InventoryBalanceTableProps> = ({
                           <span>Tồn thấp</span>
                         </span>
                       ) : (
-                        <span className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
+                        <span className="inline-flex items-center rounded-full border border-emerald-200/80 bg-emerald-50 px-2.5 py-0.5 text-[10px] font-semibold text-emerald-700">
                           Bình thường
                         </span>
                       )}
@@ -311,7 +311,7 @@ export const InventoryBalanceTable: React.FC<InventoryBalanceTableProps> = ({
               <button
                 onClick={() => onPageChange(page - 1)}
                 disabled={!meta.hasPrevPage}
-                className="inline-flex items-center space-x-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 shadow-sm transition-all hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                className="inline-flex items-center space-x-1.5 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-soft transition-all hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
               >
                 <ChevronLeft className="h-3.5 w-3.5" />
                 <span className="hidden sm:inline">Trang trước</span>
@@ -324,7 +324,7 @@ export const InventoryBalanceTable: React.FC<InventoryBalanceTableProps> = ({
               <button
                 onClick={() => onPageChange(page + 1)}
                 disabled={!meta.hasNextPage}
-                className="inline-flex items-center space-x-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 shadow-sm transition-all hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                className="inline-flex items-center space-x-1.5 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-soft transition-all hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
               >
                 <span className="hidden sm:inline">Trang sau</span>
                 <ChevronRight className="h-3.5 w-3.5" />

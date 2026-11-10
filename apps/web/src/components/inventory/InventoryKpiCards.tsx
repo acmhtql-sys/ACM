@@ -117,11 +117,11 @@ export const InventoryKpiCards: React.FC<InventoryKpiCardsProps> = ({ summary })
           return (
             <div
               key={idx}
-              className={`relative overflow-hidden rounded-xl border p-5 shadow-[0_2px_4px_rgba(0,0,0,0.02)] transition-all hover:shadow-md ${
+              className={`relative overflow-hidden rounded-2xl border p-5 shadow-card transition-all duration-200 hover:shadow-md ${
                 kpi.highlight
-                  ? 'border-emerald-300 bg-gradient-to-br from-emerald-50/50 via-white to-white'
+                  ? 'border-emerald-200/90 bg-emerald-50/20'
                   : kpi.alert
-                  ? 'border-amber-300 bg-gradient-to-br from-amber-50/40 via-white to-white'
+                  ? 'border-amber-200/90 bg-amber-50/20'
                   : 'border-slate-200/80 bg-white'
               }`}
             >
@@ -129,13 +129,13 @@ export const InventoryKpiCards: React.FC<InventoryKpiCardsProps> = ({ summary })
                 <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
                   {kpi.title}
                 </span>
-                <div className={`flex h-9 w-9 items-center justify-center rounded-lg ${kpi.iconColor}`}>
+                <div className={`flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200/50 ${kpi.iconColor}`}>
                   <Icon className="h-4 w-4" />
                 </div>
               </div>
               <div className="mt-3 flex items-baseline space-x-2">
                 <span
-                  className={`font-mono text-2xl font-extrabold tracking-tight ${
+                  className={`font-mono text-2xl font-bold tracking-tight ${
                     kpi.highlight
                       ? 'text-emerald-700'
                       : kpi.alert
@@ -154,18 +154,20 @@ export const InventoryKpiCards: React.FC<InventoryKpiCardsProps> = ({ summary })
       </div>
 
       {/* Domain Invariant Rule Banner */}
-      <div className="rounded-xl border border-blue-200 bg-blue-50/70 p-4 text-xs text-blue-950 shadow-sm">
+      <div className="rounded-2xl border border-brand-200/80 bg-brand-50/40 p-4.5 text-xs text-brand-950 shadow-card">
         <div className="flex items-start space-x-3">
-          <CheckCircle2 className="mt-0.5 h-5 w-5 flex-shrink-0 text-blue-600" />
+          <div className="h-8 w-8 rounded-xl bg-brand-100/70 border border-brand-200/60 flex items-center justify-center text-brand-700 shrink-0">
+            <CheckCircle2 className="h-4.5 w-4.5" />
+          </div>
           <div className="space-y-1">
-            <div className="font-bold uppercase tracking-wider text-blue-900">
+            <div className="font-bold uppercase tracking-wider text-brand-900 text-[11px]">
               Công thức Bất biến Tồn kho Khả dụng (ACM Stock Invariant):
             </div>
-            <div className="inline-block rounded border border-blue-200 bg-white/90 px-2.5 py-1 font-mono text-xs font-bold text-blue-900">
+            <div className="inline-block rounded-lg border border-brand-200/80 bg-white px-3 py-1 font-mono text-xs font-bold text-brand-800 shadow-xs">
               Available = OnHand - Reserved - Quarantined - KitAllocated
             </div>
-            <p className="pt-1 text-[11px] text-blue-900/90 leading-relaxed">
-              <strong>Ghi chú nghiệp vụ:</strong> <code>OnHand</code> là số lượng linh kiện thực tế đang nằm tại kho.
+            <p className="pt-1 text-[11px] text-slate-600 leading-relaxed">
+              <strong className="text-slate-800">Ghi chú nghiệp vụ:</strong> <code>OnHand</code> là số lượng linh kiện thực tế đang nằm tại kho.
               Khi bàn giao cho người mượn, <code>OnHand</code> đã được trừ và <code>Borrowed</code> được tăng.
               Vì vậy, <code>Borrowed</code> <em>không bị trừ lần thứ hai</em> khi tính <code>Available</code>.
             </p>

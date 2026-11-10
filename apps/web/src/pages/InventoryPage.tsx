@@ -324,9 +324,14 @@ export const InventoryPage: React.FC = () => {
       {/* Page Header */}
       <div className="flex flex-col justify-between space-y-4 sm:flex-row sm:items-center sm:space-y-0">
         <div>
-          <h1 className="text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">
-            Kho & Số dư Tồn kho (Inventory & Stock Balance)
-          </h1>
+          <div className="flex items-center space-x-2.5">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand-50 text-brand-600 border border-brand-200/60">
+              <Warehouse className="h-5 w-5" />
+            </div>
+            <h1 className="text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">
+              Kho & Số dư Tồn kho
+            </h1>
+          </div>
           <p className="mt-1 text-xs text-slate-500">
             Giám sát trạng thái tồn kho vật lý, hàng đặt chỗ, gán kit và kiểm soát hàng lưu hành mượn
           </p>
@@ -352,7 +357,7 @@ export const InventoryPage: React.FC = () => {
             treeQuery.isFetching ||
             locationDetailQuery.isFetching
           }
-          className="inline-flex items-center space-x-1.5 rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 shadow-sm transition-all hover:bg-slate-50 disabled:opacity-50"
+          className="inline-flex items-center space-x-1.5 rounded-xl border border-slate-200/80 bg-white px-3.5 py-2.5 text-xs font-semibold text-slate-700 shadow-soft transition-all hover:bg-slate-50 hover:text-slate-900 disabled:opacity-50 cursor-pointer"
         >
           <RefreshCw
             className={`h-3.5 w-3.5 text-slate-500 ${
@@ -360,7 +365,7 @@ export const InventoryPage: React.FC = () => {
               balancesQuery.isFetching ||
               treeQuery.isFetching ||
               locationDetailQuery.isFetching
-                ? 'animate-spin'
+                ? 'animate-spin text-brand-600'
                 : ''
             }`}
           />
@@ -369,13 +374,13 @@ export const InventoryPage: React.FC = () => {
       </div>
 
       {/* Tab Navigation Pill Bar */}
-      <div className="flex space-x-1 rounded-xl bg-slate-100 p-1 text-xs font-semibold text-slate-600 sm:w-fit">
+      <div className="flex flex-wrap gap-1 rounded-2xl border border-slate-200/80 bg-white p-1.5 shadow-card text-xs font-semibold text-slate-600 sm:w-fit">
         <button
           onClick={() => handleTabChange('overview')}
-          className={`flex items-center space-x-2 rounded-lg px-4 py-2 transition-all ${
+          className={`flex items-center space-x-2 rounded-xl px-4 py-2 transition-all cursor-pointer ${
             currentTab === 'overview'
-              ? 'bg-white text-blue-700 shadow-sm'
-              : 'text-slate-600 hover:text-slate-900'
+              ? 'bg-brand-50 text-brand-700 border border-brand-200/60 shadow-xs'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
           }`}
         >
           <LayoutDashboard className="h-4 w-4" />
@@ -383,10 +388,10 @@ export const InventoryPage: React.FC = () => {
         </button>
         <button
           onClick={() => handleTabChange('balances')}
-          className={`flex items-center space-x-2 rounded-lg px-4 py-2 transition-all ${
+          className={`flex items-center space-x-2 rounded-xl px-4 py-2 transition-all cursor-pointer ${
             currentTab === 'balances'
-              ? 'bg-white text-blue-700 shadow-sm'
-              : 'text-slate-600 hover:text-slate-900'
+              ? 'bg-brand-50 text-brand-700 border border-brand-200/60 shadow-xs'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
           }`}
         >
           <Boxes className="h-4 w-4" />
@@ -394,10 +399,10 @@ export const InventoryPage: React.FC = () => {
         </button>
         <button
           onClick={() => handleTabChange('locations')}
-          className={`flex items-center space-x-2 rounded-lg px-4 py-2 transition-all ${
+          className={`flex items-center space-x-2 rounded-xl px-4 py-2 transition-all cursor-pointer ${
             currentTab === 'locations'
-              ? 'bg-white text-blue-700 shadow-sm'
-              : 'text-slate-600 hover:text-slate-900'
+              ? 'bg-brand-50 text-brand-700 border border-brand-200/60 shadow-xs'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
           }`}
         >
           <Warehouse className="h-4 w-4" />

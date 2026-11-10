@@ -111,9 +111,14 @@ export const CategoriesPage: React.FC = () => {
       {/* Header */}
       <div className="flex flex-col justify-between space-y-4 sm:flex-row sm:items-center sm:space-y-0">
         <div>
-          <h1 className="text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">
-            Danh mục Linh kiện (Categories)
-          </h1>
+          <div className="flex items-center space-x-2.5">
+            <h1 className="text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">
+              Danh mục Linh kiện (Categories)
+            </h1>
+            <span className="inline-flex items-center rounded-full bg-brand-50 px-2.5 py-0.5 text-xs font-semibold text-brand-700 border border-brand-200/60">
+              {categories.length} danh mục
+            </span>
+          </div>
           <p className="mt-1 text-xs text-slate-500">
             Cấu trúc phân loại theo nhóm phần cứng và mục đích đào tạo phòng Lab ACM
           </p>
@@ -122,14 +127,14 @@ export const CategoriesPage: React.FC = () => {
         {canManage ? (
           <button
             onClick={handleOpenCreate}
-            className="inline-flex items-center space-x-1.5 rounded-lg bg-blue-600 px-3.5 py-2 text-xs font-semibold text-white shadow-sm shadow-blue-500/20 hover:bg-blue-700 transition-all cursor-pointer"
+            className="inline-flex items-center space-x-1.5 rounded-xl bg-brand-600 px-4 py-2.5 text-xs font-semibold text-white shadow-soft hover:bg-brand-700 active:scale-[0.99] focus:outline-none focus:ring-2 focus:ring-brand-500/20 transition-all cursor-pointer"
           >
-            <Plus className="h-3.5 w-3.5" />
+            <Plus className="h-4 w-4" />
             <span>Tạo danh mục mới</span>
           </button>
         ) : (
-          <div className="inline-flex items-center space-x-1.5 rounded-lg bg-slate-100 px-3 py-1.5 text-xs text-slate-500 border border-slate-200">
-            <ShieldAlert className="h-3.5 w-3.5 text-slate-400" />
+          <div className="inline-flex items-center space-x-1.5 rounded-xl bg-slate-100/80 px-3.5 py-2 text-xs font-medium text-slate-600 border border-slate-200/80">
+            <ShieldAlert className="h-4 w-4 text-slate-500" />
             <span>Chế độ Xem (Chỉ Admin / Lab Manager có quyền sửa)</span>
           </div>
         )}
@@ -137,33 +142,33 @@ export const CategoriesPage: React.FC = () => {
 
       {/* Success Notification */}
       {successBanner && (
-        <div className="rounded-xl bg-emerald-50 border border-emerald-200 p-3 text-xs text-emerald-800 flex items-center space-x-2">
+        <div className="rounded-xl bg-emerald-50 border border-emerald-200/80 p-3.5 text-xs text-emerald-800 flex items-center space-x-2.5 shadow-xs">
           <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
-          <span>{successBanner}</span>
+          <span className="font-medium">{successBanner}</span>
         </div>
       )}
 
       {/* Global Error Notification */}
       {errorBanner && (
-        <div className="rounded-xl bg-rose-50 border border-rose-200 p-3 text-xs text-rose-800 flex items-center space-x-2">
+        <div className="rounded-xl bg-rose-50 border border-rose-200/80 p-3.5 text-xs text-rose-800 flex items-center space-x-2.5 shadow-xs">
           <AlertCircle className="h-4 w-4 text-rose-600 shrink-0" />
-          <span>{errorBanner}</span>
+          <span className="font-medium">{errorBanner}</span>
         </div>
       )}
 
       {/* Guarded Delete Warning Banner */}
       {deleteWarning && (
-        <div className="rounded-xl bg-amber-50 border border-amber-200 p-3.5 text-xs text-amber-900 flex items-start justify-between space-x-2">
+        <div className="rounded-xl bg-amber-50 border border-amber-200/80 p-4 text-xs text-amber-900 flex items-start justify-between space-x-3 shadow-xs">
           <div className="flex items-start space-x-2.5">
             <AlertCircle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
             <div>
               <p className="font-semibold text-amber-900">Ràng buộc an toàn khi xóa danh mục</p>
-              <p className="mt-0.5 text-amber-800">{deleteWarning}</p>
+              <p className="mt-0.5 text-amber-800 leading-relaxed">{deleteWarning}</p>
             </div>
           </div>
           <button
             onClick={() => setDeleteWarning(null)}
-            className="text-amber-600 hover:text-amber-800 font-semibold"
+            className="text-amber-700 hover:text-amber-900 font-semibold cursor-pointer"
           >
             Đóng
           </button>
@@ -172,26 +177,28 @@ export const CategoriesPage: React.FC = () => {
 
       {/* Categories Grid */}
       {isLoading ? (
-        <div className="flex items-center justify-center py-12">
-          <Loader2 className="h-6 w-6 animate-spin text-blue-600" />
-          <span className="ml-2 text-xs text-slate-500">Đang tải danh mục linh kiện...</span>
+        <div className="flex flex-col items-center justify-center py-16 space-y-2.5">
+          <Loader2 className="h-7 w-7 animate-spin text-brand-600" />
+          <span className="text-xs text-slate-500">Đang tải danh mục linh kiện...</span>
         </div>
       ) : categories.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-slate-300 p-12 text-center">
-          <FolderTree className="mx-auto h-8 w-8 text-slate-400" />
-          <p className="mt-2 text-sm font-semibold text-slate-700">Chưa có danh mục nào</p>
-          <p className="mt-1 text-xs text-slate-500">Hãy tạo danh mục đầu tiên để bắt đầu phân loại linh kiện.</p>
+        <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-14 text-center">
+          <div className="h-12 w-12 rounded-2xl bg-slate-50 border border-slate-200/60 flex items-center justify-center text-slate-400 mx-auto">
+            <FolderTree className="h-6 w-6" />
+          </div>
+          <p className="mt-3 text-sm font-semibold text-slate-800">Chưa có danh mục nào</p>
+          <p className="mt-1 text-xs text-slate-500 max-w-sm mx-auto">Hãy tạo danh mục đầu tiên để bắt đầu phân loại linh kiện phòng Lab.</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {categories.map((cat) => (
             <div
               key={cat.id}
-              className="flex flex-col justify-between rounded-xl border border-slate-200/80 bg-white p-5 shadow-xs hover:border-blue-300 transition-all"
+              className="flex flex-col justify-between rounded-2xl border border-slate-200/80 bg-white p-5 shadow-card hover:shadow-md hover:border-slate-300 transition-all duration-200"
             >
               <div>
                 <div className="flex items-center justify-between">
-                  <span className="font-mono text-xs font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded">
+                  <span className="font-mono text-xs font-semibold text-brand-700 bg-brand-50 px-2.5 py-1 rounded-md border border-brand-200/60">
                     {cat.code}
                   </span>
                   <div className="flex items-center space-x-1">
@@ -200,30 +207,30 @@ export const CategoriesPage: React.FC = () => {
                         <button
                           onClick={() => handleOpenEdit(cat)}
                           title="Chỉnh sửa danh mục"
-                          className="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-blue-600"
+                          className="rounded-lg p-1.5 text-slate-400 hover:bg-brand-50 hover:text-brand-600 transition-colors"
                         >
                           <Edit2 className="h-3.5 w-3.5" />
                         </button>
                         <button
                           onClick={() => handleOpenDelete(cat)}
                           title="Xóa danh mục"
-                          className="rounded p-1 text-slate-400 hover:bg-rose-50 hover:text-rose-600"
+                          className="rounded-lg p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition-colors"
                         >
                           <Trash2 className="h-3.5 w-3.5" />
                         </button>
                       </>
                     )}
-                    <FolderTree className="h-4 w-4 text-slate-400 ml-1" />
+                    <FolderTree className="h-4 w-4 text-slate-300 ml-1" />
                   </div>
                 </div>
 
-                <h3 className="mt-3 text-sm font-bold text-slate-900">{cat.name}</h3>
-                <p className="mt-1 text-xs text-slate-500 line-clamp-2">
+                <h3 className="mt-3.5 text-sm font-bold text-slate-900 line-clamp-1">{cat.name}</h3>
+                <p className="mt-1 text-xs text-slate-500 line-clamp-2 leading-relaxed">
                   {cat.description || 'Chưa có mô tả chi tiết'}
                 </p>
               </div>
 
-              <div className="mt-4 pt-3 border-t border-slate-100 space-y-2">
+              <div className="mt-4 pt-3.5 border-t border-slate-100 space-y-2">
                 <div className="flex items-center justify-between text-[11px] text-slate-500">
                   <span>Trực thuộc:</span>
                   <span className="font-medium text-slate-700 truncate max-w-[140px]" title={cat.parent?.name}>
@@ -232,12 +239,12 @@ export const CategoriesPage: React.FC = () => {
                 </div>
 
                 <div className="flex items-center justify-between text-[11px]">
-                  <span className="inline-flex items-center space-x-1 text-slate-600">
-                    <Package className="h-3 w-3 text-slate-400" />
+                  <span className="inline-flex items-center space-x-1.5 text-slate-600 font-medium">
+                    <Package className="h-3.5 w-3.5 text-slate-400" />
                     <span>{cat._count?.items ?? 0} linh kiện</span>
                   </span>
-                  <span className="inline-flex items-center space-x-1 text-slate-600">
-                    <Layers className="h-3 w-3 text-slate-400" />
+                  <span className="inline-flex items-center space-x-1.5 text-slate-600 font-medium">
+                    <Layers className="h-3.5 w-3.5 text-slate-400" />
                     <span>{cat._count?.children ?? 0} mục con</span>
                   </span>
                 </div>

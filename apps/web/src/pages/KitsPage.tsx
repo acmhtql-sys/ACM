@@ -284,31 +284,36 @@ export const KitsPage: React.FC = () => {
       {/* Top Header */}
       <div className="flex flex-col justify-between space-y-4 sm:flex-row sm:items-center sm:space-y-0">
         <div>
-          <div className="flex items-center space-x-2">
-            <Boxes className="h-6 w-6 text-blue-600" />
+          <div className="flex items-center space-x-2.5">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand-50 text-brand-600 border border-brand-200/60">
+              <Boxes className="h-5 w-5" />
+            </div>
             <h1 className="text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">
               Hộp Kit thực hành (Practice Kits)
             </h1>
+            <span className="inline-flex items-center rounded-full bg-brand-50 px-2.5 py-0.5 text-xs font-semibold text-brand-700 border border-brand-200/60">
+              {kits.length} bộ kit
+            </span>
           </div>
           <p className="mt-1 text-xs text-slate-500">
             Quản lý vòng đời hộp kit, linh kiện thành phần và phân bổ tồn kho (KitAllocated)
           </p>
         </div>
 
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center space-x-2.5">
           <button
             onClick={() => fetchKits()}
             disabled={loading}
-            className="inline-flex items-center space-x-1.5 rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
+            className="inline-flex items-center space-x-1.5 rounded-xl border border-slate-200/80 bg-white px-3.5 py-2.5 text-xs font-semibold text-slate-700 shadow-soft hover:bg-slate-50 hover:text-slate-900 transition-all cursor-pointer"
           >
-            <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin text-blue-600' : 'text-slate-500'}`} />
+            <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin text-brand-600' : 'text-slate-500'}`} />
             <span>Làm mới</span>
           </button>
 
           {isOperator && (
             <button
               onClick={() => setIsCreateModalOpen(true)}
-              className="inline-flex items-center space-x-1.5 rounded-lg bg-blue-600 px-3.5 py-2 text-xs font-semibold text-white shadow-sm hover:bg-blue-700"
+              className="inline-flex items-center space-x-1.5 rounded-xl bg-brand-600 px-4 py-2.5 text-xs font-semibold text-white shadow-soft hover:bg-brand-700 active:scale-[0.99] focus:outline-none focus:ring-2 focus:ring-brand-500/20 transition-all cursor-pointer"
             >
               <Plus className="h-4 w-4" />
               <span>Tạo hộp kit mới</span>
@@ -320,29 +325,29 @@ export const KitsPage: React.FC = () => {
       {/* Status Feedback Banner */}
       {statusMessage && (
         <div
-          className={`flex items-center justify-between rounded-lg p-3 text-xs ${
+          className={`flex items-center justify-between rounded-xl p-3.5 text-xs shadow-xs ${
             statusMessage.type === 'success'
-              ? 'border border-emerald-200 bg-emerald-50 text-emerald-800'
-              : 'border border-rose-200 bg-rose-50 text-rose-800'
+              ? 'border border-emerald-200/80 bg-emerald-50 text-emerald-800'
+              : 'border border-rose-200/80 bg-rose-50 text-rose-800'
           }`}
         >
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center space-x-2.5 font-medium">
             {statusMessage.type === 'success' ? (
-              <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+              <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
             ) : (
-              <AlertTriangle className="h-4 w-4 text-rose-600" />
+              <AlertTriangle className="h-4 w-4 text-rose-600 shrink-0" />
             )}
             <span>{statusMessage.text}</span>
           </div>
-          <button onClick={() => setStatusMessage(null)} className="text-slate-400 hover:text-slate-600">
+          <button onClick={() => setStatusMessage(null)} className="text-slate-400 hover:text-slate-600 cursor-pointer">
             <X className="h-4 w-4" />
           </button>
         </div>
       )}
 
       {/* Tabs & Search Filter */}
-      <div className="flex flex-col space-y-3 sm:flex-row sm:items-center sm:justify-between sm:space-y-0">
-        <div className="flex flex-wrap gap-1 rounded-lg bg-slate-100 p-1">
+      <div className="rounded-2xl border border-slate-200/80 bg-white p-3.5 shadow-card flex flex-col space-y-3 sm:flex-row sm:items-center sm:justify-between sm:space-y-0">
+        <div className="flex flex-wrap gap-1 rounded-xl bg-slate-100/80 p-1">
           {[
             { id: 'ALL', label: 'Tất cả' },
             { id: 'AVAILABLE', label: 'Sẵn sàng' },
@@ -353,9 +358,9 @@ export const KitsPage: React.FC = () => {
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+              className={`rounded-lg px-3.5 py-1.5 text-xs font-semibold transition-all cursor-pointer ${
                 activeTab === tab.id
-                  ? 'bg-white text-blue-600 shadow-sm'
+                  ? 'bg-white text-brand-700 shadow-soft'
                   : 'text-slate-600 hover:text-slate-900'
               }`}
             >
@@ -364,46 +369,53 @@ export const KitsPage: React.FC = () => {
           ))}
         </div>
 
-        <div className="relative w-full sm:w-64">
-          <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-slate-400" />
+        <div className="relative w-full sm:w-72">
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
           <input
             type="text"
             placeholder="Tìm theo mã, tên kit..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && fetchKits()}
-            className="w-full rounded-lg border border-slate-200 bg-white py-1.5 pl-9 pr-3 text-xs placeholder-slate-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            className="w-full rounded-xl border border-slate-200 bg-slate-50/50 py-2 pl-9.5 pr-3.5 text-xs text-slate-800 placeholder-slate-400 focus:border-brand-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-500/20 transition-all"
           />
         </div>
       </div>
 
       {/* Main Kits Table */}
-      <div className="overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-sm">
+      <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-card">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
-            <thead className="border-b border-slate-200 bg-slate-50 text-[11px] font-semibold text-slate-600">
+            <thead className="border-b border-slate-200/80 bg-slate-50/75 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
               <tr>
-                <th className="px-4 py-3">Mã hộp Kit</th>
-                <th className="px-4 py-3">Tên hộp Kit</th>
-                <th className="px-4 py-3">Vị trí lưu kho</th>
-                <th className="px-4 py-3">Số loại linh kiện</th>
-                <th className="px-4 py-3">Trạng thái</th>
-                <th className="px-4 py-3 text-right">Thao tác</th>
+                <th className="px-4 py-3.5">Mã hộp Kit</th>
+                <th className="px-4 py-3.5">Tên hộp Kit</th>
+                <th className="px-4 py-3.5">Vị trí lưu kho</th>
+                <th className="px-4 py-3.5">Số loại linh kiện</th>
+                <th className="px-4 py-3.5">Trạng thái</th>
+                <th className="px-4 py-3.5 text-right">Thao tác</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {loading ? (
                 <tr>
-                  <td colSpan={6} className="py-8 text-center text-slate-400">
-                    <RefreshCw className="mx-auto h-5 w-5 animate-spin text-blue-600" />
-                    <span className="mt-2 block">Đang nạp danh sách hộp kit...</span>
+                  <td colSpan={6} className="py-14 text-center text-slate-400">
+                    <div className="flex flex-col items-center justify-center space-y-2.5">
+                      <div className="h-7 w-7 animate-spin rounded-full border-2 border-brand-600 border-t-transparent" />
+                      <span className="text-xs text-slate-500">Đang nạp danh sách hộp kit...</span>
+                    </div>
                   </td>
                 </tr>
               ) : kits.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="py-8 text-center text-slate-400">
-                    <Package className="mx-auto h-8 w-8 text-slate-300" />
-                    <span className="mt-2 block">Không tìm thấy hộp kit thực hành nào</span>
+                  <td colSpan={6} className="py-16 text-center text-slate-400">
+                    <div className="flex flex-col items-center justify-center space-y-2.5">
+                      <div className="h-12 w-12 rounded-2xl bg-slate-50 border border-slate-200/60 flex items-center justify-center text-slate-400">
+                        <Package className="h-6 w-6" />
+                      </div>
+                      <span className="font-semibold text-slate-700 text-sm">Không tìm thấy hộp kit thực hành nào</span>
+                      <span className="text-slate-400 text-xs">Thử đổi trạng thái lọc hoặc tạo hộp kit mới.</span>
+                    </div>
                   </td>
                 </tr>
               ) : (
@@ -411,23 +423,23 @@ export const KitsPage: React.FC = () => {
                   const isExpanded = expandedKitId === k.id;
                   return (
                     <React.Fragment key={k.id}>
-                      <tr className="hover:bg-slate-50/70">
+                      <tr className="hover:bg-slate-50/75 transition-colors">
                         <td className="px-4 py-3 font-semibold text-slate-900">
                           <button
                             onClick={() => toggleExpand(k.id)}
-                            className="flex items-center space-x-1.5 text-blue-600 hover:text-blue-800"
+                            className="inline-flex items-center space-x-1.5 font-mono text-xs text-brand-700 bg-brand-50 px-2 py-0.5 rounded-md border border-brand-200/60 hover:bg-brand-100 transition-colors cursor-pointer"
                           >
                             <span>{k.code}</span>
                             {isExpanded ? (
-                              <ChevronUp className="h-3.5 w-3.5" />
+                              <ChevronUp className="h-3.5 w-3.5 text-brand-500" />
                             ) : (
-                              <ChevronDown className="h-3.5 w-3.5" />
+                              <ChevronDown className="h-3.5 w-3.5 text-brand-500" />
                             )}
                           </button>
                         </td>
-                        <td className="px-4 py-3 font-medium text-slate-900">
-                          <div>{k.name}</div>
-                          {k.description && <div className="text-[11px] text-slate-400">{k.description}</div>}
+                        <td className="px-4 py-3">
+                          <div className="font-medium text-slate-900">{k.name}</div>
+                          {k.description && <div className="text-[11px] text-slate-400 truncate max-w-sm mt-0.5">{k.description}</div>}
                         </td>
                         <td className="px-4 py-3 text-slate-600">
                           {k.location ? `${k.location.name} (${k.location.code})` : '—'}
@@ -448,7 +460,7 @@ export const KitsPage: React.FC = () => {
                                     <button
                                       disabled={actionLoading === k.id}
                                       onClick={() => handleStatusChange(k.id, KitStatus.ALLOCATED)}
-                                      className="rounded bg-indigo-50 px-2 py-1 text-[11px] font-semibold text-indigo-700 hover:bg-indigo-100"
+                                      className="rounded-lg bg-indigo-50 border border-indigo-200/60 px-2.5 py-1 text-[11px] font-semibold text-indigo-700 hover:bg-indigo-100 transition-colors cursor-pointer"
                                       title="Bàn giao sử dụng"
                                     >
                                       Bàn giao
@@ -456,7 +468,7 @@ export const KitsPage: React.FC = () => {
                                     <button
                                       disabled={actionLoading === k.id}
                                       onClick={() => handleStatusChange(k.id, KitStatus.MAINTENANCE)}
-                                      className="rounded bg-amber-50 px-2 py-1 text-[11px] font-semibold text-amber-700 hover:bg-amber-100"
+                                      className="rounded-lg bg-amber-50 border border-amber-200/60 px-2.5 py-1 text-[11px] font-semibold text-amber-700 hover:bg-amber-100 transition-colors cursor-pointer"
                                       title="Đưa vào bảo trì"
                                     >
                                       Bảo trì
@@ -464,7 +476,7 @@ export const KitsPage: React.FC = () => {
                                     <button
                                       disabled={actionLoading === k.id}
                                       onClick={() => handleStatusChange(k.id, KitStatus.RETIRED)}
-                                      className="rounded bg-slate-100 px-2 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-200"
+                                      className="rounded-lg bg-slate-100 border border-slate-200 px-2.5 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-200 transition-colors cursor-pointer"
                                       title="Thanh lý / rã kit trả linh kiện"
                                     >
                                       Rã kit
@@ -477,7 +489,7 @@ export const KitsPage: React.FC = () => {
                                     <button
                                       disabled={actionLoading === k.id}
                                       onClick={() => handleStatusChange(k.id, KitStatus.AVAILABLE)}
-                                      className="rounded bg-emerald-50 px-2 py-1 text-[11px] font-semibold text-emerald-700 hover:bg-emerald-100"
+                                      className="rounded-lg bg-emerald-50 border border-emerald-200/60 px-2.5 py-1 text-[11px] font-semibold text-emerald-700 hover:bg-emerald-100 transition-colors cursor-pointer"
                                       title="Thu hồi về sẵn sàng"
                                     >
                                       Thu hồi
@@ -485,7 +497,7 @@ export const KitsPage: React.FC = () => {
                                     <button
                                       disabled={actionLoading === k.id}
                                       onClick={() => handleStatusChange(k.id, KitStatus.MAINTENANCE)}
-                                      className="rounded bg-amber-50 px-2 py-1 text-[11px] font-semibold text-amber-700 hover:bg-amber-100"
+                                      className="rounded-lg bg-amber-50 border border-amber-200/60 px-2.5 py-1 text-[11px] font-semibold text-amber-700 hover:bg-amber-100 transition-colors cursor-pointer"
                                       title="Chuyển sang kiểm tra sửa chữa"
                                     >
                                       Bảo trì
@@ -498,7 +510,7 @@ export const KitsPage: React.FC = () => {
                                     <button
                                       disabled={actionLoading === k.id}
                                       onClick={() => handleStatusChange(k.id, KitStatus.AVAILABLE)}
-                                      className="rounded bg-emerald-50 px-2 py-1 text-[11px] font-semibold text-emerald-700 hover:bg-emerald-100"
+                                      className="rounded-lg bg-emerald-50 border border-emerald-200/60 px-2.5 py-1 text-[11px] font-semibold text-emerald-700 hover:bg-emerald-100 transition-colors cursor-pointer"
                                       title="Hoàn tất bảo trì, đưa lại sẵn sàng"
                                     >
                                       Sẵn sàng
@@ -506,7 +518,7 @@ export const KitsPage: React.FC = () => {
                                     <button
                                       disabled={actionLoading === k.id}
                                       onClick={() => handleStatusChange(k.id, KitStatus.RETIRED)}
-                                      className="rounded bg-slate-100 px-2 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-200"
+                                      className="rounded-lg bg-slate-100 border border-slate-200 px-2.5 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-200 transition-colors cursor-pointer"
                                       title="Thanh lý do hỏng hóc"
                                     >
                                       Thanh lý
@@ -518,7 +530,7 @@ export const KitsPage: React.FC = () => {
                                   <button
                                     disabled={actionLoading === k.id}
                                     onClick={() => handleStatusChange(k.id, KitStatus.AVAILABLE)}
-                                    className="rounded bg-emerald-50 px-2 py-1 text-[11px] font-semibold text-emerald-700 hover:bg-emerald-100"
+                                    className="rounded-lg bg-emerald-50 border border-emerald-200/60 px-2.5 py-1 text-[11px] font-semibold text-emerald-700 hover:bg-emerald-100 transition-colors cursor-pointer"
                                     title="Tái kích hoạt hộp kit và cấp phát lại linh kiện"
                                   >
                                     Tái cấp phát
@@ -532,7 +544,7 @@ export const KitsPage: React.FC = () => {
                               <button
                                 disabled={actionLoading === k.id}
                                 onClick={() => handleDeleteKit(k.id, k.code)}
-                                className="rounded p-1 text-slate-400 hover:bg-rose-50 hover:text-rose-600"
+                                className="rounded-lg p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition-colors cursor-pointer"
                                 title="Xóa hộp kit"
                               >
                                 <Trash2 className="h-4 w-4" />
@@ -544,31 +556,32 @@ export const KitsPage: React.FC = () => {
 
                       {/* Expandable Component Items Detail */}
                       {isExpanded && (
-                        <tr className="bg-slate-50/50">
-                          <td colSpan={6} className="px-6 py-3">
-                            <div className="rounded-lg border border-slate-200 bg-white p-3">
-                              <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-600">
-                                Linh kiện thành phần trong hộp kit:
+                        <tr className="bg-slate-50/70 border-b border-slate-200/60">
+                          <td colSpan={6} className="px-6 py-4">
+                            <div className="rounded-xl border border-slate-200/80 bg-white p-4 shadow-xs">
+                              <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-600 flex items-center space-x-1.5">
+                                <Package className="h-3.5 w-3.5 text-brand-600" />
+                                <span>Linh kiện thành phần trong hộp kit:</span>
                               </h4>
                               {k.items && k.items.length > 0 ? (
-                                <table className="mt-2 w-full text-left text-[11px]">
+                                <table className="mt-2.5 w-full text-left text-[11px]">
                                   <thead>
-                                    <tr className="border-b border-slate-100 text-slate-400">
-                                      <th className="py-1">Mã linh kiện</th>
-                                      <th className="py-1">Tên linh kiện</th>
-                                      <th className="py-1">Số lượng</th>
-                                      <th className="py-1">Đơn vị</th>
-                                      <th className="py-1">Ghi chú</th>
+                                    <tr className="border-b border-slate-100 text-slate-400 font-semibold">
+                                      <th className="py-1.5">Mã linh kiện</th>
+                                      <th className="py-1.5">Tên linh kiện</th>
+                                      <th className="py-1.5 text-center">Số lượng</th>
+                                      <th className="py-1.5 text-center">Đơn vị</th>
+                                      <th className="py-1.5">Ghi chú</th>
                                     </tr>
                                   </thead>
                                   <tbody className="divide-y divide-slate-50">
                                     {k.items.map((item) => (
                                       <tr key={item.id} className="text-slate-700">
-                                        <td className="py-1 font-mono font-medium">{item.item?.code || item.itemId}</td>
-                                        <td className="py-1">{item.item?.name || '—'}</td>
-                                        <td className="py-1 font-semibold text-slate-900">{item.quantity}</td>
-                                        <td className="py-1">{item.item?.unit || 'cái'}</td>
-                                        <td className="py-1 text-slate-400">{item.notes || '—'}</td>
+                                        <td className="py-1.5 font-mono font-medium text-brand-700">{item.item?.code || item.itemId}</td>
+                                        <td className="py-1.5 font-medium text-slate-800">{item.item?.name || '—'}</td>
+                                        <td className="py-1.5 text-center font-semibold text-slate-900">{item.quantity}</td>
+                                        <td className="py-1.5 text-center text-slate-500">{item.item?.unit || 'cái'}</td>
+                                        <td className="py-1.5 text-slate-400">{item.notes || '—'}</td>
                                       </tr>
                                     ))}
                                   </tbody>

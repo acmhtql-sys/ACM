@@ -33,10 +33,10 @@ function assertSuccess(response: unknown): void {
   }
 }
 
-const panel = 'rounded-xl border border-slate-200 bg-white p-4 shadow-sm';
-const primaryButton = 'rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50';
-const secondaryButton = 'rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50';
-const inputStyle = 'w-full rounded-lg border border-slate-300 bg-white p-2 text-sm text-slate-900 focus:border-blue-500 focus:outline-none';
+const panel = 'rounded-2xl border border-slate-200/80 bg-white p-4.5 shadow-card';
+const primaryButton = 'inline-flex items-center space-x-1.5 rounded-xl bg-brand-600 px-3.5 py-2 text-xs font-semibold text-white shadow-soft hover:bg-brand-700 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50 transition-all cursor-pointer';
+const secondaryButton = 'inline-flex items-center space-x-1 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-soft hover:bg-slate-50 hover:text-slate-900 disabled:opacity-50 transition-all cursor-pointer';
+const inputStyle = 'w-full rounded-xl border border-slate-200 bg-slate-50/50 p-2.5 text-xs text-slate-800 focus:bg-white focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 transition-all';
 
 /** Admin-only UI. Server-side RBAC, transactional last-admin protection and audit are mandatory for release. */
 export const UsersPage: React.FC = () => {
@@ -197,30 +197,35 @@ export const UsersPage: React.FC = () => {
     </div>;
   }
 
-  return <div className="space-y-5">
+  return <div className="space-y-6">
     <header className="flex flex-wrap items-center justify-between gap-3">
       <div>
-        <h1 className="text-2xl font-bold text-slate-900">Quản trị người dùng</h1>
-        <p className="text-sm text-slate-600">Quản lý tài khoản, vai trò và trạng thái; backend là nguồn phân quyền cuối cùng.</p>
+        <div className="flex items-center space-x-2.5">
+          <h1 className="text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">Quản trị người dùng</h1>
+          <span className="inline-flex items-center rounded-full bg-brand-50 px-2.5 py-0.5 text-xs font-semibold text-brand-700 border border-brand-200/60">
+            {users.length} tài khoản
+          </span>
+        </div>
+        <p className="mt-1 text-xs text-slate-500">Quản lý tài khoản, vai trò và trạng thái; backend là nguồn phân quyền cuối cùng.</p>
       </div>
       <button type="button" className={primaryButton} onClick={() => { setOperation('create'); setCreateForm(blankCreate()); }} disabled={busy}>
         Thêm người dùng
       </button>
     </header>
 
-    {message && <div role="alert" className={`rounded-lg border p-3 text-sm ${message.type === 'error'
-      ? 'border-rose-200 bg-rose-50 text-rose-900' : 'border-emerald-200 bg-emerald-50 text-emerald-900'}`}>
+    {message && <div role="alert" className={`rounded-xl border p-3.5 text-xs font-medium shadow-xs ${message.type === 'error'
+      ? 'border-rose-200/80 bg-rose-50 text-rose-900' : 'border-emerald-200/80 bg-emerald-50 text-emerald-900'}`}>
       {message.text}
     </div>}
 
     <section className={panel} aria-label="Bộ lọc người dùng">
       <div className="flex flex-wrap items-end gap-3">
-        <label className="min-w-48 flex-1 text-sm font-medium text-slate-700">Tìm kiếm
+        <label className="min-w-48 flex-1 text-xs font-semibold text-slate-700">Tìm kiếm
           <input className={`${inputStyle} mt-1`} value={query} onChange={e => setQuery(e.target.value)}
             placeholder="Tên, email, mã số hoặc đơn vị" />
         </label>
-        <label className="w-48 text-sm font-medium text-slate-700">Vai trò
-          <select className={`${inputStyle} mt-1`} value={roleFilter} onChange={e => setRoleFilter(e.target.value as AcmRole | 'ALL')}>
+        <label className="w-48 text-xs font-semibold text-slate-700">Vai trò
+          <select className={`${inputStyle} mt-1 cursor-pointer`} value={roleFilter} onChange={e => setRoleFilter(e.target.value as AcmRole | 'ALL')}>
             <option value="ALL">Tất cả</option>
             {ACM_ROLES.map(role => <option key={role} value={role}>{role}</option>)}
           </select>
@@ -232,20 +237,45 @@ export const UsersPage: React.FC = () => {
       <p className="mt-2 text-xs text-slate-500">{visibleUsers.length} người dùng hiển thị. Dữ liệu lấy từ API /users.</p>
     </section>
 
-    <section className="overflow-x-auto rounded-xl border border-slate-200 bg-white" aria-label="Danh sách người dùng">
-      <table className="w-full min-w-[900px] border-collapse text-left text-sm">
-        <thead className="bg-slate-50 text-slate-700"><tr>
+    <section className="overflow-x-auto rounded-2xl border border-slate-200/80 bg-white shadow-card" aria-label="Danh sách người dùng">
+      <table className="w-full min-w-[900px] border-collapse text-left text-xs">
+        <thead className="bg-slate-50/75 text-[11px] font-semibold uppercase tracking-wider text-slate-500"><tr>
           {['Người dùng', 'Vai trò', 'Mã/Đơn vị', 'Trạng thái', 'Thao tác'].map(label =>
-            <th key={label} className="border-b border-slate-200 p-3 font-semibold">{label}</th>)}
+            <th key={label} className="border-b border-slate-200/80 p-3.5">{label}</th>)}
         </tr></thead>
-        <tbody>
-          {visibleUsers.map(u => <tr key={u.id} className="border-b border-slate-100">
-            <td className="p-3"><span className="block font-semibold">{u.fullName}</span>
-              <span className="text-xs text-slate-500">{u.email}</span></td>
-            <td className="p-3"><StatusBadge status={u.role} variant="role"/></td>
-            <td className="p-3 text-xs">{u.studentOrStaffId || '—'} / {u.department || '—'}</td>
-            <td className="p-3 text-xs">{u.isActive ? 'Hoạt động' : 'Vô hiệu hóa'} · {u.isLocked ? 'Đang khóa' : 'Mở'}</td>
-            <td className="p-3"><div className="flex flex-wrap gap-2">
+        <tbody className="divide-y divide-slate-100">
+          {visibleUsers.map(u => <tr key={u.id} className="hover:bg-slate-50/75 transition-colors">
+            <td className="p-3.5">
+              <div className="flex items-center space-x-3">
+                <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-brand-50 border border-brand-200/60 font-semibold text-brand-700 text-xs shrink-0">
+                  {u.fullName ? u.fullName.charAt(0).toUpperCase() : 'U'}
+                </div>
+                <div>
+                  <span className="block font-semibold text-slate-900">{u.fullName}</span>
+                  <span className="text-[11px] text-slate-400">{u.email}</span>
+                </div>
+              </div>
+            </td>
+            <td className="p-3.5"><StatusBadge status={u.role} variant="role"/></td>
+            <td className="p-3.5 text-slate-600 font-medium">
+              <span className="font-mono text-slate-800">{u.studentOrStaffId || '—'}</span>
+              <span className="text-slate-300 mx-1.5">•</span>
+              <span>{u.department || '—'}</span>
+            </td>
+            <td className="p-3.5">
+              <div className="flex items-center space-x-2">
+                <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                  u.isActive ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/60' : 'bg-slate-100 text-slate-500'
+                }`}>
+                  {u.isActive ? 'Hoạt động' : 'Vô hiệu hóa'}
+                </span>
+                <span className="text-slate-300">·</span>
+                <span className={`text-[11px] font-medium ${u.isLocked ? 'text-rose-600' : 'text-slate-500'}`}>
+                  {u.isLocked ? 'Đang khóa' : 'Mở'}
+                </span>
+              </div>
+            </td>
+            <td className="p-3.5"><div className="flex flex-wrap gap-1.5">
               <button className={secondaryButton} disabled={busy} onClick={() => beginEdit(u)}>Sửa</button>
               <button className={secondaryButton} disabled={busy} onClick={() => beginToggle(u, 'isActive')}>
                 {u.isActive ? 'Vô hiệu hóa' : 'Kích hoạt'}</button>
@@ -254,59 +284,65 @@ export const UsersPage: React.FC = () => {
               <button className={secondaryButton} disabled={busy} onClick={() => beginReset(u)}>Đặt lại mật khẩu</button>
             </div></td>
           </tr>)}
-          {!loading && visibleUsers.length === 0 && <tr><td className="p-6 text-center text-slate-500" colSpan={5}>
+          {!loading && visibleUsers.length === 0 && <tr><td className="p-8 text-center text-slate-400 text-xs" colSpan={5}>
             Không có người dùng phù hợp hoặc chưa có dữ liệu.</td></tr>}
         </tbody>
       </table>
     </section>
 
-    {operation && <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
-      <div role="dialog" aria-modal="true" aria-label="Thao tác quản trị người dùng" className="max-h-[90vh] w-full max-w-lg overflow-auto rounded-xl bg-white p-5 shadow-xl">
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-slate-900">{operation === 'create' ? 'Thêm tài khoản' :
+    {operation && <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm">
+      <div role="dialog" aria-modal="true" aria-label="Thao tác quản trị người dùng" className="max-h-[90vh] w-full max-w-lg overflow-auto rounded-2xl bg-white p-6 shadow-modal border border-slate-100">
+        <div className="mb-4 flex items-center justify-between border-b border-slate-100 pb-3">
+          <h2 className="text-base font-bold text-slate-900">{operation === 'create' ? 'Thêm tài khoản' :
             operation === 'edit' ? 'Cập nhật tài khoản' : operation === 'reset' ? 'Đặt lại mật khẩu' : 'Xác nhận trạng thái'}</h2>
           <button type="button" className={secondaryButton} disabled={busy} onClick={close}>Đóng</button>
         </div>
-        {operation === 'create' && <form className="space-y-3" onSubmit={onCreate}>
-          <label className="block text-sm">Họ tên<input required maxLength={160} className={inputStyle} value={createForm.fullName}
+        {operation === 'create' && <form className="space-y-3.5" onSubmit={onCreate}>
+          <label className="block text-xs font-semibold text-slate-700">Họ tên<input required maxLength={160} className={`${inputStyle} mt-1`} value={createForm.fullName}
             onChange={e => setCreateForm(p => ({...p, fullName: e.target.value}))}/></label>
-          <label className="block text-sm">Email<input required type="email" maxLength={254} className={inputStyle} value={createForm.email}
+          <label className="block text-xs font-semibold text-slate-700">Email<input required type="email" maxLength={254} className={`${inputStyle} mt-1`} value={createForm.email}
             onChange={e => setCreateForm(p => ({...p, email: e.target.value}))}/></label>
-          <label className="block text-sm">Mật khẩu (tối thiểu 12 ký tự)<input required type="password" autoComplete="new-password"
-            minLength={12} maxLength={128} className={inputStyle} value={createForm.password}
+          <label className="block text-xs font-semibold text-slate-700">Mật khẩu (tối thiểu 12 ký tự)<input required type="password" autoComplete="new-password"
+            minLength={12} maxLength={128} className={`${inputStyle} mt-1`} value={createForm.password}
             onChange={e => setCreateForm(p => ({...p, password: e.target.value}))}/></label>
-          <label className="block text-sm">Vai trò<select className={inputStyle} value={createForm.role}
+          <label className="block text-xs font-semibold text-slate-700">Vai trò<select className={`${inputStyle} mt-1 cursor-pointer`} value={createForm.role}
             onChange={e => setCreateForm(p => ({...p, role: e.target.value as AcmRole}))}>
             {ACM_ROLES.map(r => <option key={r} value={r}>{r}</option>)}</select></label>
-          <label className="block text-sm">Mã sinh viên/nhân viên<input maxLength={80} className={inputStyle} value={createForm.studentOrStaffId}
+          <label className="block text-xs font-semibold text-slate-700">Mã sinh viên/nhân viên<input maxLength={80} className={`${inputStyle} mt-1`} value={createForm.studentOrStaffId}
             onChange={e => setCreateForm(p => ({...p, studentOrStaffId: e.target.value}))}/></label>
-          <label className="block text-sm">Đơn vị<input maxLength={160} className={inputStyle} value={createForm.department}
+          <label className="block text-xs font-semibold text-slate-700">Đơn vị<input maxLength={160} className={`${inputStyle} mt-1`} value={createForm.department}
             onChange={e => setCreateForm(p => ({...p, department: e.target.value}))}/></label>
-          <button type="submit" className={primaryButton} disabled={busy}>{busy ? 'Đang xử lý...' : 'Tạo tài khoản'}</button>
+          <div className="pt-2">
+            <button type="submit" className={primaryButton} disabled={busy}>{busy ? 'Đang xử lý...' : 'Tạo tài khoản'}</button>
+          </div>
         </form>}
-        {operation === 'edit' && target && <form className="space-y-3" onSubmit={onEdit}>
-          <p className="text-sm text-slate-500">{target.email}</p>
-          <label className="block text-sm">Họ tên<input required maxLength={160} className={inputStyle} value={editForm.fullName}
+        {operation === 'edit' && target && <form className="space-y-3.5" onSubmit={onEdit}>
+          <p className="text-xs text-slate-500 font-mono bg-slate-50 p-2 rounded-lg border border-slate-200/60">{target.email}</p>
+          <label className="block text-xs font-semibold text-slate-700">Họ tên<input required maxLength={160} className={`${inputStyle} mt-1`} value={editForm.fullName}
             onChange={e => setEditForm(p => ({...p, fullName: e.target.value}))}/></label>
-          <label className="block text-sm">Vai trò<select className={inputStyle} value={editForm.role}
+          <label className="block text-xs font-semibold text-slate-700">Vai trò<select className={`${inputStyle} mt-1 cursor-pointer`} value={editForm.role}
             onChange={e => setEditForm(p => ({...p, role: e.target.value as AcmRole}))}>
             {ACM_ROLES.map(r => <option key={r} value={r}>{r}</option>)}</select></label>
-          <label className="block text-sm">Đơn vị<input maxLength={160} className={inputStyle} value={editForm.department}
+          <label className="block text-xs font-semibold text-slate-700">Đơn vị<input maxLength={160} className={`${inputStyle} mt-1`} value={editForm.department}
             onChange={e => setEditForm(p => ({...p, department: e.target.value}))}/></label>
-          <button type="submit" disabled={busy} className={primaryButton}>{busy ? 'Đang xử lý...' : 'Lưu thay đổi'}</button>
+          <div className="pt-2">
+            <button type="submit" disabled={busy} className={primaryButton}>{busy ? 'Đang xử lý...' : 'Lưu thay đổi'}</button>
+          </div>
         </form>}
         {operation === 'toggle' && target && <div className="space-y-4">
-          <p className="text-sm">Bạn có chắc muốn {toggleField === 'isLocked' ? (target.isLocked ? 'mở khóa' : 'khóa') :
-            (target.isActive ? 'vô hiệu hóa' : 'kích hoạt')} tài khoản <strong>{target.email}</strong>?</p>
+          <p className="text-xs text-slate-700 leading-relaxed">Bạn có chắc muốn {toggleField === 'isLocked' ? (target.isLocked ? 'mở khóa' : 'khóa') :
+            (target.isActive ? 'vô hiệu hóa' : 'kích hoạt')} tài khoản <strong className="font-semibold text-slate-900">{target.email}</strong>?</p>
           <button type="button" className={primaryButton} disabled={busy} onClick={onToggle}>
             {busy ? 'Đang xử lý...' : 'Xác nhận'}</button>
         </div>}
-        {operation === 'reset' && target && <form className="space-y-3" onSubmit={onReset}>
-          <p className="text-sm">Đặt lại mật khẩu của <strong>{target.email}</strong>. Không gửi mật khẩu qua nhật ký.</p>
-          <label className="block text-sm">Mật khẩu mới<input required autoComplete="new-password" type="password"
-            minLength={12} maxLength={128} className={inputStyle} value={newPassword}
+        {operation === 'reset' && target && <form className="space-y-3.5" onSubmit={onReset}>
+          <p className="text-xs text-slate-600">Đặt lại mật khẩu của <strong className="font-semibold text-slate-900">{target.email}</strong>. Không gửi mật khẩu qua nhật ký.</p>
+          <label className="block text-xs font-semibold text-slate-700">Mật khẩu mới<input required autoComplete="new-password" type="password"
+            minLength={12} maxLength={128} className={`${inputStyle} mt-1`} value={newPassword}
             onChange={e => setNewPassword(e.target.value)}/></label>
-          <button type="submit" className={primaryButton} disabled={busy}>{busy ? 'Đang xử lý...' : 'Xác nhận đặt lại'}</button>
+          <div className="pt-2">
+            <button type="submit" className={primaryButton} disabled={busy}>{busy ? 'Đang xử lý...' : 'Xác nhận đặt lại'}</button>
+          </div>
         </form>}
       </div>
     </div>}

@@ -114,12 +114,12 @@ export const CategoryModal: React.FC<CategoryModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-slate-900/50 p-4 backdrop-blur-xs">
-      <div className="relative w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl transition-all">
+    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-slate-900/50 p-4 backdrop-blur-sm">
+      <div className="relative w-full max-w-lg rounded-2xl bg-white p-6 shadow-modal border border-slate-100 transition-all">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-slate-100 pb-4">
-          <div className="flex items-center space-x-2.5">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-50 text-blue-600">
+          <div className="flex items-center space-x-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-50 text-brand-600 border border-brand-100/60">
               <FolderPlus className="h-5 w-5" />
             </div>
             <div>
@@ -135,7 +135,7 @@ export const CategoryModal: React.FC<CategoryModalProps> = ({
           </div>
           <button
             onClick={onClose}
-            className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+            className="rounded-xl p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors"
             disabled={isSubmitting}
           >
             <X className="h-5 w-5" />
@@ -144,9 +144,9 @@ export const CategoryModal: React.FC<CategoryModalProps> = ({
 
         {/* Error Alerts */}
         {(validationError || apiError) && (
-          <div className="mt-4 rounded-lg bg-rose-50 border border-rose-200 p-3 text-xs text-rose-700 flex items-start space-x-2">
+          <div className="mt-4 rounded-xl bg-rose-50 border border-rose-200/80 p-3.5 text-xs text-rose-700 flex items-start space-x-2.5 shadow-xs">
             <AlertCircle className="h-4 w-4 shrink-0 mt-0.5 text-rose-600" />
-            <span>{validationError || apiError}</span>
+            <span className="leading-relaxed font-medium">{validationError || apiError}</span>
           </div>
         )}
 
@@ -162,7 +162,7 @@ export const CategoryModal: React.FC<CategoryModalProps> = ({
               onChange={(e) => setCode(e.target.value.toUpperCase())}
               placeholder="VD: CAT-DEV-KIT"
               disabled={isSubmitting}
-              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-xs font-mono uppercase text-slate-900 focus:border-blue-500 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
+              className="mt-1.5 w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-xs font-mono uppercase text-slate-900 focus:border-brand-500 focus:outline-hidden focus:ring-2 focus:ring-brand-500/20 transition-all"
             />
             <p className="mt-1 text-[11px] text-slate-400">
               Quy chuẩn: In hoa, chữ số và dấu gạch nối (tối đa 30 ký tự, duy nhất).
@@ -179,7 +179,7 @@ export const CategoryModal: React.FC<CategoryModalProps> = ({
               onChange={(e) => setName(e.target.value)}
               placeholder="VD: Bo mạch vi điều khiển & Phát triển"
               disabled={isSubmitting}
-              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-900 focus:border-blue-500 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
+              className="mt-1.5 w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-xs text-slate-900 focus:border-brand-500 focus:outline-hidden focus:ring-2 focus:ring-brand-500/20 transition-all"
             />
           </div>
 
@@ -191,7 +191,7 @@ export const CategoryModal: React.FC<CategoryModalProps> = ({
               value={parentId}
               onChange={(e) => setParentId(e.target.value)}
               disabled={isSubmitting}
-              className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-900 focus:border-blue-500 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
+              className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs text-slate-900 focus:border-brand-500 focus:outline-hidden focus:ring-2 focus:ring-brand-500/20 transition-all cursor-pointer"
             >
               <option value="">-- Danh mục gốc (Root Category) --</option>
               {availableParents.map((parent) => (
@@ -212,7 +212,7 @@ export const CategoryModal: React.FC<CategoryModalProps> = ({
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Ghi chú về nhóm linh kiện, mục đích sử dụng hoặc tiêu chuẩn kỹ thuật..."
               disabled={isSubmitting}
-              className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-900 focus:border-blue-500 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
+              className="mt-1.5 w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-xs text-slate-900 focus:border-brand-500 focus:outline-hidden focus:ring-2 focus:ring-brand-500/20 transition-all"
             />
           </div>
 
@@ -222,23 +222,23 @@ export const CategoryModal: React.FC<CategoryModalProps> = ({
               type="button"
               onClick={onClose}
               disabled={isSubmitting}
-              className="rounded-lg border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+              className="rounded-xl border border-slate-200 px-4 py-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
             >
               Hủy
             </button>
             <button
               type="submit"
               disabled={isSubmitting}
-              className="inline-flex items-center space-x-1.5 rounded-lg bg-blue-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-blue-700 disabled:opacity-50"
+              className="inline-flex items-center space-x-1.5 rounded-xl bg-brand-600 px-4.5 py-2.5 text-xs font-semibold text-white shadow-soft hover:bg-brand-700 active:scale-[0.99] focus:outline-none focus:ring-2 focus:ring-brand-500/20 disabled:opacity-50 transition-all"
             >
               {isSubmitting ? (
                 <>
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  <Loader2 className="h-4 w-4 animate-spin" />
                   <span>Đang lưu...</span>
                 </>
               ) : (
                 <>
-                  <Save className="h-3.5 w-3.5" />
+                  <Save className="h-4 w-4" />
                   <span>{isEdit ? 'Lưu thay đổi' : 'Tạo danh mục'}</span>
                 </>
               )}

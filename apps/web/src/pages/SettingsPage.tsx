@@ -47,9 +47,11 @@ export const SettingsPage: React.FC = () => {
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         {/* Card 1: Infrastructure & API Status */}
-        <div className="rounded-xl border border-slate-200/80 bg-white p-5 shadow-sm">
-          <div className="flex items-center space-x-2 border-b border-slate-100 pb-3">
-            <Server className="h-4 w-4 text-blue-600" />
+        <div className="rounded-2xl border border-slate-200/80 bg-white p-5.5 shadow-card">
+          <div className="flex items-center space-x-2.5 border-b border-slate-100 pb-3.5">
+            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-brand-50 text-brand-600 border border-brand-200/60">
+              <Server className="h-4 w-4" />
+            </div>
             <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900">
               Trạng thái Hạ tầng & Dịch vụ
             </h3>
@@ -64,10 +66,10 @@ export const SettingsPage: React.FC = () => {
             <div className="flex items-center justify-between">
               <span className="text-slate-500">Trạng thái kết nối:</span>
               <span
-                className={`inline-flex items-center space-x-1 rounded-full px-2.5 py-0.5 font-bold text-[10px] ${
+                className={`inline-flex items-center space-x-1.5 rounded-full px-2.5 py-0.5 font-bold text-[10px] ${
                   apiHealth?.status === 'ok'
-                    ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                    : 'bg-amber-50 text-amber-700 border border-amber-200'
+                    ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/80'
+                    : 'bg-amber-50 text-amber-700 border border-amber-200/80'
                 }`}
               >
                 {apiHealth?.status === 'ok' ? (
@@ -85,13 +87,13 @@ export const SettingsPage: React.FC = () => {
             </div>
             <div className="flex items-center justify-between">
               <span className="text-slate-500">Cơ sở dữ liệu (PostgreSQL):</span>
-              <span className="font-mono text-[11px] text-slate-700">
+              <span className="font-mono text-[11px] text-slate-700 bg-slate-50 px-2 py-0.5 rounded-md border border-slate-200/50">
                 {apiHealth?.database === 'connected' ? 'Đã kết nối (Healthy)' : (apiHealth?.database || 'UAT Database')}
               </span>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-slate-500">Dịch vụ AI Vision (FastAPI):</span>
-              <span className="font-mono text-[11px] text-blue-600">Port 5055 (Active)</span>
+              <span className="font-mono text-[11px] text-brand-700 font-semibold bg-brand-50 px-2 py-0.5 rounded-md border border-brand-200/50">Port 5055 (Active)</span>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-slate-500">API Prefix:</span>
@@ -99,7 +101,7 @@ export const SettingsPage: React.FC = () => {
             </div>
             <div className="flex items-center justify-between">
               <span className="text-slate-500">Môi trường triển khai:</span>
-              <span className="rounded bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-700">
+              <span className="rounded-md bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-700">
                 Isolated UAT & Demo
               </span>
             </div>
@@ -107,10 +109,12 @@ export const SettingsPage: React.FC = () => {
         </div>
 
         {/* Card 2: Standard Lab Operational Parameters (Read-Only) */}
-        <div className="rounded-xl border border-slate-200/80 bg-white p-5 shadow-sm lg:col-span-2">
-          <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-            <div className="flex items-center space-x-2">
-              <Building2 className="h-4 w-4 text-blue-600" />
+        <div className="rounded-2xl border border-slate-200/80 bg-white p-5.5 shadow-card lg:col-span-2">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-3.5">
+            <div className="flex items-center space-x-2.5">
+              <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-brand-50 text-brand-600 border border-brand-200/60">
+                <Building2 className="h-4 w-4" />
+              </div>
               <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900">
                 Quy chuẩn Vận hành Phòng Lab (Chế độ Chỉ đọc)
               </h3>
@@ -121,11 +125,11 @@ export const SettingsPage: React.FC = () => {
           </div>
 
           <div className="mt-4 space-y-4 text-xs">
-            <div className="rounded-lg bg-slate-50/80 p-3 border border-slate-200/70">
-              <div className="flex items-start space-x-2">
-                <Info className="h-4 w-4 text-blue-600 mt-0.5 shrink-0" />
+            <div className="rounded-xl bg-brand-50/40 p-3.5 border border-brand-200/60 shadow-xs">
+              <div className="flex items-start space-x-2.5">
+                <Info className="h-4 w-4 text-brand-600 mt-0.5 shrink-0" />
                 <div className="space-y-1 text-slate-600">
-                  <p className="font-medium text-slate-800">
+                  <p className="font-semibold text-slate-800">
                     Chính sách cấu hình hệ thống:
                   </p>
                   <p className="text-[11px] leading-relaxed">
@@ -136,7 +140,7 @@ export const SettingsPage: React.FC = () => {
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-              <div className="rounded-lg border border-slate-100 bg-white p-3 shadow-xs">
+              <div className="rounded-xl border border-slate-100 bg-slate-50/50 p-3.5 shadow-xs">
                 <div className="flex items-center space-x-2 text-slate-500 mb-1">
                   <Building2 className="h-3.5 w-3.5 text-slate-400" />
                   <span className="font-semibold text-slate-700">Cơ sở / Đơn vị quản lý:</span>
@@ -146,7 +150,7 @@ export const SettingsPage: React.FC = () => {
                 </p>
               </div>
 
-              <div className="rounded-lg border border-slate-100 bg-white p-3 shadow-xs">
+              <div className="rounded-xl border border-slate-100 bg-slate-50/50 p-3.5 shadow-xs">
                 <div className="flex items-center space-x-2 text-slate-500 mb-1">
                   <Warehouse className="h-3.5 w-3.5 text-slate-400" />
                   <span className="font-semibold text-slate-700">Mã kho trung tâm mặc định:</span>
@@ -156,7 +160,7 @@ export const SettingsPage: React.FC = () => {
                 </p>
               </div>
 
-              <div className="rounded-lg border border-slate-100 bg-white p-3 shadow-xs">
+              <div className="rounded-xl border border-slate-100 bg-slate-50/50 p-3.5 shadow-xs">
                 <div className="flex items-center space-x-2 text-slate-500 mb-1">
                   <Clock className="h-3.5 w-3.5 text-slate-400" />
                   <span className="font-semibold text-slate-700">Thời hạn mượn tiêu chuẩn:</span>
@@ -166,7 +170,7 @@ export const SettingsPage: React.FC = () => {
                 </p>
               </div>
 
-              <div className="rounded-lg border border-slate-100 bg-white p-3 shadow-xs">
+              <div className="rounded-xl border border-slate-100 bg-slate-50/50 p-3.5 shadow-xs">
                 <div className="flex items-center space-x-2 text-slate-500 mb-1">
                   <FileCheck className="h-3.5 w-3.5 text-slate-400" />
                   <span className="font-semibold text-slate-700">Quy tắc kiểm soát số lượng:</span>
@@ -177,7 +181,7 @@ export const SettingsPage: React.FC = () => {
               </div>
             </div>
 
-            <div className="rounded-lg border border-slate-100 bg-white p-3 shadow-xs">
+            <div className="rounded-xl border border-slate-100 bg-slate-50/50 p-3.5 shadow-xs">
               <div className="flex items-center space-x-2 text-slate-500 mb-1">
                 <Shield className="h-3.5 w-3.5 text-slate-400" />
                 <span className="font-semibold text-slate-700">Chính sách Truy vết Kiểm toán (Audit Trail):</span>
