@@ -25,6 +25,7 @@ export interface ReturnOperationLineSnapshot {
   returnedQuantity: number;
   condition: ReturnCondition;
   locationId: string | null;
+  sourceLocationId?: string | null;
   notes: string | null;
 }
 export interface ReturnOperationPayloadSnapshot {
@@ -80,7 +81,7 @@ export function canonicalReturnOperationPayload(input: unknown): ReturnOperation
   const seen = new Set<string>();
   const items: ReturnOperationLineSnapshot[] = input.items.map((value: unknown) => {
     if (!record(value) || Object.keys(value).some(k => ![
-      'borrowDetailId', 'returnedQuantity', 'condition', 'locationId', 'notes',
+      'borrowDetailId', 'returnedQuantity', 'condition', 'locationId', 'sourceLocationId', 'notes',
     ].includes(k))) {
       throw new AppError('Chi tiết hoàn trả không hợp lệ', 422);
     }
@@ -101,11 +102,17 @@ export function canonicalReturnOperationPayload(input: unknown): ReturnOperation
         (typeof locationId !== 'string' || !uuid.test(locationId))) {
       throw new AppError('Kho nhận trả không hợp lệ', 422);
     }
+    const sourceLocationId = value.sourceLocationId;
+    if (sourceLocationId !== null && sourceLocationId !== undefined &&
+        (typeof sourceLocationId !== 'string' || !uuid.test(sourceLocationId))) {
+      throw new AppError('Kho nguồn hoàn trả không hợp lệ', 422);
+    }
     return {
       borrowDetailId: id.toLowerCase(),
       returnedQuantity: value.returnedQuantity as number,
       condition: value.condition as ReturnCondition,
       locationId: typeof locationId === 'string' ? locationId.toLowerCase() : null,
+      sourceLocationId: typeof sourceLocationId === 'string' ? sourceLocationId.toLowerCase() : null,
       notes: textOrNull(value.notes),
     };
   });

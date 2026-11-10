@@ -7,6 +7,7 @@ import {
   hasAuthoritativeReturnReceipt,
 } from './borrow.return-cache-integrity';
 import { prisma } from '../../config/database';
+import { Stage4CReturnWriterService } from './borrow.stage4c-writer.service';
 import { AppError } from '../../shared/AppError';
 import { AuthenticatedUser } from '../../middleware/auth';
 import {
@@ -199,6 +200,17 @@ export async function generateReturnTransactionNumber(
   return `RT-${dateStr}-${Date.now().toString().slice(-4)}`;
 }
 
+function assertLegacyReturnWriteAllowed(
+  value: string | undefined = process.env.ACM_RETURN_OPERATIONS_ENABLED
+): void {
+  if (value === 'true') {
+    throw new AppError(
+      'Đường hoàn trả cũ đã bị khóa; hệ thống cần hoàn tất chuyển đổi operation',
+      503
+    );
+  }
+}
+
 /**
  * Reserve, release, handover and return involve read/modify/write across
  * StockBalance and BorrowDetail. PostgreSQL SERIALIZABLE detects conflicting
@@ -252,6 +264,13 @@ async function runBorrowTransaction<T>(
 }
 
 export class BorrowService {
+  private _stage4cWriter?: Stage4CReturnWriterService;
+  public get stage4CReturnWriter(): Stage4CReturnWriterService {
+    if (!this._stage4cWriter) {
+      this._stage4cWriter = new Stage4CReturnWriterService(prisma);
+    }
+    return this._stage4cWriter;
+  }
   /**
    * Creates a new BorrowRequest with validation of available stock and dates.
    */
@@ -798,6 +817,19 @@ export class BorrowService {
       );
     }
 
+    // Cutover Gate: Khi cờ chuyển đổi Stage4C được kích hoạt, chuyển sang Stage4C Writer (P1.1)
+    if (process.env.ACM_RETURN_OPERATIONS_ENABLED === 'true') {
+      return await this.stage4CReturnWriter.executeDirectReturn(
+        id,
+        input,
+        currentUser,
+        idempotencyKey
+      );
+    }
+
+    // Khóa đường hoàn trả cũ khi cờ chuyển đổi Stage4C được kích hoạt
+    assertLegacyReturnWriteAllowed(process.env.ACM_RETURN_OPERATIONS_ENABLED);
+
     // The HTTP router validates Zod input, but the public service can also be
     // called directly. Never let malformed quantities or an unknown condition
     // commit a BorrowDetail/ReturnDetail without the matching stock posting.
@@ -914,7 +946,8 @@ export class BorrowService {
       // Prevent duplicate BorrowDetail rows even when service is called directly
       // (outside the HTTP/Zod validation layer).
       const seenReturnDetails = new Set<string>();
-      for (const returnItem of input.items) {
+      const sortedReturnItems = [...input.items].sort((a, b) => a.borrowDetailId.localeCompare(b.borrowDetailId));
+      for (const returnItem of sortedReturnItems) {
         if (seenReturnDetails.has(returnItem.borrowDetailId)) {
           throw new AppError('Không được hoàn trả trùng dòng chi tiết mượn trong một giao dịch', 400);
         }
@@ -922,7 +955,7 @@ export class BorrowService {
       }
 
       // Anti-double-return and quantity validation
-      for (const returnItem of input.items) {
+      for (const returnItem of sortedReturnItems) {
         const detail = req.details.find((d) => d.id === returnItem.borrowDetailId);
         if (!detail) {
           throw new AppError(
@@ -942,6 +975,11 @@ export class BorrowService {
 
       const returnNumber = await generateReturnTransactionNumber(tx);
 
+      // Khóa phân tán Postgres Advisory Lock theo mã chứng từ hoàn trả RC5 (P1.5)
+      await (tx as any).$queryRaw`
+        SELECT pg_advisory_xact_lock(hashtext('EV_' || LOWER(${returnNumber})))
+      `;
+
       // Create ReturnTransaction
       const returnTx = await tx.returnTransaction.create({
         data: {
@@ -952,8 +990,25 @@ export class BorrowService {
         },
       });
 
+      // Đăng ký đồng bộ vào system_evidence_registry (P1.5)
+      try {
+        await (tx as any).$executeRaw`
+          INSERT INTO "system_evidence_registry" (
+            "normalized_ref", "original_ref", "source_type", "source_id", "created_at"
+          ) VALUES (
+            LOWER(${returnNumber}),
+            ${returnNumber},
+            'RC5_RETURN',
+            ${returnTx.id}::uuid,
+            NOW()
+          )
+        `;
+      } catch {
+        // Fallback an toàn nếu chưa migrate bảng
+      }
+
       // Process each return item
-      for (const returnItem of input.items) {
+      for (const returnItem of sortedReturnItems) {
         const detail = req.details.find((d) => d.id === returnItem.borrowDetailId)!;
 
         // Record ReturnDetail
@@ -1291,3 +1346,4 @@ export class BorrowService {
 }
 
 export const borrowService = new BorrowService();
+export const stage4CReturnWriterService = new Stage4CReturnWriterService(prisma);

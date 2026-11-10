@@ -24,7 +24,7 @@
     "react-router-dom": "^6.27.0",
     "recharts": "^2.13.0",
     "tailwind-merge": "^2.5.4",
-    "zod": "4.6.7"
+    "zod": "^3.23.8"
   },
   "devDependencies": {
     "@playwright/test": "^1.64.0",

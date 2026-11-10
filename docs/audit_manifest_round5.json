@@ -1,0 +1,44 @@
+{
+  "manifestVersion": "1.0.0",
+  "auditRound": "Round 5",
+  "generatedAt": "2026-11-10T07:07:00Z",
+  "git": {
+    "repository": "acmhtql-sys/ACM_QLLK",
+    "baseCommit": "a09b2b097871c14f087f47a8b81de845830b193d",
+    "baseBranch": "codex/d8-pg17-postidentity-dba-review-20261109",
+    "auditBranch": "codex/d8-production-readiness-evidence-20261110"
+  },
+  "releaseStatus": {
+    "gate": "RELEASE_NO_GO",
+    "stagingMode": "STAGING_READ_ONLY=true",
+    "stage4cFlag": "ACM_RETURN_OPERATIONS_ENABLED=false (guarded)"
+  },
+  "auditZip": {
+    "filename": "ACM_STAGE4C_AUDIT_CAPTURE_ROUND5.zip",
+    "sizeBytes": 99133,
+    "sha256": "888684156fb52c3286446d7384be1782447163e1af78349f3da58dbb5a43876c"
+  },
+  "fileHashes": {
+    ".github/workflows/ci.yml": "0ff0fabd71358c43cbab9aab9b839f147eced0af1589f2b81e69bbb2ba8fdb0b",
+    "packages/shared/src/validators.ts": "20fe64f01a5ccd34137004dd51c4b926b887633ef8a8279c107adeb5c5a3093d",
+    "infra/supabase_granular_rbac_rls.sql": "e9f4e2ee861dbd341fc4b6052eb1c3610448618cb942a71578f565c71d2d42ce",
+    "infra/supabase_performance_indexes.sql": "24c6d94eb1191c1d50b7d21bc907c668ba50cfc8db109a3c0afdd1fd8adee310",
+    "infra/supabase_rls_lockdown.sql": "5bcb6a171a69d6c72400d3b3f76941c4fcf01b14bbd05f36c484cec577e6db9d",
+    "apps/api/src/modules/storage/image-storage.supabase.ts": "c4b0b4fc87da9d4c37d4ceaaf7d74d0babf2047a3636d43718365b2ccb1ca8e2",
+    "apps/api/tests/image-storage.supabase.unit.test.ts": "1b5470bef09adbd171b23e6b262631fff2955c9f012936021143c14603c4d1ca",
+    "apps/api/tests/e2e.cloud-flow.integration.ts": "3aef83cf6daea20e0b03c69c8446fa833fb812c2b23d39286be49376c47943e7",
+    "apps/api/src/modules/borrow/borrow.stage4c-writer.service.ts": "fad0ee64b0540c489def3d2ab9b74219fb658c7bde2fc18e4ac5159a9edc9ebe",
+    "docs/stage4c_pg17_verification.sql": "52385dd14c5dd9698ee298f1a45bc2e0103309b938d199ed84abf722fb059d0d"
+  },
+  "testExecutionSummary": {
+    "packagesShared": "3/3 files, 128/128 tests passed (0 failed)",
+    "appsWeb": "28/28 files, 409/409 tests passed (0 failed)",
+    "appsApiBorrowReturn": "15 suites, 299/299 tests passed (0 failed)",
+    "appsApiReleaseFence": "10/10 tests passed (DBA-01 to DBA-06)",
+    "appsApiStage4CWriter": "25/25 tests passed",
+    "appsApiSupabaseStorage": "6/6 tests passed",
+    "monorepoTypecheck": "PASS (0 errors)",
+    "monorepoLint": "PASS (0 warnings/errors)",
+    "monorepoBuild": "PASS (Vite production bundle built)"
+  }
+}

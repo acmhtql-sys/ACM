@@ -1,10 +1,10 @@
 import { Request, Response, NextFunction } from 'express';
-import { ZodObject } from 'zod';
+import { AnyZodObject } from 'zod';
 
 export function validateRequest(schema: {
-  body?: ZodObject;
-  query?: ZodObject;
-  params?: ZodObject;
+  body?: AnyZodObject;
+  query?: AnyZodObject;
+  params?: AnyZodObject;
 }) {
   return async (req: Request, _res: Response, next: NextFunction) => {
     try {
