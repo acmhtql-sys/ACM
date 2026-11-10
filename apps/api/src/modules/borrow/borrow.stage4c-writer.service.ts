@@ -45,9 +45,9 @@ export async function generateReturnNumber(tx: any): Promise<string> {
   const prefix = `RT-${dateStr}`;
 
   // DB-02: Khóa Postgres advisory xact lock theo ngày để đảm bảo sinh số thứ tự tuần tự tuyệt đối
-  if (typeof tx?.$queryRaw === 'function') {
+  if (typeof tx?.$executeRaw === 'function') {
     try {
-      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${'SEQ_' + prefix}))`;
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${'SEQ_' + prefix}))`;
     } catch (err: any) {
       // Trong môi trường Production / live PostgreSQL, lỗi lock KHÔNG ĐƯỢC NUỐT mà phải fail-closed
       if (process.env.NODE_ENV !== 'test' && !err?.message?.includes('mock')) {
@@ -272,9 +272,11 @@ export class Stage4CReturnWriterService {
 
     return await this.prisma.$transaction(async (tx) => {
       // 6. Khóa phân tán Postgres Advisory Lock theo hàm băm của mã chứng từ (chống race condition đồng thời - P1 Issue 4/5)
-      await tx.$queryRaw`
-        SELECT pg_advisory_xact_lock(hashtext('EV_' || LOWER(${input.physicalEvidenceRef})))
-      `;
+      if (typeof tx?.$executeRaw === 'function') {
+        await tx.$executeRaw`
+          SELECT pg_advisory_xact_lock(hashtext('EV_' || LOWER(${input.physicalEvidenceRef})))
+        `;
+      }
 
       // 7. Kiểm tra tính duy nhất của mã chứng từ vật lý trên toàn hệ thống (case-insensitive - Issue B / P1.5)
       // 7a. Kiểm tra trong bảng borrow_return_operations
@@ -872,9 +874,11 @@ export class Stage4CReturnWriterService {
       const returnNumber = await generateReturnNumber(tx);
 
       // Khóa phân tán Postgres Advisory Lock theo mã chứng từ hoàn trả
-      await tx.$queryRaw`
-        SELECT pg_advisory_xact_lock(hashtext('EV_' || LOWER(${returnNumber})))
-      `;
+      if (typeof tx?.$executeRaw === 'function') {
+        await tx.$executeRaw`
+          SELECT pg_advisory_xact_lock(hashtext('EV_' || LOWER(${returnNumber})))
+        `;
+      }
 
       // Đăng ký returnNumber vào registry toàn hệ thống (P1.5)
       try {

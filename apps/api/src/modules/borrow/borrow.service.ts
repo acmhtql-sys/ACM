@@ -976,9 +976,11 @@ export class BorrowService {
       const returnNumber = await generateReturnTransactionNumber(tx);
 
       // Khóa phân tán Postgres Advisory Lock theo mã chứng từ hoàn trả RC5 (P1.5)
-      await (tx as any).$queryRaw`
-        SELECT pg_advisory_xact_lock(hashtext('EV_' || LOWER(${returnNumber})))
-      `;
+      if (typeof (tx as any).$executeRaw === 'function') {
+        await (tx as any).$executeRaw`
+          SELECT pg_advisory_xact_lock(hashtext('EV_' || LOWER(${returnNumber})))
+        `;
+      }
 
       // Create ReturnTransaction
       const returnTx = await tx.returnTransaction.create({
