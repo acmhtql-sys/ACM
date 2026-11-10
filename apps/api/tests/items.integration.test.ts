@@ -145,8 +145,8 @@ describe('ACM Phase 2.1 Backend API Integration Test Suite – Item Management',
     });
 
     it('supports sorting by name ascending and descending', async () => {
-      const resAsc = await request(app).get('/api/v1/items?sortBy=name&sortOrder=asc&limit=10');
-      const resDesc = await request(app).get('/api/v1/items?sortBy=name&sortOrder=desc&limit=10');
+      const resAsc = await request(app).get('/api/v1/items?sortBy=name&sortOrder=asc&limit=50');
+      const resDesc = await request(app).get('/api/v1/items?sortBy=name&sortOrder=desc&limit=50');
       expect(resAsc.status).toBe(200);
       expect(resDesc.status).toBe(200);
       const namesAsc = resAsc.body.data.map((i: any) => i.name);

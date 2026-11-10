@@ -138,3 +138,4 @@ describe('CloudinaryItemImageStorage (Cloud: zua6n3a3)', () => {
     expect(mockFetch).toHaveBeenCalledTimes(2); // 1 save + 1 destroy
   });
 });
+

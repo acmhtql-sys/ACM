@@ -39,3 +39,4 @@ export function getImageStorageProvider(): ItemImageStorageProvider {
 export function resetStorageProviderForTesting(mockProvider?: ItemImageStorageProvider): void {
   globalStorageInstance = mockProvider || null;
 }
+

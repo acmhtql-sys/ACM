@@ -51,6 +51,7 @@ vi.mock('../src/middleware/auth', async () => {
       }
       next();
     },
+    authenticateCatalogInStaging: (_req: any, _res: any, next: any) => next(),
   };
 });
 
