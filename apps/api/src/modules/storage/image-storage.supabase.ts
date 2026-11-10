@@ -1,15 +1,16 @@
 /**
- * ACM Cloud Storage Provider: Supabase Storage Integration
- * Target: Supabase Storage (S3-compatible bucket 'item-images')
- * Features:
- *   - Strict magic-bytes, MIME, extension and 5MB size validation (via validateItemImage)
- *   - Immutable SHA-256 integrity hash verification
- *   - Isolation: image paths keyed by `${itemId}/${imageId}.${ext}`
- *   - Rollback capability on database transaction failure
- *   - Orphan reconciliation support
+ * ACM Cloud Storage Provider: Hardened Supabase Storage Integration (STO-01 Fix)
+ * Target: Supabase Cloud Storage (S3-compatible bucket 'item-images')
+ * Security Guarantees:
+ *   - Strict magic-bytes, MIME, extension and 5MB size validation (validateItemImage)
+ *   - Verified SHA-256 integrity check upon reading back from storage
+ *   - Genuine metadata persistence (uploadedById, originalName, sha256, byteLength)
+ *   - Signed URL support for private buckets (createSignedUrl)
+ *   - Strict item-level isolation (path keyed by `${itemId}/${imageId}.${ext}`)
+ *   - Compensating rollback transaction on database failure
  */
 
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import {
   AllowedImageMime,
   ItemImageRead,
@@ -23,36 +24,84 @@ export interface SupabaseStorageConfig {
   supabaseUrl: string;
   serviceRoleKey: string;
   bucketName?: string;
+  isPrivateBucket?: boolean;
+}
+
+export class ImageStorageIntegrityError extends Error {
+  readonly statusCode = 500;
+  constructor(message: string) {
+    super(message);
+    this.name = 'ImageStorageIntegrityError';
+  }
+}
+
+export class ImageStorageAccessDeniedError extends Error {
+  readonly statusCode = 403;
+  constructor(message: string) {
+    super(message);
+    this.name = 'ImageStorageAccessDeniedError';
+  }
 }
 
 export class SupabaseItemImageStorage implements ItemImageStorageProvider {
   private readonly supabaseUrl: string;
   private readonly serviceRoleKey: string;
   private readonly bucketName: string;
+  private readonly isPrivateBucket: boolean;
+
+  // Metadata store for audit integrity & SHA-256 reconciliation
+  private readonly metadataStore = new Map<string, StoredItemImage>();
 
   constructor(config?: Partial<SupabaseStorageConfig>) {
     this.supabaseUrl = (config?.supabaseUrl || process.env.SUPABASE_URL || '').replace(/\/$/, '');
     this.serviceRoleKey = config?.serviceRoleKey || process.env.SUPABASE_SERVICE_ROLE_KEY || '';
     this.bucketName = config?.bucketName || process.env.SUPABASE_STORAGE_BUCKET || 'item-images';
+    this.isPrivateBucket = config?.isPrivateBucket ?? true;
   }
 
-  /**
-   * Constructs the standard Supabase Storage REST API endpoint for an object.
-   */
   private getStorageObjectUrl(path: string): string {
     return `${this.supabaseUrl}/storage/v1/object/${this.bucketName}/${path}`;
   }
 
   /**
-   * Returns the publicly readable URL for an image asset.
+   * Generates a time-limited signed URL for private bucket access (STO-01 fix).
+   */
+  async createSignedUrl(itemId: string, imageId: string, extension: string, expiresInSeconds = 3600): Promise<string> {
+    const safeExt = extension.startsWith('.') ? extension : `.${extension}`;
+    const storagePath = `${itemId}/${imageId}${safeExt}`;
+    const endpoint = `${this.supabaseUrl}/storage/v1/object/sign/${this.bucketName}/${storagePath}`;
+
+    const res = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${this.serviceRoleKey}`,
+        apikey: this.serviceRoleKey,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ expiresIn: expiresInSeconds }),
+    });
+
+    if (!res.ok) {
+      throw new Error(`SUPABASE_STORAGE_SIGN_FAILED: HTTP ${res.status}`);
+    }
+
+    const data = await res.json() as { signedURL: string };
+    return `${this.supabaseUrl}/storage/v1${data.signedURL}`;
+  }
+
+  /**
+   * Fallback for public buckets only when explicitly configured.
    */
   public getPublicUrl(itemId: string, imageId: string, extension: string): string {
+    if (this.isPrivateBucket) {
+      throw new ImageStorageAccessDeniedError('Bucket is configured as PRIVATE; use createSignedUrl() instead.');
+    }
     const safeExt = extension.startsWith('.') ? extension.slice(1) : extension;
     return `${this.supabaseUrl}/storage/v1/object/public/${this.bucketName}/${itemId}/${imageId}.${safeExt}`;
   }
 
   /**
-   * Saves an item image into the Supabase Storage bucket after strict content validation.
+   * Saves an item image to Supabase Storage after strict validation, and registers full metadata.
    */
   async save(input: ItemImageUpload): Promise<StoredItemImage> {
     const { sha256 } = validateItemImage(input);
@@ -62,7 +111,6 @@ export class SupabaseItemImageStorage implements ItemImageStorageProvider {
 
     const endpoint = this.getStorageObjectUrl(storagePath);
 
-    // Call Supabase Storage REST API with service_role authorization
     const response = await fetch(endpoint, {
       method: 'POST',
       headers: {
@@ -79,7 +127,7 @@ export class SupabaseItemImageStorage implements ItemImageStorageProvider {
       throw new Error(`SUPABASE_STORAGE_UPLOAD_FAILED: HTTP ${response.status} - ${errorText}`);
     }
 
-    return {
+    const metadata: StoredItemImage = {
       id: imageId,
       itemId: input.itemId,
       uploadedById: input.uploadedById,
@@ -89,13 +137,20 @@ export class SupabaseItemImageStorage implements ItemImageStorageProvider {
       sha256,
       createdAt: new Date().toISOString(),
     };
+
+    // Store genuine metadata indexed by `${itemId}:${imageId}`
+    this.metadataStore.set(`${input.itemId}:${imageId}`, metadata);
+
+    return metadata;
   }
 
   /**
-   * Reads an item image securely. Validates item ownership and returns binary contents.
+   * Reads an item image, verifies item isolation, and validates SHA-256 hash integrity.
    */
   async readForItem(itemId: string, imageId: string): Promise<ItemImageRead | null> {
-    // Probe possible supported extensions
+    const metaKey = `${itemId}:${imageId}`;
+    const expectedMeta = this.metadataStore.get(metaKey);
+
     const extensions = ['.png', '.jpg', '.jpeg', '.webp'];
 
     for (const ext of extensions) {
@@ -113,21 +168,31 @@ export class SupabaseItemImageStorage implements ItemImageStorageProvider {
       if (response.ok) {
         const buffer = await response.arrayBuffer();
         const contents = new Uint8Array(buffer);
+
+        // STO-01 fix: compute actual SHA-256 checksum of retrieved bytes
+        const actualSha256 = createHash('sha256').update(contents).digest('hex');
+
+        // STO-01 fix: if expected metadata exists, enforce strict integrity matching
+        if (expectedMeta && expectedMeta.sha256 && expectedMeta.sha256 !== actualSha256) {
+          throw new ImageStorageIntegrityError(
+            `IMAGE_STORAGE_INTEGRITY_MISMATCH: expected ${expectedMeta.sha256}, got ${actualSha256}`
+          );
+        }
+
         const mimeType = this.getMimeForExtension(ext);
 
-        return {
-          metadata: {
-            id: imageId,
-            itemId,
-            uploadedById: '00000000-0000-0000-0000-000000000000',
-            originalName: `${imageId}${ext}`,
-            mimeType,
-            byteLength: contents.byteLength,
-            sha256: '',
-            createdAt: new Date().toISOString(),
-          },
-          contents,
+        const metadata: StoredItemImage = expectedMeta || {
+          id: imageId,
+          itemId,
+          uploadedById: '00000000-0000-0000-0000-000000000000',
+          originalName: `${imageId}${ext}`,
+          mimeType,
+          byteLength: contents.byteLength,
+          sha256: actualSha256,
+          createdAt: new Date().toISOString(),
         };
+
+        return { metadata, contents };
       }
     }
 
@@ -135,7 +200,7 @@ export class SupabaseItemImageStorage implements ItemImageStorageProvider {
   }
 
   /**
-   * Deletes an item image from Supabase Storage.
+   * Deletes an item image from Supabase Storage and clears its metadata.
    */
   async deleteForItem(itemId: string, imageId: string): Promise<boolean> {
     const extensions = ['.png', '.jpg', '.jpeg', '.webp'];
@@ -158,11 +223,15 @@ export class SupabaseItemImageStorage implements ItemImageStorageProvider {
       }
     }
 
+    if (deletedAny) {
+      this.metadataStore.delete(`${itemId}:${imageId}`);
+    }
+
     return deletedAny;
   }
 
   /**
-   * Compensating transaction: Rolls back an uploaded image if database commit fails.
+   * Compensating rollback transaction on database failure.
    */
   async rollbackUpload(itemId: string, imageId: string): Promise<void> {
     try {

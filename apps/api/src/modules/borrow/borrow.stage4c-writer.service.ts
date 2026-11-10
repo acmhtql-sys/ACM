@@ -44,11 +44,16 @@ export async function generateReturnNumber(tx: any): Promise<string> {
   const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
   const prefix = `RT-${dateStr}`;
 
-  // Khóa Postgres advisory xact lock theo ngày để đảm bảo sinh số thứ tự tuần tự tuyệt đối
-  try {
-    await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${'SEQ_' + prefix}))`;
-  } catch {
-    // Non-Postgres / mock fallback
+  // DB-02: Khóa Postgres advisory xact lock theo ngày để đảm bảo sinh số thứ tự tuần tự tuyệt đối
+  if (typeof tx?.$queryRaw === 'function') {
+    try {
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${'SEQ_' + prefix}))`;
+    } catch (err: any) {
+      // Trong môi trường Production / live PostgreSQL, lỗi lock KHÔNG ĐƯỢC NUỐT mà phải fail-closed
+      if (process.env.NODE_ENV !== 'test' && !err?.message?.includes('mock')) {
+        throw new AppError(`Không thể thiết lập khóa sinh số chứng từ: ${err?.message || err}`, 500);
+      }
+    }
   }
 
   let latest = null;

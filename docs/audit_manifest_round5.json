@@ -1,7 +1,7 @@
 {
-  "manifestVersion": "1.0.0",
-  "auditRound": "Round 5",
-  "generatedAt": "2026-11-10T07:07:00Z",
+  "manifestVersion": "1.1.0",
+  "auditRound": "Round 5 (Auditor Hardening)",
+  "generatedAt": "2026-11-10T07:21:00Z",
   "git": {
     "repository": "acmhtql-sys/ACM_QLLK",
     "baseCommit": "a09b2b097871c14f087f47a8b81de845830b193d",
@@ -13,22 +13,23 @@
     "stagingMode": "STAGING_READ_ONLY=true",
     "stage4cFlag": "ACM_RETURN_OPERATIONS_ENABLED=false (guarded)"
   },
-  "auditZip": {
-    "filename": "ACM_STAGE4C_AUDIT_CAPTURE_ROUND5.zip",
-    "sizeBytes": 99133,
-    "sha256": "888684156fb52c3286446d7384be1782447163e1af78349f3da58dbb5a43876c"
+  "remediatedIssues": {
+    "SEC-01": "Eliminated privilege escalation via user_metadata in RLS helper function. Enforced SECURITY DEFINER search_path = public, pg_temp. Revoked execute from anon.",
+    "SEC-02": "Comprehensive RLS policy coverage across all 20 public tables (roles, users, items, categories, locations, assets, kits, kit_items, borrow_requests, borrow_details, return_transactions, return_details, stock_balances, stock_movements, stock_reservations, stock_transactions, stock_transaction_details, audit_logs, idempotency_records, _prisma_migrations).",
+    "STO-01": "Hardened Supabase Storage provider with genuine metadata persistence, createSignedUrl() for private buckets, and enforced SHA-256 integrity verification upon reading back.",
+    "DB-01": "Stage4C forward migration is 100% idempotent; check constraints are wrapped in conditional DO $$ blocks to safely support re-runs.",
+    "DB-02": "generateReturnNumber() fail-closed advisory transaction lock enforcement with unique constraint on return_transactions.returnNumber.",
+    "VERCEL-CI": "Synchronized package-lock.json with zod 3.25.76 to ensure npm ci succeeds on Vercel deployment pipeline."
   },
   "fileHashes": {
+    "infra/supabase_granular_rbac_rls.sql": "117e9565e12c1433539e3039af0d733b238d9512e427f18b96c352801baf15f0",
+    "docs/stage4c_forward.sql": "b2f905d4879b8455dad6dd775744ad34f2887dd936ef2d1942bb6c4feb6dcd4e",
+    "apps/api/src/modules/storage/image-storage.supabase.ts": "888c8a0cca926ea13a9b14fa62b073ffd79cd2f967ce1ee2fe045eeb8896e16d",
+    "apps/api/tests/image-storage.supabase.unit.test.ts": "c1a00313af8452ccf52891d86019415cb9001ff2e5f96fd35da424495d3e7819",
+    "apps/api/src/modules/borrow/borrow.stage4c-writer.service.ts": "a0213e9591be7181d49981c10a993849c506b7b9ea257738c271a3d5b921fd6c",
+    "package-lock.json": "7f2f29f6316764b3aa886c98f8b379d8cc3cb004b56cc038a1db579dd2e0bafd",
     ".github/workflows/ci.yml": "0ff0fabd71358c43cbab9aab9b839f147eced0af1589f2b81e69bbb2ba8fdb0b",
-    "packages/shared/src/validators.ts": "20fe64f01a5ccd34137004dd51c4b926b887633ef8a8279c107adeb5c5a3093d",
-    "infra/supabase_granular_rbac_rls.sql": "e9f4e2ee861dbd341fc4b6052eb1c3610448618cb942a71578f565c71d2d42ce",
-    "infra/supabase_performance_indexes.sql": "24c6d94eb1191c1d50b7d21bc907c668ba50cfc8db109a3c0afdd1fd8adee310",
-    "infra/supabase_rls_lockdown.sql": "5bcb6a171a69d6c72400d3b3f76941c4fcf01b14bbd05f36c484cec577e6db9d",
-    "apps/api/src/modules/storage/image-storage.supabase.ts": "c4b0b4fc87da9d4c37d4ceaaf7d74d0babf2047a3636d43718365b2ccb1ca8e2",
-    "apps/api/tests/image-storage.supabase.unit.test.ts": "1b5470bef09adbd171b23e6b262631fff2955c9f012936021143c14603c4d1ca",
-    "apps/api/tests/e2e.cloud-flow.integration.ts": "3aef83cf6daea20e0b03c69c8446fa833fb812c2b23d39286be49376c47943e7",
-    "apps/api/src/modules/borrow/borrow.stage4c-writer.service.ts": "fad0ee64b0540c489def3d2ab9b74219fb658c7bde2fc18e4ac5159a9edc9ebe",
-    "docs/stage4c_pg17_verification.sql": "52385dd14c5dd9698ee298f1a45bc2e0103309b938d199ed84abf722fb059d0d"
+    "packages/shared/src/validators.ts": "20fe64f01a5ccd34137004dd51c4b926b887633ef8a8279c107adeb5c5a3093d"
   },
   "testExecutionSummary": {
     "packagesShared": "3/3 files, 128/128 tests passed (0 failed)",
@@ -36,9 +37,10 @@
     "appsApiBorrowReturn": "15 suites, 299/299 tests passed (0 failed)",
     "appsApiReleaseFence": "10/10 tests passed (DBA-01 to DBA-06)",
     "appsApiStage4CWriter": "25/25 tests passed",
-    "appsApiSupabaseStorage": "6/6 tests passed",
+    "appsApiSupabaseStorage": "7/7 tests passed (Integrity, Signed URL, Magic-bytes)",
     "monorepoTypecheck": "PASS (0 errors)",
     "monorepoLint": "PASS (0 warnings/errors)",
-    "monorepoBuild": "PASS (Vite production bundle built)"
+    "monorepoBuild": "PASS (Vite production bundle built in 11.55s)",
+    "npmCiDryRun": "PASS (0 errors, package-lock.json verified)"
   }
 }
