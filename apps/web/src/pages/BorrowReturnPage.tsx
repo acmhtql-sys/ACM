@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { isCameraReturnEnabled } from '../config/features';
 import { CameraReturnModal } from '../components/camera/CameraReturnModal';
+import { CreateBorrowModal } from '../components/borrow/CreateBorrowModal';
 import { StatusBadge } from '../components/StatusBadge';
 import { apiClient } from '../services/api';
 import { useAuth } from '../hooks/useAuth';
@@ -83,6 +84,9 @@ export const BorrowReturnPage: React.FC = () => {
     type: 'success' | 'error' | 'warning';
     text: string;
   } | null>(null);
+
+  // Create borrow modal state
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState<boolean>(false);
 
   // Return dialog state
   const [returningBorrow, setReturningBorrow] = useState<BorrowRecord | null>(null);
@@ -570,7 +574,7 @@ export const BorrowReturnPage: React.FC = () => {
     }`}
     onClick={() => {
       if (import.meta.env.VITE_STAGING_READ_ONLY === 'true') return;
-      alert('Chức năng tạo phiếu mượn đang được kết nối với Modal local test.');
+      setIsCreateModalOpen(true);
     }}
   >
     <Plus className="w-4 h-4" />
@@ -1109,6 +1113,19 @@ export const BorrowReturnPage: React.FC = () => {
           </div>
         </div>
       )}
+      {/* Create Borrow Request Modal */}
+      <CreateBorrowModal
+        isOpen={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
+        onSuccess={() => {
+          setIsCreateModalOpen(false);
+          fetchBorrows();
+          setStatusMessage({
+            type: 'success',
+            text: 'Tạo phiếu mượn mới thành công! Phiếu đang ở trạng thái Chờ duyệt (Pending).',
+          });
+        }}
+      />
     </div>
   );
 };
