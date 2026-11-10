@@ -23,7 +23,7 @@ SECURITY DEFINER
 SET search_path = public, pg_temp
 AS $$
   SELECT COALESCE(
-    (SELECT r.name 
+    (SELECT r.name::text 
      FROM public.users u 
      JOIN public.roles r ON u."roleId" = r.id 
      WHERE u.id = auth.uid()),

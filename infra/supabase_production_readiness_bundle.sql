@@ -117,7 +117,7 @@ SECURITY DEFINER
 SET search_path = public, pg_temp
 AS $$
   SELECT COALESCE(
-    (SELECT r.name 
+    (SELECT r.name::text 
      FROM public.users u 
      JOIN public.roles r ON u."roleId" = r.id 
      WHERE u.id = auth.uid()),
@@ -384,3 +384,4 @@ FOR ALL TO authenticated USING (false);
 -- 3.5 LAYER 3: ZERO-TRUST FOR UNAUTHENTICATED (ANON) USERS
 -- PostgREST anon role cannot perform any operation directly.
 -- (Strictly Fail-Closed Posture)
+
