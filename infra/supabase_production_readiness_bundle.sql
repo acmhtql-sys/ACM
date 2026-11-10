@@ -69,30 +69,42 @@ CREATE TABLE IF NOT EXISTS public.system_evidence_registry (
 CREATE INDEX IF NOT EXISTS idx_evidence_source_type_id
 ON public.system_evidence_registry (source_type, source_id);
 
--- 1.3 TABLE: borrow_return_source_allocations
+-- 1.3 TABLE: borrow_return_source_allocations (P1.3 Structured Relief Ledger)
 CREATE TABLE IF NOT EXISTS public.borrow_return_source_allocations (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  return_detail_id UUID NOT NULL REFERENCES public.return_details(id) ON DELETE CASCADE,
+  borrow_request_id UUID NOT NULL REFERENCES public.borrow_requests(id) ON DELETE CASCADE,
+  borrow_detail_id UUID NOT NULL REFERENCES public.borrow_details(id) ON DELETE CASCADE,
+  return_transaction_id UUID NOT NULL REFERENCES public.return_transactions(id) ON DELETE CASCADE,
+  item_id UUID NOT NULL REFERENCES public.items(id) ON DELETE CASCADE,
   source_location_id UUID NOT NULL REFERENCES public.locations(id),
-  allocated_quantity INTEGER NOT NULL,
+  destination_location_id UUID NOT NULL REFERENCES public.locations(id),
+  quantity INTEGER NOT NULL,
+  condition VARCHAR(32) NOT NULL DEFAULT 'GOOD',
   created_at TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 DO $$
 BEGIN
   IF NOT EXISTS (
-    SELECT 1 FROM pg_constraint WHERE conname = 'chk_alloc_qty_positive'
+    SELECT 1 FROM pg_constraint WHERE conname = 'chk_br_source_alloc_qty_positive'
   ) THEN
     ALTER TABLE public.borrow_return_source_allocations
-    ADD CONSTRAINT chk_alloc_qty_positive CHECK (allocated_quantity > 0);
+    ADD CONSTRAINT chk_br_source_alloc_qty_positive
+    CHECK (quantity > 0);
   END IF;
 END $$;
 
-CREATE INDEX IF NOT EXISTS idx_alloc_return_detail
-ON public.borrow_return_source_allocations (return_detail_id);
+CREATE INDEX IF NOT EXISTS idx_br_source_alloc_lookup
+ON public.borrow_return_source_allocations (borrow_request_id, borrow_detail_id, source_location_id);
 
-CREATE INDEX IF NOT EXISTS idx_alloc_source_location
-ON public.borrow_return_source_allocations (source_location_id);
+-- 1.4 SEED ESSENTIAL SYSTEM ROLES (IF NOT EXISTS)
+INSERT INTO public.roles ("id", "name", "description", "createdAt", "updatedAt")
+VALUES 
+  (gen_random_uuid(), 'ADMIN', 'Quản trị viên toàn hệ thống', NOW(), NOW()),
+  (gen_random_uuid(), 'LAB_MANAGER', 'Quản lý phòng Lab / Thủ kho', NOW(), NOW()),
+  (gen_random_uuid(), 'TECHNICIAN', 'Kỹ thuật viên / Trợ giảng hỗ trợ', NOW(), NOW()),
+  (gen_random_uuid(), 'STUDENT', 'Sinh viên / Người mượn linh kiện', NOW(), NOW())
+ON CONFLICT ("name") DO NOTHING;
 
 -- ============================================================================
 -- PART 2: PERFORMANCE FOREIGN KEY INDEXES
@@ -107,6 +119,33 @@ ON public."stock_reservations"("locationId");
 -- ============================================================================
 -- PART 3: GRANULAR RBAC ROW LEVEL SECURITY (RLS) POLICIES (SEC-01 & SEC-02)
 -- ============================================================================
+
+-- 3.0 ENSURE AUTH SCHEMA & POSTGREST ROLES COMPATIBILITY (Safe for local PostgreSQL and Supabase Cloud)
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.schemata WHERE schema_name = 'auth') THEN
+    CREATE SCHEMA auth;
+    CREATE OR REPLACE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql STABLE AS 'SELECT NULL::uuid;';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon') THEN
+    BEGIN
+      CREATE ROLE anon NOLOGIN;
+    EXCEPTION WHEN insufficient_privilege THEN NULL;
+    END;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticated') THEN
+    BEGIN
+      CREATE ROLE authenticated NOLOGIN;
+    EXCEPTION WHEN insufficient_privilege THEN NULL;
+    END;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'service_role') THEN
+    BEGIN
+      CREATE ROLE service_role NOLOGIN;
+    EXCEPTION WHEN insufficient_privilege THEN NULL;
+    END;
+  END IF;
+END $$;
 
 -- 3.1 SEC-01 FIX: HELPER FUNCTION TO RESOLVE ROLE SAFELY
 CREATE OR REPLACE FUNCTION public.acm_current_user_role()
@@ -126,8 +165,19 @@ AS $$
   );
 $$;
 
-REVOKE EXECUTE ON FUNCTION public.acm_current_user_role() FROM PUBLIC, anon;
-GRANT EXECUTE ON FUNCTION public.acm_current_user_role() TO authenticated, service_role;
+REVOKE EXECUTE ON FUNCTION public.acm_current_user_role() FROM PUBLIC;
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon') THEN
+    REVOKE EXECUTE ON FUNCTION public.acm_current_user_role() FROM anon;
+  END IF;
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticated') THEN
+    GRANT EXECUTE ON FUNCTION public.acm_current_user_role() TO authenticated;
+  END IF;
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'service_role') THEN
+    GRANT EXECUTE ON FUNCTION public.acm_current_user_role() TO service_role;
+  END IF;
+END $$;
 
 -- 3.2 ENABLE RLS ON ALL PUBLIC TABLES
 DO $$
@@ -364,22 +414,30 @@ BEGIN
     END LOOP;
 END $$;
 
--- Audit Logs & Idempotency Records
-DROP POLICY IF EXISTS "audit_logs_read_admin" ON public.audit_logs;
-CREATE POLICY "audit_logs_read_admin" ON public.audit_logs
-FOR SELECT TO authenticated
-USING (public.acm_current_user_role() = 'ADMIN');
+-- Audit Logs, Idempotency Records & Prisma Migrations Lock
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'audit_logs') THEN
+    DROP POLICY IF EXISTS "audit_logs_read_admin" ON public.audit_logs;
+    CREATE POLICY "audit_logs_read_admin" ON public.audit_logs
+    FOR SELECT TO authenticated
+    USING (public.acm_current_user_role() = 'ADMIN');
+  END IF;
 
-DROP POLICY IF EXISTS "idempotency_staff_only" ON public.idempotency_records;
-CREATE POLICY "idempotency_staff_only" ON public.idempotency_records
-FOR ALL TO authenticated
-USING (public.acm_current_user_role() IN ('ADMIN', 'LAB_MANAGER', 'TECHNICIAN'))
-WITH CHECK (public.acm_current_user_role() IN ('ADMIN', 'LAB_MANAGER', 'TECHNICIAN'));
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'idempotency_records') THEN
+    DROP POLICY IF EXISTS "idempotency_staff_only" ON public.idempotency_records;
+    CREATE POLICY "idempotency_staff_only" ON public.idempotency_records
+    FOR ALL TO authenticated
+    USING (public.acm_current_user_role() IN ('ADMIN', 'LAB_MANAGER', 'TECHNICIAN'))
+    WITH CHECK (public.acm_current_user_role() IN ('ADMIN', 'LAB_MANAGER', 'TECHNICIAN'));
+  END IF;
 
--- Prisma Migrations Lock
-DROP POLICY IF EXISTS "prisma_migrations_deny_all" ON public._prisma_migrations;
-CREATE POLICY "prisma_migrations_deny_all" ON public._prisma_migrations
-FOR ALL TO authenticated USING (false);
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = '_prisma_migrations') THEN
+    DROP POLICY IF EXISTS "prisma_migrations_deny_all" ON public._prisma_migrations;
+    CREATE POLICY "prisma_migrations_deny_all" ON public._prisma_migrations
+    FOR ALL TO authenticated USING (false);
+  END IF;
+END $$;
 
 -- 3.5 LAYER 3: ZERO-TRUST FOR UNAUTHENTICATED (ANON) USERS
 -- PostgREST anon role cannot perform any operation directly.
