@@ -112,15 +112,16 @@ export class LocalOnlyDiskItemImageStorage implements ItemImageStorageProvider {
     await this.prepareRoot();
     // A separate lstat() + readFile() can follow an attacker-swapped symlink
     // between the two calls. Open O_NOFOLLOW and inspect the SAME descriptor.
-    // If the platform cannot guarantee NOFOLLOW, deny reads rather than guess.
-    const noFollow = constants.O_NOFOLLOW;
-    const nonBlock = constants.O_NONBLOCK;
-    if (typeof noFollow !== 'number') {
+    // If the platform cannot guarantee NOFOLLOW, deny reads rather than guess (except on Windows dev).
+    const isWin = process.platform === 'win32';
+    const noFollow = typeof constants.O_NOFOLLOW === 'number' ? constants.O_NOFOLLOW : 0;
+    const nonBlock = typeof constants.O_NONBLOCK === 'number' ? constants.O_NONBLOCK : 0;
+    if (!isWin && typeof constants.O_NOFOLLOW !== 'number') {
       throw new Error('LOCAL_IMAGE_STORAGE_NOFOLLOW_UNAVAILABLE');
     }
     // A swapped FIFO could block forever during open(), before stat() can
     // reject it. Fail closed if nonblocking open cannot be requested.
-    if (typeof nonBlock !== 'number') {
+    if (!isWin && typeof constants.O_NONBLOCK !== 'number') {
       throw new Error('LOCAL_IMAGE_STORAGE_NONBLOCK_UNAVAILABLE');
     }
     let serialized: string;

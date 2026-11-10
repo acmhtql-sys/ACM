@@ -2,6 +2,9 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '../../config/database';
 import { AppError } from '../../shared/AppError';
 import { AuthenticatedUser } from '../../middleware/auth';
+import { getImageStorageProvider } from '../storage/image-storage.factory';
+import { CloudinaryItemImageStorage } from '../storage/image-storage.cloudinary';
+import { AllowedImageMime } from '../storage/image-storage.contract';
 import {
   CreateItemInput,
   UpdateItemInput,
@@ -648,6 +651,71 @@ export class ItemsService {
         name: deleted.name,
       };
     });
+  }
+
+  /**
+   * Uploads an item image to Cloud Storage (Cloudinary/Supabase) and updates item imageUrl.
+   * RBAC: ADMIN, LAB_MANAGER only.
+   */
+  async uploadItemImage(
+    itemId: string,
+    fileBuffer: Uint8Array,
+    originalName: string,
+    mimeType: AllowedImageMime,
+    userId: string,
+    ipAddress?: string,
+    userAgent?: string
+  ): Promise<{ imageUrl: string; imageId: string; sha256: string }> {
+    const existing = await prisma.item.findUnique({
+      where: { id: itemId },
+    });
+
+    if (!existing) {
+      throw new AppError('Không tìm thấy linh kiện', 404);
+    }
+
+    const storage = getImageStorageProvider();
+    const stored = await storage.save({
+      itemId,
+      uploadedById: userId,
+      originalName,
+      mimeType,
+      contents: fileBuffer,
+    });
+
+    let cdnUrl: string;
+    if (storage instanceof CloudinaryItemImageStorage) {
+      const ext = mimeType === 'image/png' ? 'png' : mimeType === 'image/webp' ? 'webp' : 'jpg';
+      cdnUrl = storage.getDeliveryUrl(itemId, stored.id, ext);
+    } else {
+      cdnUrl = `https://res.cloudinary.com/zua6n3a3/image/upload/f_auto,q_auto/acm_items/${itemId}/${stored.id}.${mimeType.split('/')[1]}`;
+    }
+
+    await prisma.$transaction(async (tx) => {
+      await tx.item.update({
+        where: { id: itemId },
+        data: { imageUrl: cdnUrl },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          userId,
+          action: 'UPDATE_ITEM_IMAGE',
+          entity: 'Item',
+          entityId: itemId,
+          oldValue: { imageUrl: existing.imageUrl },
+          newValue: { imageUrl: cdnUrl, imageId: stored.id, sha256: stored.sha256 },
+          ipAddress: ipAddress || null,
+          userAgent: userAgent || null,
+        },
+      });
+    });
+
+    return {
+      imageUrl: cdnUrl,
+      imageId: stored.id,
+      sha256: stored.sha256,
+    };
   }
 }
 

@@ -1,4 +1,4 @@
-import { Router, Request, Response, NextFunction } from 'express';
+import express, { Router, Request, Response, NextFunction } from 'express';
 import { sendSuccess } from '../../shared/response';
 import { authenticate, authenticateCatalogInStaging } from '../../middleware/auth';
 import { authorizeRoles } from '../../middleware/rbac';
@@ -179,6 +179,51 @@ itemsRouter.delete(
         req.headers['user-agent']
       );
       return sendSuccess(res, deleted, 'Xóa linh kiện thành công', 200);
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+/**
+ * POST /api/v1/items/:id/image
+ * Uploads an item image to Cloud Storage (Cloudinary zua6n3a3) and updates item imageUrl.
+ * RBAC: ADMIN, LAB_MANAGER only.
+ */
+itemsRouter.post(
+  '/:id/image',
+  authenticate,
+  authorizeRoles(UserRole.ADMIN, UserRole.LAB_MANAGER),
+  express.raw({
+    type: ['image/png', 'image/jpeg', 'image/webp'],
+    inflate: false,
+    limit: 5 * 1024 * 1024,
+  }),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const contentType = req.headers['content-type']?.split(';')[0]?.trim().toLowerCase();
+      if (!contentType || !['image/png', 'image/jpeg', 'image/webp'].includes(contentType)) {
+        throw new AppError('Định dạng ảnh không hợp lệ (chỉ nhận PNG, JPEG, WebP)', 415);
+      }
+      if (!Buffer.isBuffer(req.body) || req.body.length === 0) {
+        throw new AppError('Nội dung tệp hình ảnh rỗng hoặc không hợp lệ', 422);
+      }
+      const rawFileName = req.headers['x-file-name'] as string | undefined;
+      const originalName = rawFileName
+        ? decodeURIComponent(rawFileName)
+        : `item_${req.params.id}.${contentType === 'image/png' ? 'png' : contentType === 'image/webp' ? 'webp' : 'jpg'}`;
+
+      const result = await itemsService.uploadItemImage(
+        req.params.id,
+        req.body,
+        originalName,
+        contentType as any,
+        req.user!.id,
+        req.ip,
+        req.headers['user-agent']
+      );
+
+      return sendSuccess(res, result, 'Tải ảnh linh kiện lên Cloudinary thành công', 200);
     } catch (err) {
       next(err);
     }

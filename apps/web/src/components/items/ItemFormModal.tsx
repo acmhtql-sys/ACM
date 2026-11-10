@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { X, AlertCircle, Save, Info } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { X, AlertCircle, Save, Info, UploadCloud, Image as ImageIcon, CheckCircle, RefreshCw } from 'lucide-react';
 import { apiClient } from '../../services/api';
 import { ItemType, ItemResponse } from '@acm/shared';
 
@@ -34,6 +34,12 @@ export const ItemFormModal: React.FC<ItemFormModalProps> = ({
   const [minStockAlert, setMinStockAlert] = useState(5);
   const [description, setDescription] = useState('');
   const [imageUrl, setImageUrl] = useState('');
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string>('');
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [uploadSuccess, setUploadSuccess] = useState(false);
+  const [activeTab, setActiveTab] = useState<'upload' | 'url'>('upload');
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [apiError, setApiError] = useState<string | null>(null);
@@ -43,6 +49,9 @@ export const ItemFormModal: React.FC<ItemFormModalProps> = ({
     if (isOpen) {
       setErrors({});
       setApiError(null);
+      setSelectedFile(null);
+      setUploadSuccess(false);
+      setUploadingImage(false);
       if (mode === 'edit' && item) {
         setCode(item.code);
         setName(item.name);
@@ -52,6 +61,8 @@ export const ItemFormModal: React.FC<ItemFormModalProps> = ({
         setMinStockAlert(item.minStockAlert);
         setDescription(item.description || '');
         setImageUrl(item.imageUrl || '');
+        setPreviewUrl(item.imageUrl || '');
+        setActiveTab(item.imageUrl ? 'url' : 'upload');
       } else {
         // Reset defaults for create mode
         setCode('');
@@ -62,9 +73,50 @@ export const ItemFormModal: React.FC<ItemFormModalProps> = ({
         setMinStockAlert(5);
         setDescription('');
         setImageUrl('');
+        setPreviewUrl('');
+        setActiveTab('upload');
       }
     }
   }, [isOpen, mode, item, categories]);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type)) {
+      setApiError('Định dạng hình ảnh không hợp lệ. Chỉ chấp nhận PNG, JPEG, WebP.');
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      setApiError('Dung lượng tệp vượt quá giới hạn 5 MB.');
+      return;
+    }
+
+    setApiError(null);
+    setSelectedFile(file);
+    const objectUrl = URL.createObjectURL(file);
+    setPreviewUrl(objectUrl);
+  };
+
+  const uploadFileToBackend = async (itemId: string, file: File): Promise<string> => {
+    setUploadingImage(true);
+    try {
+      const buffer = await file.arrayBuffer();
+      const res = await apiClient.post(`/items/${itemId}/image`, buffer, {
+        headers: {
+          'Content-Type': file.type,
+          'x-file-name': encodeURIComponent(file.name),
+        },
+      });
+      const cdnUrl = res.data?.data?.imageUrl;
+      setImageUrl(cdnUrl || '');
+      setUploadSuccess(true);
+      return cdnUrl;
+    } finally {
+      setUploadingImage(false);
+    }
+  };
 
   if (!isOpen) return null;
 
@@ -112,10 +164,29 @@ export const ItemFormModal: React.FC<ItemFormModalProps> = ({
 
         const res = await apiClient.post('/items', payload);
         if (res.data?.success) {
+          const newItemId = res.data?.data?.id;
+          if (selectedFile && newItemId) {
+            try {
+              await uploadFileToBackend(newItemId, selectedFile);
+            } catch (uploadErr) {
+              console.warn('Lưu ảnh thất bại, linh kiện đã được tạo thành công:', uploadErr);
+            }
+          }
           onSuccess(`Đã tạo thành công linh kiện: ${code.trim()}`);
           onClose();
         }
       } else if (mode === 'edit' && item) {
+        let finalImageUrl = imageUrl.trim() || null;
+        if (selectedFile && item.id) {
+          try {
+            const uploadedUrl = await uploadFileToBackend(item.id, selectedFile);
+            if (uploadedUrl) {
+              finalImageUrl = uploadedUrl;
+            }
+          } catch (uploadErr) {
+            console.warn('Cập nhật ảnh thất bại:', uploadErr);
+          }
+        }
         const payload = {
           code: code.trim(),
           name: name.trim(),
@@ -124,9 +195,8 @@ export const ItemFormModal: React.FC<ItemFormModalProps> = ({
           type,
           categoryId,
           minStockAlert: Number(minStockAlert),
-          imageUrl: imageUrl.trim() || null,
+          imageUrl: finalImageUrl,
         };
-
         const res = await apiClient.put(`/items/${item.id}`, payload);
         if (res.data?.success) {
           onSuccess(`Đã cập nhật linh kiện: ${item.code}`);
@@ -333,18 +403,121 @@ export const ItemFormModal: React.FC<ItemFormModalProps> = ({
             />
           </div>
 
-          {/* Image URL */}
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">
-              Đường dẫn hình ảnh minh họa (URL)
-            </label>
-            <input
-              type="text"
-              value={imageUrl}
-              onChange={(e) => setImageUrl(e.target.value)}
-              placeholder="https://example.com/item.jpg"
-              className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs transition-colors focus:bg-white focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-            />
+          {/* Image Upload & Management (Cloudinary zua6n3a3) */}
+          <div className="space-y-2 pt-1">
+            <div className="flex items-center justify-between">
+              <label className="block text-xs font-semibold text-slate-700">
+                Hình ảnh minh họa linh kiện
+              </label>
+              <div className="flex rounded-lg bg-slate-100 p-0.5 text-[11px] font-medium text-slate-600">
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('upload')}
+                  className={`px-2.5 py-0.5 rounded-md transition-all ${
+                    activeTab === 'upload' ? 'bg-white text-blue-600 shadow-sm font-semibold' : 'hover:text-slate-900'
+                  }`}
+                >
+                  Tải ảnh lên (Cloudinary)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('url')}
+                  className={`px-2.5 py-0.5 rounded-md transition-all ${
+                    activeTab === 'url' ? 'bg-white text-blue-600 shadow-sm font-semibold' : 'hover:text-slate-900'
+                  }`}
+                >
+                  Nhập link URL
+                </button>
+              </div>
+            </div>
+
+            {activeTab === 'upload' ? (
+              <div className="space-y-2">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  onChange={handleFileChange}
+                  className="hidden"
+                />
+
+                {previewUrl ? (
+                  <div className="relative flex items-center space-x-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
+                    <img
+                      src={previewUrl}
+                      alt="Xem trước linh kiện"
+                      className="h-16 w-16 rounded-lg object-cover border border-slate-200 shadow-sm bg-white shrink-0"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-semibold text-slate-800 truncate">
+                        {selectedFile ? selectedFile.name : 'Ảnh hiện tại của linh kiện'}
+                      </p>
+                      <p className="text-[11px] text-slate-500 mt-0.5">
+                        {selectedFile ? `${(selectedFile.size / 1024).toFixed(1)} KB` : 'Đã lưu trên CDN Cloudinary'}
+                      </p>
+                      <div className="flex items-center space-x-2 mt-1.5">
+                        <button
+                          type="button"
+                          onClick={() => fileInputRef.current?.click()}
+                          className="text-[11px] font-medium text-blue-600 hover:text-blue-700 underline"
+                        >
+                          Chọn ảnh khác
+                        </button>
+                        <span className="text-slate-300">•</span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedFile(null);
+                            setPreviewUrl('');
+                            setImageUrl('');
+                          }}
+                          className="text-[11px] font-medium text-rose-600 hover:text-rose-700 underline"
+                        >
+                          Gỡ ảnh
+                        </button>
+                      </div>
+                    </div>
+                    {uploadSuccess && (
+                      <span className="inline-flex items-center space-x-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-medium text-emerald-700 border border-emerald-200 shrink-0">
+                        <CheckCircle className="h-3 w-3" />
+                        <span>Đã đồng bộ</span>
+                      </span>
+                    )}
+                  </div>
+                ) : (
+                  <div
+                    onClick={() => fileInputRef.current?.click()}
+                    className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-slate-200 bg-slate-50/70 p-4 hover:border-blue-400 hover:bg-blue-50/20 transition-all cursor-pointer group"
+                  >
+                    <div className="rounded-full bg-blue-50 p-2 text-blue-600 group-hover:scale-110 transition-transform">
+                      <UploadCloud className="h-5 w-5" />
+                    </div>
+                    <p className="mt-1.5 text-xs font-semibold text-slate-700">
+                      Nhấn để chọn tệp hình ảnh từ máy tính
+                    </p>
+                    <p className="text-[11px] text-slate-400 mt-0.5">
+                      Định dạng PNG, JPG, WebP (Tối đa 5 MB) • Lưu trữ đám mây Cloudinary
+                    </p>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="space-y-1">
+                <input
+                  type="text"
+                  value={imageUrl}
+                  onChange={(e) => {
+                    setImageUrl(e.target.value);
+                    setPreviewUrl(e.target.value);
+                  }}
+                  placeholder="https://res.cloudinary.com/zua6n3a3/image/upload/..."
+                  className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs transition-colors focus:bg-white focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                />
+                <p className="text-[11px] text-slate-400">
+                  Dán đường dẫn HTTPS trực tiếp của hình ảnh linh kiện
+                </p>
+              </div>
+            )}
           </div>
 
           {/* Actions */}
