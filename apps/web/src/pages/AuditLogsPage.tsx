@@ -12,6 +12,10 @@ import {
   User,
   Clock,
   Info,
+  Copy,
+  Check,
+  Code,
+  Shield,
 } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { apiClient } from '../services/api';
@@ -41,6 +45,20 @@ export const AuditLogsPage: React.FC = () => {
 
   // Inspection Modal
   const [inspectLog, setInspectLog] = useState<AuditLogEntry | null>(null);
+  const [copiedPayload, setCopiedPayload] = useState(false);
+  const [copiedId, setCopiedId] = useState(false);
+
+  const handleCopyPayload = (text: string) => {
+    navigator.clipboard?.writeText(text);
+    setCopiedPayload(true);
+    setTimeout(() => setCopiedPayload(false), 2000);
+  };
+
+  const handleCopyId = (id: string) => {
+    navigator.clipboard?.writeText(id);
+    setCopiedId(true);
+    setTimeout(() => setCopiedId(false), 2000);
+  };
 
   const fetchLogs = async () => {
     if (!isAdmin) return;
@@ -394,90 +412,194 @@ export const AuditLogsPage: React.FC = () => {
 
       {/* Detail Inspection Modal */}
       {inspectLog && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
-          <div className="w-full max-w-2xl rounded-xl bg-white shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-md p-4 animate-in fade-in duration-200">
+          <div className="w-full max-w-2xl rounded-2xl bg-white shadow-modal border border-slate-200/90 overflow-hidden animate-in zoom-in-95 duration-200">
             {/* Modal Header */}
-            <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4 bg-slate-50/50">
-              <div className="flex items-center space-x-2">
-                <ShieldCheck className="h-5 w-5 text-purple-600" />
-                <h2 className="text-sm font-bold text-slate-900">
-                  Chi tiết Bản ghi Kiểm toán ({inspectLog.id.slice(0, 8)})
-                </h2>
+            <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4 bg-gradient-to-r from-slate-50/90 via-white to-slate-50/60">
+              <div className="flex items-center space-x-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-50 border border-indigo-100/80 text-indigo-600 shadow-xs">
+                  <ShieldCheck className="h-5 w-5" />
+                </div>
+                <div>
+                  <div className="flex items-center space-x-2">
+                    <h2 className="text-sm font-bold text-slate-900">
+                      Chi tiết Bản ghi Kiểm toán
+                    </h2>
+                    <span className="font-mono text-[11px] font-semibold text-indigo-700 bg-indigo-50/90 px-2 py-0.5 rounded-md border border-indigo-200/60">
+                      #{inspectLog.id.slice(0, 8)}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-400 mt-0.5">
+                    Dữ liệu nhật ký an toàn được ghi nhận bất biến theo thời gian thực
+                  </p>
+                </div>
               </div>
               <button
                 onClick={() => setInspectLog(null)}
-                className="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+                aria-label="Đóng cửa sổ"
+                className="rounded-xl p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors"
               >
                 <X className="h-4 w-4" />
               </button>
             </div>
 
             {/* Modal Content */}
-            <div className="p-5 space-y-4 max-h-[75vh] overflow-y-auto text-xs">
-              {/* Metadata Grid */}
-              <div className="grid grid-cols-2 gap-3 rounded-lg bg-slate-50 p-3.5 border border-slate-100">
-                <div>
-                  <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
-                    Người thực hiện:
-                  </span>
-                  <div className="mt-0.5 font-medium text-slate-800">{inspectLog.userName}</div>
-                </div>
-                <div>
-                  <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
-                    Thời điểm:
-                  </span>
-                  <div className="mt-0.5 text-slate-700">
-                    {new Date(inspectLog.createdAt).toLocaleString('vi-VN')}
+            <div className="p-6 space-y-4.5 max-h-[75vh] overflow-y-auto text-xs">
+              {/* 4-Card Metadata Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {/* Card 1: Người thực hiện */}
+                <div className="rounded-xl border border-slate-200/70 bg-slate-50/60 p-3.5 flex items-start space-x-3">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-100 text-blue-700 shrink-0 mt-0.5">
+                    <User className="h-4 w-4" />
                   </div>
-                </div>
-                <div>
-                  <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
-                    Hành động:
-                  </span>
-                  <div className="mt-0.5">
-                    <span
-                      className={`inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-semibold border ${getActionBadgeClass(
-                        inspectLog.action
-                      )}`}
-                    >
-                      {inspectLog.action}
+                  <div className="min-w-0 flex-1">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                      Người thực hiện
+                    </span>
+                    <span className="text-xs font-bold text-slate-800 truncate block mt-0.5">
+                      {inspectLog.userName}
                     </span>
                   </div>
                 </div>
-                <div>
-                  <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
-                    Đối tượng:
-                  </span>
-                  <div className="mt-0.5 font-mono text-slate-700">
-                    {inspectLog.entity} ({inspectLog.entityId || 'N/A'})
+
+                {/* Card 2: Thời điểm */}
+                <div className="rounded-xl border border-slate-200/70 bg-slate-50/60 p-3.5 flex items-start space-x-3">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-100 text-amber-700 shrink-0 mt-0.5">
+                    <Clock className="h-4 w-4" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                      Thời điểm ghi nhận
+                    </span>
+                    <span className="text-xs font-medium text-slate-800 block mt-0.5">
+                      {new Date(inspectLog.createdAt).toLocaleString('vi-VN', {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        second: '2-digit',
+                        day: '2-digit',
+                        month: '2-digit',
+                        year: 'numeric',
+                      })}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Card 3: Hành động */}
+                <div className="rounded-xl border border-slate-200/70 bg-slate-50/60 p-3.5 flex items-start space-x-3">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700 shrink-0 mt-0.5">
+                    <FileText className="h-4 w-4" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                      Hành động
+                    </span>
+                    <div className="mt-1">
+                      <span
+                        className={`inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-semibold border ${getActionBadgeClass(
+                          inspectLog.action
+                        )}`}
+                      >
+                        {inspectLog.action}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Card 4: Đối tượng */}
+                <div className="rounded-xl border border-slate-200/70 bg-slate-50/60 p-3.5 flex items-start space-x-3">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-purple-100 text-purple-700 shrink-0 mt-0.5">
+                    <Shield className="h-4 w-4" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                      Đối tượng
+                    </span>
+                    <div className="mt-0.5 flex items-center space-x-1.5 flex-wrap gap-1">
+                      <span className="font-semibold text-xs text-slate-800">{inspectLog.entity}</span>
+                      {inspectLog.entityId && (
+                        <span className="font-mono text-[10px] text-slate-600 bg-white border border-slate-200 rounded px-1.5 py-0.5 truncate max-w-[150px]" title={inspectLog.entityId}>
+                          {inspectLog.entityId.length > 18 ? `${inspectLog.entityId.slice(0, 8)}...${inspectLog.entityId.slice(-4)}` : inspectLog.entityId}
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
 
-              {/* Payload Data Inspection */}
-              <div>
-                <span className="text-xs font-semibold text-slate-700 block mb-1">
-                  Nội dung Payload đã qua khử nhạy cảm (Sanitized Payload):
-                </span>
-                <pre className="max-h-60 overflow-y-auto rounded-lg bg-slate-900 p-3.5 font-mono text-[11px] text-blue-300 leading-relaxed">
+              {/* Developer-grade Code Inspector */}
+              <div className="rounded-xl border border-slate-800 bg-slate-950 overflow-hidden shadow-inner">
+                {/* Code Header Bar */}
+                <div className="flex items-center justify-between px-4 py-2.5 bg-slate-900 border-b border-slate-800 text-[11px]">
+                  <div className="flex items-center space-x-2">
+                    <div className="flex items-center space-x-1.5 mr-1.5">
+                      <span className="h-2.5 w-2.5 rounded-full bg-rose-500/80"></span>
+                      <span className="h-2.5 w-2.5 rounded-full bg-amber-500/80"></span>
+                      <span className="h-2.5 w-2.5 rounded-full bg-emerald-500/80"></span>
+                    </div>
+                    <Code className="h-3.5 w-3.5 text-slate-400" />
+                    <span className="font-mono font-semibold text-slate-200">
+                      Nội dung Payload đã qua khử nhạy cảm (Sanitized Payload):
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleCopyPayload(JSON.stringify(parseDetails(inspectLog.details), null, 2))}
+                    className="inline-flex items-center space-x-1.5 rounded-lg bg-slate-800 px-2.5 py-1 text-[11px] font-medium text-slate-300 hover:bg-slate-700 hover:text-white transition-colors"
+                  >
+                    {copiedPayload ? (
+                      <>
+                        <Check className="h-3 w-3 text-emerald-400" />
+                        <span className="text-emerald-400 font-semibold">Đã chép</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="h-3 w-3" />
+                        <span>Sao chép JSON</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                {/* Code Body */}
+                <pre className="max-h-60 overflow-y-auto p-4 font-mono text-xs text-sky-300 leading-relaxed selection:bg-blue-600 selection:text-white">
                   {JSON.stringify(parseDetails(inspectLog.details), null, 2)}
                 </pre>
               </div>
 
               {/* Security Protection Disclaimer */}
-              <div className="rounded-lg border border-purple-100 bg-purple-50/70 p-3 text-[11px] text-purple-900 flex items-center space-x-2">
-                <ShieldCheck className="h-4 w-4 text-purple-600 flex-shrink-0" />
-                <span>
+              <div className="rounded-xl border border-indigo-100 bg-gradient-to-r from-indigo-50/80 to-blue-50/50 p-3.5 text-[11px] text-indigo-900 flex items-start space-x-2.5">
+                <div className="flex h-5 w-5 items-center justify-center rounded-full bg-indigo-200/70 text-indigo-700 shrink-0 mt-0.5">
+                  <ShieldCheck className="h-3.5 w-3.5" />
+                </div>
+                <span className="leading-relaxed">
                   Các trường nhạy cảm (mật khẩu, hash, token xác thực, JWT, API keys) đã được hệ thống tự động khử ẩn danh ([REDACTED]) trước khi hiển thị.
                 </span>
               </div>
             </div>
 
             {/* Modal Footer */}
-            <div className="border-t border-slate-100 px-5 py-3 bg-slate-50 flex justify-end">
+            <div className="border-t border-slate-100 px-6 py-3.5 bg-slate-50/70 flex items-center justify-between">
               <button
+                type="button"
+                onClick={() => handleCopyId(inspectLog.id)}
+                className="inline-flex items-center space-x-1.5 text-xs text-slate-500 hover:text-slate-800 transition-colors"
+              >
+                {copiedId ? (
+                  <>
+                    <Check className="h-3.5 w-3.5 text-emerald-600" />
+                    <span className="text-emerald-600 font-semibold">Đã sao chép ID!</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy className="h-3.5 w-3.5 text-slate-400" />
+                    <span>Sao chép ID bản ghi</span>
+                  </>
+                )}
+              </button>
+              <button
+                type="button"
                 onClick={() => setInspectLog(null)}
-                className="rounded-lg bg-slate-800 px-4 py-2 text-xs font-semibold text-white hover:bg-slate-700"
+                className="rounded-xl bg-slate-900 px-5 py-2 text-xs font-semibold text-white shadow-soft hover:bg-slate-800 transition-all active:scale-[0.99]"
               >
                 Đóng
               </button>
