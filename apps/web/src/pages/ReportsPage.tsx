@@ -280,13 +280,13 @@ export const ReportsPage: React.FC = () => {
         <div className="space-y-4">
           <div className="flex flex-col justify-between space-y-3 sm:flex-row sm:items-center sm:space-y-0">
             <div className="relative w-full sm:w-72">
-              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
               <input
                 type="text"
                 placeholder="Tìm mã, tên, danh mục..."
                 value={inventorySearch}
                 onChange={(e) => setInventorySearch(e.target.value)}
-                className="w-full rounded-xl border border-slate-200 bg-white py-2 pl-9.5 pr-3 text-xs placeholder-slate-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 transition-all"
+                className="w-full rounded-xl border border-slate-200 bg-white py-2 pl-10 pr-3.5 text-xs placeholder-slate-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 transition-all"
               />
             </div>
 
