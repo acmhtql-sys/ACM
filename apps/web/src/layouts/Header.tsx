@@ -1,6 +1,18 @@
-import React from 'react';
-import { Menu, Bell, Search, LogOut, User as UserIcon, ChevronRight } from 'lucide-react';
-import { useLocation } from 'react-router-dom';
+import React, { useState, useRef, useEffect } from 'react';
+import {
+  Menu,
+  Bell,
+  BellOff,
+  Search,
+  LogOut,
+  User as UserIcon,
+  ChevronRight,
+  CheckCheck,
+  AlertTriangle,
+  Clock,
+  CheckCircle2,
+} from 'lucide-react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { StatusBadge } from '../components/StatusBadge';
 
@@ -8,6 +20,46 @@ interface HeaderProps {
   onOpenSidebar: () => void;
   isSidebarOpen: boolean;
 }
+
+interface NotificationItem {
+  id: string;
+  type: 'warning' | 'info' | 'success';
+  title: string;
+  message: string;
+  time: string;
+  read: boolean;
+  link?: string;
+}
+
+const INITIAL_NOTIFICATIONS: NotificationItem[] = [
+  {
+    id: 'notif-1',
+    type: 'warning',
+    title: 'Cảnh báo mức tồn tối thiểu',
+    message: 'Linh kiện Điện trở 10k Ohm (SKU-RES-10K) đang dưới mức định mức an toàn (còn 5/20 chiếc).',
+    time: '15 phút trước',
+    read: false,
+    link: '/inventory',
+  },
+  {
+    id: 'notif-2',
+    type: 'info',
+    title: 'Yêu cầu mượn linh kiện mới',
+    message: 'Giảng viên Nguyễn Văn An gửi phiếu mượn Kit Arduino Uno R3 phục vụ lớp thực hành.',
+    time: '42 phút trước',
+    read: false,
+    link: '/borrow-return',
+  },
+  {
+    id: 'notif-3',
+    type: 'success',
+    title: 'Đồng bộ Supabase Cloud an toàn',
+    message: 'Hệ thống đã tự động sao lưu số dư tồn kho và nhật ký giao dịch lên máy chủ đám mây.',
+    time: '2 giờ trước',
+    read: false,
+    link: '/settings',
+  },
+];
 
 const routeMap: Record<string, { parent: string; title: string }> = {
   '/dashboard': { parent: 'Tổng quan', title: 'Bảng điều khiển' },
@@ -26,6 +78,40 @@ const routeMap: Record<string, { parent: string; title: string }> = {
 export const Header: React.FC<HeaderProps> = ({ onOpenSidebar, isSidebarOpen }) => {
   const { user, logout } = useAuth();
   const location = useLocation();
+  const navigate = useNavigate();
+
+  const [notifications, setNotifications] = useState<NotificationItem[]>(INITIAL_NOTIFICATIONS);
+  const [isNotifOpen, setIsNotifOpen] = useState(false);
+  const notifRef = useRef<HTMLDivElement>(null);
+
+  // Close when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (notifRef.current && !notifRef.current.contains(event.target as Node)) {
+        setIsNotifOpen(false);
+      }
+    };
+    if (isNotifOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isNotifOpen]);
+
+  const unreadCount = notifications.filter((n) => !n.read).length;
+
+  const markAllAsRead = () => {
+    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+  };
+
+  const markAsRead = (id: string, link?: string) => {
+    setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)));
+    if (link) {
+      navigate(link);
+      setIsNotifOpen(false);
+    }
+  };
 
   const currentRoute = routeMap[location.pathname] || {
     parent: 'ACM System',
@@ -78,15 +164,134 @@ export const Header: React.FC<HeaderProps> = ({ onOpenSidebar, isSidebarOpen }) 
           <span>Cloud Online</span>
         </div>
 
-        {/* Notifications */}
-        <button
-          type="button"
-          aria-label="Thông báo hệ thống"
-          className="relative rounded-xl p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors"
-        >
-          <Bell className="h-4 w-4" />
-          <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-blue-600 ring-2 ring-white" />
-        </button>
+        {/* Interactive Notifications Popover */}
+        <div className="relative" ref={notifRef}>
+          <button
+            type="button"
+            onClick={() => setIsNotifOpen((prev) => !prev)}
+            aria-label="Thông báo hệ thống"
+            aria-expanded={isNotifOpen}
+            className={`relative rounded-xl p-2 transition-all ${
+              isNotifOpen
+                ? 'bg-blue-50 text-blue-600 ring-2 ring-blue-500/20'
+                : 'text-slate-400 hover:bg-slate-100 hover:text-slate-700'
+            }`}
+          >
+            <Bell className="h-4 w-4" />
+            {unreadCount > 0 && (
+              <span className="absolute right-1.5 top-1.5 flex h-2 w-2">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-blue-400 opacity-75"></span>
+                <span className="relative inline-flex h-2 w-2 rounded-full bg-blue-600 ring-2 ring-white"></span>
+              </span>
+            )}
+          </button>
+
+          {/* Notifications Dropdown Panel */}
+          {isNotifOpen && (
+            <div className="absolute right-0 top-full mt-2 w-80 sm:w-96 rounded-2xl border border-slate-200/90 bg-white shadow-modal z-50 overflow-hidden animate-in fade-in slide-in-from-top-1 duration-150">
+              {/* Dropdown Header */}
+              <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3 bg-slate-50/70">
+                <div className="flex items-center space-x-2">
+                  <span className="text-xs font-bold text-slate-800">Thông báo hệ thống</span>
+                  {unreadCount > 0 ? (
+                    <span className="rounded-full bg-blue-50 border border-blue-200/60 px-2 py-0.5 text-[10px] font-semibold text-blue-700">
+                      {unreadCount} mới
+                    </span>
+                  ) : (
+                    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-500">
+                      Đã đọc hết
+                    </span>
+                  )}
+                </div>
+                {unreadCount > 0 && (
+                  <button
+                    onClick={markAllAsRead}
+                    className="flex items-center space-x-1 text-[11px] font-semibold text-blue-600 hover:text-blue-700 hover:underline transition-colors"
+                  >
+                    <CheckCheck className="h-3.5 w-3.5" />
+                    <span>Đánh dấu đã đọc</span>
+                  </button>
+                )}
+              </div>
+
+              {/* Notifications List */}
+              <div className="max-h-[360px] overflow-y-auto divide-y divide-slate-100">
+                {notifications.length === 0 ? (
+                  <div className="py-10 text-center px-4">
+                    <div className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-slate-400">
+                      <BellOff className="h-5 w-5" />
+                    </div>
+                    <p className="text-xs font-semibold text-slate-700">Không có thông báo mới</p>
+                    <p className="text-[11px] text-slate-400 mt-0.5">Tất cả hoạt động kho và hệ thống đều ổn định.</p>
+                  </div>
+                ) : (
+                  notifications.map((item) => (
+                    <div
+                      key={item.id}
+                      onClick={() => markAsRead(item.id, item.link)}
+                      className={`flex items-start space-x-3 p-3.5 cursor-pointer transition-colors ${
+                        item.read ? 'bg-white hover:bg-slate-50/80 opacity-75' : 'bg-blue-50/30 hover:bg-blue-50/60'
+                      }`}
+                    >
+                      {/* Icon based on type */}
+                      <div
+                        className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-xs ${
+                          item.type === 'warning'
+                            ? 'bg-amber-100 text-amber-700'
+                            : item.type === 'success'
+                            ? 'bg-emerald-100 text-emerald-700'
+                            : 'bg-blue-100 text-blue-700'
+                        }`}
+                      >
+                        {item.type === 'warning' && <AlertTriangle className="h-4 w-4" />}
+                        {item.type === 'success' && <CheckCircle2 className="h-4 w-4" />}
+                        {item.type === 'info' && <Clock className="h-4 w-4" />}
+                      </div>
+
+                      {/* Content */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between">
+                          <p className={`text-xs truncate ${item.read ? 'font-medium text-slate-700' : 'font-bold text-slate-900'}`}>
+                            {item.title}
+                          </p>
+                          {!item.read && <span className="h-1.5 w-1.5 rounded-full bg-blue-600 shrink-0 ml-2" />}
+                        </div>
+                        <p className="text-[11px] text-slate-500 line-clamp-2 mt-0.5 leading-relaxed">
+                          {item.message}
+                        </p>
+                        <span className="text-[10px] text-slate-400 mt-1 inline-block font-medium">
+                          {item.time}
+                        </span>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              {/* Dropdown Footer */}
+              <div className="border-t border-slate-100 bg-slate-50/60 p-2.5 flex items-center justify-between text-[11px]">
+                <button
+                  onClick={() => {
+                    navigate('/borrow-return');
+                    setIsNotifOpen(false);
+                  }}
+                  className="font-semibold text-slate-600 hover:text-blue-600 transition-colors"
+                >
+                  Quản lý mượn trả &rarr;
+                </button>
+                <button
+                  onClick={() => {
+                    navigate('/inventory');
+                    setIsNotifOpen(false);
+                  }}
+                  className="font-semibold text-slate-600 hover:text-blue-600 transition-colors"
+                >
+                  Xem tồn kho &rarr;
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
 
         <div className="h-5 w-[1px] bg-slate-200" />
 
