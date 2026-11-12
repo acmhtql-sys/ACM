@@ -568,16 +568,18 @@ export const ItemFormModal: React.FC<ItemFormModalProps> = ({
                 {previewUrl ? (
                   <div className="relative flex items-center space-x-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
                     {previewError ? (
-                      <div className="h-16 w-16 rounded-lg border border-amber-200 bg-amber-50 text-amber-600 flex flex-col items-center justify-center shrink-0">
+                      <div className="w-24 aspect-[4/3] rounded-lg border border-amber-200 bg-amber-50 text-amber-600 flex flex-col items-center justify-center shrink-0">
                         <ImageOff className="h-5 w-5" />
                       </div>
                     ) : (
-                      <img
-                        src={previewUrl}
-                        alt="Xem trước linh kiện"
-                        onError={() => setPreviewError(true)}
-                        className="h-16 w-16 rounded-lg object-contain border border-slate-200 shadow-sm bg-white shrink-0"
-                      />
+                      <div className="w-24 aspect-[4/3] rounded-lg overflow-hidden border border-slate-200 shadow-sm bg-slate-100 shrink-0">
+                        <img
+                          src={previewUrl}
+                          alt="Xem trước linh kiện"
+                          onError={() => setPreviewError(true)}
+                          className="w-full h-full object-cover object-center"
+                        />
+                      </div>
                     )}
                     <div className="flex-1 min-w-0">
                       <p className="text-xs font-semibold text-slate-800 truncate">

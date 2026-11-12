@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Barcode, AlertTriangle, MapPin, Calendar, Clock, Layers, Package, ShieldCheck, ImageOff } from 'lucide-react';
+import { X, Barcode, AlertTriangle, MapPin, Calendar, Layers, Package, ShieldCheck, ImageOff, Maximize2 } from 'lucide-react';
 import { apiClient } from '../../services/api';
 import { ItemResponse } from '@acm/shared';
 import { StatusBadge } from '../StatusBadge';
@@ -19,6 +19,7 @@ export const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [imgError, setImgError] = useState(false);
+  const [zoomed, setZoomed] = useState(false);
 
   useEffect(() => {
     if (isOpen && itemId) {
@@ -26,6 +27,7 @@ export const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
         setLoading(true);
         setError(null);
         setImgError(false);
+        setZoomed(false);
         try {
           const res = await apiClient.get(`/items/${itemId}`);
           if (res.data?.success) {
@@ -47,6 +49,7 @@ export const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
       fetchDetail();
     } else {
       setItem(null);
+      setZoomed(false);
     }
   }, [isOpen, itemId]);
 
@@ -87,9 +90,9 @@ export const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
           ) : item ? (
             <>
               {/* Item Info Banner */}
-              <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 p-4 rounded-xl border border-slate-100 bg-slate-50/60">
-                <div className="space-y-1">
-                  <div className="flex items-center space-x-2">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-xl border border-slate-100 bg-slate-50/60">
+                <div className="flex-1 min-w-0 space-y-1.5">
+                  <div className="flex flex-wrap items-center gap-1.5">
                     <span className="font-mono text-xs font-bold text-blue-600 bg-blue-50 border border-blue-100 px-2 py-0.5 rounded">
                       {item.code}
                     </span>
@@ -100,11 +103,11 @@ export const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                       variant="activeStatus"
                     />
                   </div>
-                  <h2 className="text-base font-bold text-slate-900 mt-1">{item.name}</h2>
+                  <h2 className="text-base font-bold text-slate-900">{item.name}</h2>
                   <p className="text-xs text-slate-500">
                     {item.description || 'Chưa có thông tin mô tả chi tiết'}
                   </p>
-                  <div className="pt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-slate-400">
+                  <div className="pt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-slate-400">
                     <span className="flex items-center space-x-1">
                       <Layers className="h-3 w-3" />
                       <span>Danh mục: {item.category?.name || 'Chưa gán'}</span>
@@ -123,22 +126,32 @@ export const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                 </div>
 
                 {item.imageUrl && (
-                  <div className="shrink-0 w-24 h-24 rounded-xl overflow-hidden border border-slate-200 bg-white flex items-center justify-center p-1 shadow-sm">
+                  <div className="shrink-0 w-full sm:w-44 aspect-[4/3] rounded-xl overflow-hidden border border-slate-200/90 bg-slate-100 flex items-center justify-center shadow-sm relative group">
                     {imgError ? (
                       <div
                         title="Không thể tải hình ảnh từ đường dẫn đã lưu"
-                        className="flex flex-col items-center justify-center text-slate-400 text-center px-1"
+                        className="flex flex-col items-center justify-center text-slate-400 text-center px-2"
                       >
                         <ImageOff className="h-5 w-5 text-slate-300" />
                         <span className="text-[10px] mt-1 leading-tight">Ảnh lỗi</span>
                       </div>
                     ) : (
-                      <img
-                        src={item.imageUrl}
-                        alt={item.name}
-                        onError={() => setImgError(true)}
-                        className="w-full h-full object-contain rounded-lg"
-                      />
+                      <button
+                        type="button"
+                        onClick={() => setZoomed(true)}
+                        title="Nhấn để phóng to ảnh linh kiện"
+                        className="w-full h-full block focus:outline-none focus:ring-2 focus:ring-blue-500 rounded-xl cursor-zoom-in"
+                      >
+                        <img
+                          src={item.imageUrl}
+                          alt={item.name}
+                          onError={() => setImgError(true)}
+                          className="w-full h-full object-cover object-center transition-transform duration-300 group-hover:scale-105"
+                        />
+                        <span className="absolute bottom-2 right-2 rounded-lg bg-slate-900/65 text-white p-1.5 opacity-0 group-hover:opacity-100 transition-opacity shadow-sm pointer-events-none">
+                          <Maximize2 className="h-3.5 w-3.5" />
+                        </span>
+                      </button>
                     )}
                   </div>
                 )}
@@ -276,6 +289,39 @@ export const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Click-to-zoom lightbox */}
+      {zoomed && item?.imageUrl && !imgError && (
+        <div
+          onClick={() => setZoomed(false)}
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4 animate-in fade-in cursor-zoom-out"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="relative max-w-3xl w-full rounded-2xl bg-white p-2 shadow-2xl border border-slate-200 cursor-default"
+          >
+            <button
+              type="button"
+              onClick={() => setZoomed(false)}
+              aria-label="Đóng ảnh phóng to"
+              className="absolute top-4 right-4 z-10 rounded-full bg-slate-900/70 p-2 text-white hover:bg-slate-900 transition-colors shadow"
+            >
+              <X className="h-4 w-4" />
+            </button>
+            <div className="w-full aspect-[4/3] max-h-[75vh] rounded-xl overflow-hidden bg-slate-100 flex items-center justify-center">
+              <img
+                src={item.imageUrl}
+                alt={item.name}
+                className="w-full h-full object-contain"
+              />
+            </div>
+            <div className="px-3 py-2 flex items-center justify-between text-xs text-slate-600">
+              <span className="font-semibold text-slate-900">{item.name}</span>
+              <span className="font-mono text-blue-600">{item.code}</span>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
