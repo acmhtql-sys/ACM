@@ -219,8 +219,18 @@ export const StockTransactionsPage: React.FC = () => {
   const itemsQuery = useQuery<ItemResponse[]>({
     queryKey: ['items', 'active-list'],
     queryFn: async () => {
-      const res = await apiClient.get('/items', { params: { limit: 100, status: 'active' } });
-      return res.data?.data || [];
+      const firstPage = await apiClient.get('/items', { params: { page: 1, limit: 100, status: 'active' } });
+      const collected: ItemResponse[] = Array.isArray(firstPage.data?.data) ? [...firstPage.data.data] : [];
+      const totalPages = Math.min(Number(firstPage.data?.meta?.totalPages) || 1, 10);
+      for (let nextPage = 2; nextPage <= totalPages; nextPage += 1) {
+        const pageRes = await apiClient.get('/items', {
+          params: { page: nextPage, limit: 100, status: 'active' },
+        });
+        if (Array.isArray(pageRes.data?.data)) {
+          collected.push(...pageRes.data.data);
+        }
+      }
+      return collected;
     },
     enabled: isAuthorized,
     staleTime: 60000,
@@ -250,6 +260,7 @@ export const StockTransactionsPage: React.FC = () => {
     queryClient.invalidateQueries({ queryKey: ['inventory', 'summary'] });
     queryClient.invalidateQueries({ queryKey: ['locations', 'tree'] });
     queryClient.invalidateQueries({ queryKey: ['locations', 'list'] });
+    queryClient.invalidateQueries({ queryKey: ['items'] });
 
     showToast('success', `${actionName} thành công: ${result?.transactionNumber || 'Giao dịch đã ghi sổ'}`);
   };
