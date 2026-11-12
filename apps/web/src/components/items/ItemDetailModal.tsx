@@ -3,6 +3,7 @@ import { X, Barcode, AlertTriangle, MapPin, Calendar, Layers, Package, ShieldChe
 import { apiClient } from '../../services/api';
 import { ItemResponse } from '@acm/shared';
 import { StatusBadge } from '../StatusBadge';
+import { useModalDismiss } from '../../hooks/useModalDismiss';
 
 interface ItemDetailModalProps {
   isOpen: boolean;
@@ -20,6 +21,14 @@ export const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [imgError, setImgError] = useState(false);
   const [zoomed, setZoomed] = useState(false);
+
+  const backdropDismiss = useModalDismiss(isOpen, () => {
+    if (zoomed) {
+      setZoomed(false);
+    } else {
+      onClose();
+    }
+  });
 
   useEffect(() => {
     if (isOpen && itemId) {
@@ -56,7 +65,10 @@ export const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4 overflow-y-auto animate-in fade-in">
+    <div
+      {...backdropDismiss}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4 overflow-y-auto animate-in fade-in"
+    >
       <div className="relative w-full max-w-2xl rounded-2xl bg-white shadow-2xl border border-slate-200 overflow-hidden my-8">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4 bg-slate-50/50">
@@ -293,7 +305,12 @@ export const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
       {/* Click-to-zoom lightbox */}
       {zoomed && item?.imageUrl && !imgError && (
         <div
-          onClick={() => setZoomed(false)}
+          onClick={(e) => {
+            e.stopPropagation();
+            if (e.target === e.currentTarget) {
+              setZoomed(false);
+            }
+          }}
           className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4 animate-in fade-in cursor-zoom-out"
         >
           <div

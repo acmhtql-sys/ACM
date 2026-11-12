@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { X, Power, AlertTriangle } from 'lucide-react';
 import { apiClient } from '../../services/api';
 import { ItemResponse } from '@acm/shared';
+import { useModalDismiss } from '../../hooks/useModalDismiss';
 
 interface ItemStatusModalProps {
   isOpen: boolean;
@@ -19,6 +20,8 @@ export const ItemStatusModal: React.FC<ItemStatusModalProps> = ({
   const [reason, setReason] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const backdropDismiss = useModalDismiss(isOpen && Boolean(item), onClose, submitting);
 
   if (!isOpen || !item) return null;
 
@@ -50,7 +53,10 @@ export const ItemStatusModal: React.FC<ItemStatusModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4 overflow-y-auto animate-in fade-in">
+    <div
+      {...backdropDismiss}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4 overflow-y-auto animate-in fade-in"
+    >
       <div className="relative w-full max-w-md rounded-2xl bg-white shadow-2xl border border-slate-200 overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4 bg-slate-50/50">
