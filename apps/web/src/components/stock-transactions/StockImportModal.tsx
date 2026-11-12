@@ -13,6 +13,7 @@ import {
   AlertTriangle,
   Search,
   Sliders,
+  Boxes,
 } from 'lucide-react';
 import { z } from 'zod';
 import {
@@ -33,7 +34,9 @@ import {
   MAX_IMPORT_LINES_PER_VOUCHER,
   buildBulkImportLines,
   createEmptyImportLine,
+  distributeLinesAcrossBins,
   getDefaultLocationId,
+  getDistributableBins,
   getItemAvailableStock,
   getItemMinStockAlert,
   getShortageItems,
@@ -41,6 +44,7 @@ import {
   isPlaceholderLine,
   isShortageItem,
   mergeMissingItemsIntoLines,
+  summarizeBinDistribution,
 } from './stockImportHelpers';
 
 export type ImportItemLine = ImportItemDraftLine;
@@ -112,6 +116,7 @@ export const StockImportModal: React.FC<StockImportModalProps> = ({
   const [bulkBatchIndex, setBulkBatchIndex] = useState(0);
   const [bulkDefaultQty, setBulkDefaultQty] = useState<number | ''>(10);
   const [selectedDefaultLocationId, setSelectedDefaultLocationId] = useState('');
+  const [excludedBinIds, setExcludedBinIds] = useState<string[]>([]);
   const [tableSearch, setTableSearch] = useState('');
   const [quickLoadNotice, setQuickLoadNotice] = useState<string | null>(null);
 
@@ -170,6 +175,22 @@ export const StockImportModal: React.FC<StockImportModalProps> = ({
     return bulkEligibleItems.slice(start, start + MAX_IMPORT_LINES_PER_VOUCHER);
   }, [bulkEligibleItems, safeBatchIndex]);
 
+  const distributableBins = useMemo(
+    () => getDistributableBins(activeLocations),
+    [activeLocations]
+  );
+
+  const selectedBinIds = useMemo(() => {
+    const excluded = new Set(excludedBinIds);
+    const valid = distributableBins.filter((b) => !excluded.has(b.id)).map((b) => b.id);
+    return valid.length > 0 ? valid : distributableBins.map((b) => b.id);
+  }, [distributableBins, excludedBinIds]);
+
+  const currentBinDistribution = useMemo(
+    () => summarizeBinDistribution(lines, activeLocations),
+    [lines, activeLocations]
+  );
+
   // Initialize Idempotency FSM Hook
   const fsm = useIdempotentTransaction<ImportStockInput, any>({
     endpoint: '/api/v1/stock-transactions/import',
@@ -187,6 +208,7 @@ export const StockImportModal: React.FC<StockImportModalProps> = ({
     setBulkBatchIndex(0);
     setBulkDefaultQty(10);
     setSelectedDefaultLocationId('');
+    setExcludedBinIds([]);
     setTableSearch('');
     setQuickLoadNotice(null);
     setNotes('');
@@ -236,7 +258,8 @@ export const StockImportModal: React.FC<StockImportModalProps> = ({
   const applyBulkPreset = (
     targetItems: ItemResponse[],
     useMinStockThreshold: boolean,
-    customBatchIndex = safeBatchIndex
+    customBatchIndex = safeBatchIndex,
+    distributeAcrossBins = selectedBinIds.length > 1
   ) => {
     if (fsm.isSubmitting || fsm.isAmbiguous) return;
     clearValidationMessages();
@@ -245,6 +268,8 @@ export const StockImportModal: React.FC<StockImportModalProps> = ({
     const built = buildBulkImportLines({
       items: targetItems,
       defaultLocationId: effectiveDefaultLocationId,
+      distributeLocationIds:
+        distributeAcrossBins && selectedBinIds.length > 1 ? selectedBinIds : undefined,
       fixedQuantity: numericQty,
       useMinStockThreshold,
     });
@@ -258,11 +283,42 @@ export const StockImportModal: React.FC<StockImportModalProps> = ({
         bulkTotalBatches > 1 ? ` (Lô ${customBatchIndex + 1}/${bulkTotalBatches})` : '';
       setNotes(`Nhập kho khởi tạo toàn bộ linh kiện${batchLabel}`);
     }
-    setQuickLoadNotice(
-      `Đã nạp ${built.length} linh kiện vào phiếu${
-        effectiveDefaultLocationId ? '' : ' — vui lòng chọn Vị trí kho mặc định'
-      }.`
-    );
+    const summary = summarizeBinDistribution(built, activeLocations);
+    const distText =
+      summary.length > 1
+        ? ` và chia đều vào ${summary.length} thùng (${summary.map((s) => `${s.code}: ${s.count} món`).join(', ')})`
+        : effectiveDefaultLocationId
+        ? ''
+        : ' — vui lòng chọn Vị trí kho mặc định';
+    setQuickLoadNotice(`Đã nạp ${built.length} linh kiện vào phiếu${distText}.`);
+  };
+
+  const toggleBinSelection = (binId: string) => {
+    setExcludedBinIds((prev) => {
+      const isCurrentlyExcluded = prev.includes(binId);
+      if (isCurrentlyExcluded) {
+        return prev.filter((id) => id !== binId);
+      }
+      if (distributableBins.length - prev.length <= 1) {
+        return prev;
+      }
+      return [...prev, binId];
+    });
+  };
+
+  const handleDistributeAcrossBins = (targetBinIds?: string[]) => {
+    if (fsm.isSubmitting || fsm.isAmbiguous) return;
+    clearValidationMessages();
+    const binsToUse = targetBinIds && targetBinIds.length > 0 ? targetBinIds : selectedBinIds;
+    if (binsToUse.length === 0) {
+      setQuickLoadNotice('Không có thùng hoặc vị trí kho nào để chia đều.');
+      return;
+    }
+    const distributed = distributeLinesAcrossBins(lines, binsToUse);
+    setLines(distributed);
+    const summary = summarizeBinDistribution(distributed, activeLocations);
+    const summaryText = summary.map((s) => `${s.code} (${s.count} món)`).join(', ');
+    setQuickLoadNotice(`Đã chia đều ${distributed.length} linh kiện vào ${binsToUse.length} thùng: ${summaryText}.`);
   };
 
   const handleSelectMode = (nextMode: ImportMode) => {
@@ -975,6 +1031,74 @@ export const StockImportModal: React.FC<StockImportModalProps> = ({
                                 }`}
                               >
                                 Lô {batchIdx + 1} ({startNum}–{endNum})
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Bins Auto-Distribution Strip */}
+                    {distributableBins.length > 1 && (
+                      <div className="rounded-xl border border-indigo-200/90 bg-indigo-50/50 p-3 space-y-2">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div className="flex items-center space-x-2 text-xs font-bold text-indigo-950">
+                            <Boxes className="h-4 w-4 text-indigo-600" />
+                            <span>
+                              Chia đều vào các thùng ({selectedBinIds.length}/{distributableBins.length} thùng)
+                            </span>
+                            <span className="rounded-full bg-indigo-100 text-indigo-700 font-semibold px-2 py-0.5 text-[10px]">
+                              ~{lines.length > 0 ? Math.ceil(lines.length / selectedBinIds.length) : 0} món/thùng
+                            </span>
+                          </div>
+
+                          <div className="flex items-center space-x-2">
+                            <button
+                              type="button"
+                              onClick={() => handleDistributeAcrossBins()}
+                              disabled={fsm.isSubmitting || fsm.isAmbiguous || selectedBinIds.length === 0}
+                              className="inline-flex items-center space-x-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700 disabled:opacity-50 shadow-sm transition"
+                              data-testid="btn-distribute-bins"
+                            >
+                              <Boxes className="h-3.5 w-3.5" />
+                              <span>Chia đều {lines.length} linh kiện</span>
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Distributable Bins Selection Chips */}
+                        <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                          <span className="text-[11px] font-medium text-indigo-800 mr-1">Các thùng:</span>
+                          {distributableBins.map((bin) => {
+                            const isSelected = selectedBinIds.includes(bin.id);
+                            const countInLines =
+                              currentBinDistribution.find((d) => d.locationId === bin.id)?.count || 0;
+                            return (
+                              <button
+                                key={bin.id}
+                                type="button"
+                                onClick={() => toggleBinSelection(bin.id)}
+                                disabled={fsm.isSubmitting || fsm.isAmbiguous}
+                                className={`inline-flex items-center space-x-1.5 rounded-lg border px-2.5 py-1 text-[11px] font-medium transition ${
+                                  isSelected
+                                    ? 'border-indigo-300 bg-white text-indigo-900 shadow-xs hover:bg-indigo-50/60'
+                                    : 'border-slate-200 bg-slate-100/80 text-slate-400 line-through'
+                                }`}
+                                title={`Nhấn để ${isSelected ? 'loại trừ' : 'thêm'} thùng này khỏi phân bổ đều`}
+                                data-testid={`chip-bin-${bin.code}`}
+                              >
+                                <span
+                                  className={`h-1.5 w-1.5 rounded-full ${
+                                    isSelected ? 'bg-indigo-600' : 'bg-slate-300'
+                                  }`}
+                                />
+                                <span className="font-mono font-bold">{bin.code}</span>
+                                <span className="truncate max-w-[140px]">{bin.name}</span>
+                                {countInLines > 0 && (
+                                  <span className="rounded-full bg-indigo-100 border border-indigo-200/60 px-1.5 py-0.2 text-[10px] font-bold text-indigo-700">
+                                    {countInLines}
+                                  </span>
+                                )}
                               </button>
                             );
                           })}

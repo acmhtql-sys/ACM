@@ -78,6 +78,83 @@ export function getDefaultLocationId(locations: LocationResponse[]): string {
   return preferred.id;
 }
 
+export function getDistributableBins(locations: LocationResponse[]): LocationResponse[] {
+  const active = locations
+    .filter((l) => l.isActive)
+    .sort((a, b) => a.code.localeCompare(b.code, undefined, { numeric: true, sensitivity: 'base' }));
+
+  const bins = active.filter((l) => l.type === LocationType.BIN);
+  if (bins.length > 0) return bins;
+
+  const shelves = active.filter((l) => l.type === LocationType.SHELF);
+  if (shelves.length > 0) return shelves;
+
+  return active;
+}
+
+export function distributeLinesAcrossBins(
+  lines: ImportItemDraftLine[],
+  binIds: string[]
+): ImportItemDraftLine[] {
+  if (binIds.length === 0 || lines.length === 0) return lines;
+
+  const usedBinsByItem = new Map<string, Set<string>>();
+
+  return lines.map((line, index) => {
+    const preferredIdx =
+      lines.length <= binIds.length
+        ? index
+        : Math.min(binIds.length - 1, Math.floor((index * binIds.length) / lines.length));
+
+    let chosenBinId = binIds[preferredIdx];
+    if (line.itemId) {
+      const used = usedBinsByItem.get(line.itemId) ?? new Set<string>();
+      if (used.has(chosenBinId)) {
+        for (let offset = 1; offset < binIds.length; offset += 1) {
+          const candidate = binIds[(preferredIdx + offset) % binIds.length];
+          if (!used.has(candidate)) {
+            chosenBinId = candidate;
+            break;
+          }
+        }
+      }
+      used.add(chosenBinId);
+      usedBinsByItem.set(line.itemId, used);
+    }
+
+    return {
+      ...line,
+      locationId: chosenBinId,
+    };
+  });
+}
+
+export function summarizeBinDistribution(
+  lines: ImportItemDraftLine[],
+  locations: LocationResponse[]
+): { locationId: string; code: string; name: string; count: number }[] {
+  const locMap = new Map(locations.map((l) => [l.id, l]));
+  const counts = new Map<string, number>();
+
+  for (const line of lines) {
+    if (line.locationId) {
+      counts.set(line.locationId, (counts.get(line.locationId) || 0) + 1);
+    }
+  }
+
+  return Array.from(counts.entries())
+    .map(([locationId, count]) => {
+      const loc = locMap.get(locationId);
+      return {
+        locationId,
+        code: loc?.code || 'N/A',
+        name: loc?.name || '',
+        count,
+      };
+    })
+    .sort((a, b) => a.code.localeCompare(b.code, undefined, { numeric: true, sensitivity: 'base' }));
+}
+
 export function isPlaceholderLine(line: ImportItemDraftLine): boolean {
   return !line.itemId;
 }
@@ -85,6 +162,7 @@ export function isPlaceholderLine(line: ImportItemDraftLine): boolean {
 export function buildBulkImportLines(options: {
   items: ItemResponse[];
   defaultLocationId: string;
+  distributeLocationIds?: string[];
   fixedQuantity: number;
   useMinStockThreshold?: boolean;
 }): ImportItemDraftLine[] {
@@ -92,7 +170,7 @@ export function buildBulkImportLines(options: {
     ? options.fixedQuantity
     : 1;
 
-  return options.items.slice(0, MAX_IMPORT_LINES_PER_VOUCHER).map((item) => {
+  const baseLines = options.items.slice(0, MAX_IMPORT_LINES_PER_VOUCHER).map((item) => {
     const qty = options.useMinStockThreshold
       ? getSuggestedReplenishQty(item, safeQty)
       : safeQty;
@@ -104,6 +182,12 @@ export function buildBulkImportLines(options: {
       notes: '',
     };
   });
+
+  if (options.distributeLocationIds && options.distributeLocationIds.length > 1) {
+    return distributeLinesAcrossBins(baseLines, options.distributeLocationIds);
+  }
+
+  return baseLines;
 }
 
 export function mergeMissingItemsIntoLines(options: {
@@ -140,3 +224,4 @@ export function mergeMissingItemsIntoLines(options: {
     skippedCapCount,
   };
 }
+

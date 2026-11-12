@@ -6,9 +6,11 @@ import { ItemResponse, ItemType, LocationResponse, LocationType, StockStatus, Us
 import { StockImportModal } from './StockImportModal';
 import {
   buildBulkImportLines,
+  distributeLinesAcrossBins,
   getShortageItems,
   getSuggestedReplenishQty,
   mergeMissingItemsIntoLines,
+  summarizeBinDistribution,
 } from './stockImportHelpers';
 import { stockTransactionsService } from '../../services/stock-transactions.service';
 import * as features from '../../config/features';
@@ -21,6 +23,7 @@ vi.mock('../../services/stock-transactions.service', () => ({
 }));
 
 const LOC_BIN = 'b2010000-0000-4000-8000-000000000201';
+const LOC_BIN_2 = 'b2020000-0000-4000-8000-000000000202';
 const ITEM_EMPTY = 'a1010000-0000-4000-8000-000000000101';
 const ITEM_LOW = 'a1020000-0000-4000-8000-000000000102';
 const ITEM_HEALTHY = 'a1030000-0000-4000-8000-000000000103';
@@ -30,6 +33,15 @@ const mockLocations: LocationResponse[] = [
     id: LOC_BIN,
     code: 'BIN-A1',
     name: 'Khay linh kiện A1',
+    type: LocationType.BIN,
+    isActive: true,
+    createdAt: '',
+    updatedAt: '',
+  },
+  {
+    id: LOC_BIN_2,
+    code: 'BIN-A2',
+    name: 'Khay linh kiện A2',
     type: LocationType.BIN,
     isActive: true,
     createdAt: '',
@@ -137,7 +149,25 @@ describe('StockImportModal 2-part flow (Bulk All vs Individual/Shortage)', () =>
     expect(merged.nextLines[1]).toMatchObject({ itemId: ITEM_LOW, quantity: 14, locationId: LOC_BIN });
   });
 
-  it('Mode 1 (Bulk All): loads all active items at once and allows batch quantity update & review', async () => {
+  it('distributes lines evenly across multiple bins and summarizes counts', () => {
+    const rawLines = [
+      { itemId: ITEM_EMPTY, locationId: LOC_BIN, quantity: 1, unitCost: null, notes: '' },
+      { itemId: ITEM_LOW, locationId: LOC_BIN, quantity: 1, unitCost: null, notes: '' },
+      { itemId: ITEM_HEALTHY, locationId: LOC_BIN, quantity: 1, unitCost: null, notes: '' },
+    ];
+    const distributed = distributeLinesAcrossBins(rawLines, [LOC_BIN, LOC_BIN_2]);
+    expect(distributed[0].locationId).toBe(LOC_BIN);
+    expect(distributed[1].locationId).toBe(LOC_BIN);
+    expect(distributed[2].locationId).toBe(LOC_BIN_2);
+
+    const summary = summarizeBinDistribution(distributed, mockLocations);
+    expect(summary).toEqual([
+      { locationId: LOC_BIN, code: 'BIN-A1', name: 'Khay linh kiện A1', count: 2 },
+      { locationId: LOC_BIN_2, code: 'BIN-A2', name: 'Khay linh kiện A2', count: 1 },
+    ]);
+  });
+
+  it('Mode 1 (Bulk All): loads all active items at once, supports auto-dividing across bins and batch quantity update & review', async () => {
     const onSuccess = vi.fn();
     (stockTransactionsService.importStock as any).mockResolvedValue({
       id: 'tx-bulk-1',
@@ -161,6 +191,16 @@ describe('StockImportModal 2-part flow (Bulk All vs Individual/Shortage)', () =>
     await waitFor(() => {
       expect(screen.getByTestId('bulk-import-toolbar')).toBeDefined();
       expect(screen.getByTestId('line-row-2')).toBeDefined();
+    });
+
+    // Test distributing lines evenly across bins
+    expect(screen.getByTestId('btn-distribute-bins')).toBeDefined();
+    fireEvent.click(screen.getByTestId('btn-distribute-bins'));
+
+    await waitFor(() => {
+      expect((screen.getByTestId('select-location-0') as HTMLSelectElement).value).toBe(LOC_BIN);
+      expect((screen.getByTestId('select-location-1') as HTMLSelectElement).value).toBe(LOC_BIN);
+      expect((screen.getByTestId('select-location-2') as HTMLSelectElement).value).toBe(LOC_BIN_2);
     });
 
     fireEvent.change(screen.getByTestId('input-bulk-default-qty'), { target: { value: '25' } });
@@ -210,3 +250,4 @@ describe('StockImportModal 2-part flow (Bulk All vs Individual/Shortage)', () =>
     expect(screen.queryByTestId('line-row-2')).toBeNull();
   });
 });
+
