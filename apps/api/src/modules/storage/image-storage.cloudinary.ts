@@ -27,8 +27,36 @@ export interface CloudinaryStorageConfig {
   cloudName: string;
   apiKey?: string;
   apiSecret?: string;
+  cloudinaryUrl?: string;
   folder?: string;
   fetchFn?: typeof fetch;
+}
+
+export function parseCloudinaryUrl(rawUrl?: string): {
+  cloudName?: string;
+  apiKey?: string;
+  apiSecret?: string;
+} {
+  if (!rawUrl || !rawUrl.trim()) return {};
+  try {
+    let normalized = rawUrl.trim();
+    if (normalized.startsWith('CLOUDINARY_URL=')) {
+      normalized = normalized.slice('CLOUDINARY_URL='.length).trim();
+    }
+    const parsed = new URL(normalized);
+    if (parsed.protocol !== 'cloudinary:') return {};
+    const cloudName = parsed.hostname || parsed.pathname.replace(/^\/+/, '') || undefined;
+    const rawKey = parsed.username ? decodeURIComponent(parsed.username) : undefined;
+    const rawSecret = parsed.password ? decodeURIComponent(parsed.password) : undefined;
+    const isPlaceholder = (v?: string) => !v || v.includes('<') || v.includes('>');
+    return {
+      cloudName: isPlaceholder(cloudName) ? undefined : cloudName,
+      apiKey: isPlaceholder(rawKey) || isPlaceholder(rawSecret) ? undefined : rawKey,
+      apiSecret: isPlaceholder(rawKey) || isPlaceholder(rawSecret) ? undefined : rawSecret,
+    };
+  } catch {
+    return {};
+  }
 }
 
 export class CloudinaryStorageError extends Error {
@@ -53,9 +81,11 @@ export class CloudinaryItemImageStorage implements ItemImageStorageProvider {
   private readonly uploadedUrls = new Map<string, string>();
 
   constructor(config?: Partial<CloudinaryStorageConfig>) {
-    this.cloudName = config?.cloudName || process.env.CLOUDINARY_CLOUD_NAME || 'zua6n3a3';
-    this.apiKey = config?.apiKey || process.env.CLOUDINARY_API_KEY;
-    this.apiSecret = config?.apiSecret || process.env.CLOUDINARY_API_SECRET;
+    const urlConfig = parseCloudinaryUrl(config?.cloudinaryUrl ?? process.env.CLOUDINARY_URL);
+    this.cloudName =
+      config?.cloudName || process.env.CLOUDINARY_CLOUD_NAME || urlConfig.cloudName || 'zua6n3a3';
+    this.apiKey = config?.apiKey || process.env.CLOUDINARY_API_KEY || urlConfig.apiKey;
+    this.apiSecret = config?.apiSecret || process.env.CLOUDINARY_API_SECRET || urlConfig.apiSecret;
     this.folder = config?.folder || process.env.CLOUDINARY_FOLDER || 'acm_items';
     this.fetchFn = config?.fetchFn || globalThis.fetch;
   }

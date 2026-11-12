@@ -2,7 +2,12 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   CloudinaryItemImageStorage,
   CloudinaryStorageError,
+  parseCloudinaryUrl,
 } from '../src/modules/storage/image-storage.cloudinary';
+import {
+  getImageStorageProvider,
+  resetStorageProviderForTesting,
+} from '../src/modules/storage/image-storage.factory';
 
 const ITEM_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const OTHER_ITEM_ID = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
@@ -98,6 +103,52 @@ describe('CloudinaryItemImageStorage (Cloud: zua6n3a3)', () => {
   it('reports isConfigured=false when Cloudinary API credentials are missing', () => {
     const storage = new CloudinaryItemImageStorage({ cloudName: 'zua6n3a3' });
     expect(storage.isConfigured).toBe(false);
+  });
+
+  it('parses CLOUDINARY_URL cleanly and rejects unreplaced placeholder templates', () => {
+    const parsed = parseCloudinaryUrl('CLOUDINARY_URL=cloudinary://44987:my%2Dsec@zua6n3a3');
+    expect(parsed).toEqual({
+      cloudName: 'zua6n3a3',
+      apiKey: '44987',
+      apiSecret: 'my-sec',
+    });
+
+    const storage = new CloudinaryItemImageStorage({
+      cloudinaryUrl: 'cloudinary://key123:sec456@customcloud',
+    });
+    expect(storage.cloudName).toBe('customcloud');
+    expect(storage.isConfigured).toBe(true);
+
+    const placeholderStorage = new CloudinaryItemImageStorage({
+      cloudinaryUrl: 'cloudinary://<your_api_key>:<your_api_secret>@zua6n3a3',
+    });
+    expect(placeholderStorage.cloudName).toBe('zua6n3a3');
+    expect(placeholderStorage.isConfigured).toBe(false);
+  });
+
+  it('factory picks up process.env.CLOUDINARY_URL when individual keys are absent', () => {
+    const prevUrl = process.env.CLOUDINARY_URL;
+    const prevKey = process.env.CLOUDINARY_API_KEY;
+    const prevSecret = process.env.CLOUDINARY_API_SECRET;
+    try {
+      delete process.env.CLOUDINARY_API_KEY;
+      delete process.env.CLOUDINARY_API_SECRET;
+      process.env.CLOUDINARY_URL = 'cloudinary://999888:secret777@zua6n3a3';
+      resetStorageProviderForTesting();
+
+      const provider = getImageStorageProvider();
+      expect(provider).toBeInstanceOf(CloudinaryItemImageStorage);
+      expect((provider as CloudinaryItemImageStorage).isConfigured).toBe(true);
+      expect((provider as CloudinaryItemImageStorage).cloudName).toBe('zua6n3a3');
+    } finally {
+      if (prevUrl === undefined) delete process.env.CLOUDINARY_URL;
+      else process.env.CLOUDINARY_URL = prevUrl;
+      if (prevKey === undefined) delete process.env.CLOUDINARY_API_KEY;
+      else process.env.CLOUDINARY_API_KEY = prevKey;
+      if (prevSecret === undefined) delete process.env.CLOUDINARY_API_SECRET;
+      else process.env.CLOUDINARY_API_SECRET = prevSecret;
+      resetStorageProviderForTesting();
+    }
   });
 
   it('enforces item-level isolation when reading images', async () => {

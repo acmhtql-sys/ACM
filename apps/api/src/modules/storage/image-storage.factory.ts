@@ -20,12 +20,13 @@ export function getImageStorageProvider(): ItemImageStorageProvider {
 
   if (providerType === 'supabase' && process.env.SUPABASE_URL) {
     globalStorageInstance = new SupabaseItemImageStorage();
-  } else if (providerType === 'cloudinary' || process.env.CLOUDINARY_CLOUD_NAME || 'zua6n3a3') {
-    globalStorageInstance = new CloudinaryItemImageStorage({
-      cloudName: process.env.CLOUDINARY_CLOUD_NAME || 'zua6n3a3',
-      apiKey: process.env.CLOUDINARY_API_KEY,
-      apiSecret: process.env.CLOUDINARY_API_SECRET,
-    });
+  } else if (
+    providerType === 'cloudinary' ||
+    process.env.CLOUDINARY_CLOUD_NAME ||
+    process.env.CLOUDINARY_URL ||
+    'zua6n3a3'
+  ) {
+    globalStorageInstance = new CloudinaryItemImageStorage();
   } else if (process.env.NODE_ENV === 'test') {
     globalStorageInstance = new TestOnlyMemoryItemImageStorage();
   } else {
