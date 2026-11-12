@@ -4,6 +4,8 @@ import { itemsService, formatItemResponse } from '../src/modules/items/items.ser
 import { itemsRouter } from '../src/modules/items/items.router';
 import { prisma } from '../src/config/database';
 import { AppError } from '../src/shared/AppError';
+import { resetStorageProviderForTesting } from '../src/modules/storage/image-storage.factory';
+import { CloudinaryItemImageStorage } from '../src/modules/storage/image-storage.cloudinary';
 
 // Mock prisma client methods
 vi.mock('../src/config/database', () => {
@@ -724,6 +726,93 @@ describe('ACM Phase 3 – Inventory Management & Items Suite', () => {
           borrowed: 0,
         })
       ).toThrow(/exceeds On-hand/);
+    });
+  });
+
+  // ==========================================
+  // SUITE 7: ITEM IMAGE UPLOAD & STORAGE FALLBACK
+  // ==========================================
+  describe('uploadItemImage – Cloud & Inline Data URI Fallback', () => {
+    const validPng = Uint8Array.from([137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 1]);
+    const itemUuid = '4f39e605-5c2c-4d98-8c3b-0eee9d14640c';
+    const uploaderUuid = '11111111-1111-4111-8111-111111111111';
+
+    it('stores a valid inline data URI when Cloudinary credentials are missing (prevents dead CDN links)', async () => {
+      resetStorageProviderForTesting(new CloudinaryItemImageStorage({ cloudName: 'zua6n3a3' }));
+
+      (prisma.item.findUnique as any).mockResolvedValue({
+        id: itemUuid,
+        code: 'BEAM-03H',
+        imageUrl: null,
+      });
+
+      const result = await itemsService.uploadItemImage(
+        itemUuid,
+        validPng,
+        'beam_03h.png',
+        'image/png',
+        uploaderUuid
+      );
+
+      expect(result.imageUrl.startsWith('data:image/png;base64,')).toBe(true);
+      expect(result.imageUrl).not.toContain('res.cloudinary.com');
+      const txMock = (prisma as any).__mockTx;
+      expect(txMock.item.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: itemUuid },
+          data: { imageUrl: result.imageUrl },
+        })
+      );
+      expect(txMock.auditLog.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            action: 'UPDATE_ITEM_IMAGE',
+            newValue: expect.objectContaining({
+              imageUrl: expect.stringContaining('[INLINE_'),
+            }),
+          }),
+        })
+      );
+      resetStorageProviderForTesting();
+    });
+
+    it('uses verified versioned Cloudinary URL when credentials are configured', async () => {
+      const mockFetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          secure_url: `https://res.cloudinary.com/zua6n3a3/image/upload/v1762909000/acm_items/${itemUuid}/img.png`,
+          public_id: `acm_items/${itemUuid}/img`,
+          version: 1762909000,
+          format: 'png',
+        }),
+      });
+      resetStorageProviderForTesting(
+        new CloudinaryItemImageStorage({
+          cloudName: 'zua6n3a3',
+          apiKey: 'key_123',
+          apiSecret: 'secret_456',
+          fetchFn: mockFetch as any,
+        })
+      );
+
+      (prisma.item.findUnique as any).mockResolvedValue({
+        id: itemUuid,
+        code: 'BEAM-03H',
+        imageUrl: null,
+      });
+
+      const result = await itemsService.uploadItemImage(
+        itemUuid,
+        validPng,
+        'beam_03h.png',
+        'image/png',
+        uploaderUuid
+      );
+
+      expect(result.imageUrl).toBe(
+        `https://res.cloudinary.com/zua6n3a3/image/upload/f_auto,q_auto,c_limit,w_800,h_800/v1762909000/acm_items/${itemUuid}/img.png`
+      );
+      resetStorageProviderForTesting();
     });
   });
 });

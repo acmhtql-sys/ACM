@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Barcode, AlertTriangle, MapPin, Calendar, Clock, Layers, Package, ShieldCheck } from 'lucide-react';
+import { X, Barcode, AlertTriangle, MapPin, Calendar, Clock, Layers, Package, ShieldCheck, ImageOff } from 'lucide-react';
 import { apiClient } from '../../services/api';
 import { ItemResponse } from '@acm/shared';
 import { StatusBadge } from '../StatusBadge';
@@ -18,12 +18,14 @@ export const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
   const [item, setItem] = useState<ItemResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [imgError, setImgError] = useState(false);
 
   useEffect(() => {
     if (isOpen && itemId) {
       const fetchDetail = async () => {
         setLoading(true);
         setError(null);
+        setImgError(false);
         try {
           const res = await apiClient.get(`/items/${itemId}`);
           if (res.data?.success) {
@@ -121,12 +123,23 @@ export const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                 </div>
 
                 {item.imageUrl && (
-                  <div className="shrink-0 w-20 h-20 rounded-lg overflow-hidden border border-slate-200 bg-white">
-                    <img
-                      src={item.imageUrl}
-                      alt={item.name}
-                      className="w-full h-full object-cover"
-                    />
+                  <div className="shrink-0 w-24 h-24 rounded-xl overflow-hidden border border-slate-200 bg-white flex items-center justify-center p-1 shadow-sm">
+                    {imgError ? (
+                      <div
+                        title="Không thể tải hình ảnh từ đường dẫn đã lưu"
+                        className="flex flex-col items-center justify-center text-slate-400 text-center px-1"
+                      >
+                        <ImageOff className="h-5 w-5 text-slate-300" />
+                        <span className="text-[10px] mt-1 leading-tight">Ảnh lỗi</span>
+                      </div>
+                    ) : (
+                      <img
+                        src={item.imageUrl}
+                        alt={item.name}
+                        onError={() => setImgError(true)}
+                        className="w-full h-full object-contain rounded-lg"
+                      />
+                    )}
                   </div>
                 )}
               </div>

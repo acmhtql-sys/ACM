@@ -1,7 +1,115 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, AlertCircle, Save, Info, UploadCloud, Image as ImageIcon, CheckCircle, RefreshCw } from 'lucide-react';
+import {
+  X,
+  AlertCircle,
+  Save,
+  Info,
+  UploadCloud,
+  ImageOff,
+  CheckCircle,
+} from 'lucide-react';
 import { apiClient } from '../../services/api';
 import { ItemType, ItemResponse } from '@acm/shared';
+
+function buildSafeFileName(originalName: string, mimeType: string): string {
+  const ext =
+    mimeType === 'image/png' ? 'png' : mimeType === 'image/webp' ? 'webp' : 'jpg';
+  const dotIdx = originalName.lastIndexOf('.');
+  const rawBase = dotIdx > 0 ? originalName.slice(0, dotIdx) : originalName;
+  const cleanBase = rawBase
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9_-]/g, '_')
+    .replace(/^_+|_+$/g, '');
+  const safeBase = cleanBase.length >= 3 ? cleanBase.slice(0, 80) : `item_${cleanBase || 'img'}`;
+  return `${safeBase}.${ext}`;
+}
+
+async function compressImageFile(file: File): Promise<File> {
+  if (typeof document === 'undefined' || typeof URL === 'undefined' || !URL.createObjectURL) {
+    return file;
+  }
+
+  return new Promise((resolve) => {
+    const objectUrl = URL.createObjectURL(file);
+    const img = new Image();
+
+    img.onload = async () => {
+      try {
+        URL.revokeObjectURL(objectUrl);
+        const maxDim = 800;
+        let { width, height } = img;
+        if (width <= 0 || height <= 0) {
+          resolve(file);
+          return;
+        }
+        if (width > maxDim || height > maxDim) {
+          if (width >= height) {
+            height = Math.round((height * maxDim) / width);
+            width = maxDim;
+          } else {
+            width = Math.round((width * maxDim) / height);
+            height = maxDim;
+          }
+        }
+
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          resolve(file);
+          return;
+        }
+
+        ctx.drawImage(img, 0, 0, width, height);
+
+        const toBlob = (mime: string, quality: number) =>
+          new Promise<Blob | null>((res) => {
+            try {
+              canvas.toBlob((b) => res(b), mime, quality);
+            } catch {
+              res(null);
+            }
+          });
+
+        // Prefer WebP (preserves alpha & compresses well); fall back to JPEG
+        let blob = await toBlob('image/webp', 0.82);
+        if (!blob || blob.type !== 'image/webp') {
+          // Fill white background before JPEG to avoid black transparency artifact
+          ctx.globalCompositeOperation = 'destination-over';
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(0, 0, width, height);
+          blob = await toBlob('image/jpeg', 0.82);
+        }
+
+        if (blob && blob.size > 120 * 1024) {
+          const smaller = await toBlob(blob.type, 0.65);
+          if (smaller && smaller.size < blob.size) {
+            blob = smaller;
+          }
+        }
+
+        if (!blob || (blob.size >= file.size && file.size <= 150 * 1024)) {
+          resolve(file);
+          return;
+        }
+
+        const safeName = buildSafeFileName(file.name, blob.type);
+        resolve(new File([blob], safeName, { type: blob.type }));
+      } catch {
+        resolve(file);
+      }
+    };
+
+    img.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      resolve(file);
+    };
+
+    img.src = objectUrl;
+  });
+}
 
 interface CategoryOption {
   id: string;
@@ -36,6 +144,7 @@ export const ItemFormModal: React.FC<ItemFormModalProps> = ({
   const [imageUrl, setImageUrl] = useState('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string>('');
+  const [previewError, setPreviewError] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [uploadSuccess, setUploadSuccess] = useState(false);
   const [activeTab, setActiveTab] = useState<'upload' | 'url'>('upload');
@@ -50,6 +159,7 @@ export const ItemFormModal: React.FC<ItemFormModalProps> = ({
       setErrors({});
       setApiError(null);
       setSelectedFile(null);
+      setPreviewError(false);
       setUploadSuccess(false);
       setUploadingImage(false);
       if (mode === 'edit' && item) {
@@ -62,7 +172,11 @@ export const ItemFormModal: React.FC<ItemFormModalProps> = ({
         setDescription(item.description || '');
         setImageUrl(item.imageUrl || '');
         setPreviewUrl(item.imageUrl || '');
-        setActiveTab(item.imageUrl ? 'url' : 'upload');
+        setActiveTab(
+          item.imageUrl && !item.imageUrl.startsWith('data:') && !item.imageUrl.includes('/zua6n3a3/')
+            ? 'url'
+            : 'upload'
+        );
       } else {
         // Reset defaults for create mode
         setCode('');
@@ -94,6 +208,8 @@ export const ItemFormModal: React.FC<ItemFormModalProps> = ({
     }
 
     setApiError(null);
+    setPreviewError(false);
+    setUploadSuccess(false);
     setSelectedFile(file);
     const objectUrl = URL.createObjectURL(file);
     setPreviewUrl(objectUrl);
@@ -102,15 +218,21 @@ export const ItemFormModal: React.FC<ItemFormModalProps> = ({
   const uploadFileToBackend = async (itemId: string, file: File): Promise<string> => {
     setUploadingImage(true);
     try {
-      const buffer = await file.arrayBuffer();
+      const optimizedFile = await compressImageFile(file);
+      const safeFileName = buildSafeFileName(optimizedFile.name, optimizedFile.type);
+      const buffer = await optimizedFile.arrayBuffer();
       const res = await apiClient.post(`/items/${itemId}/image`, buffer, {
         headers: {
-          'Content-Type': file.type,
-          'x-file-name': encodeURIComponent(file.name),
+          'Content-Type': optimizedFile.type,
+          'x-file-name': encodeURIComponent(safeFileName),
         },
       });
       const cdnUrl = res.data?.data?.imageUrl;
-      setImageUrl(cdnUrl || '');
+      if (cdnUrl) {
+        setImageUrl(cdnUrl);
+        setPreviewUrl(cdnUrl);
+        setPreviewError(false);
+      }
       setUploadSuccess(true);
       return cdnUrl;
     } finally {
@@ -151,6 +273,7 @@ export const ItemFormModal: React.FC<ItemFormModalProps> = ({
 
     try {
       if (mode === 'create') {
+        const initialImageUrl = selectedFile ? null : imageUrl.trim() || null;
         const payload = {
           code: code.trim(),
           name: name.trim(),
@@ -159,35 +282,34 @@ export const ItemFormModal: React.FC<ItemFormModalProps> = ({
           type,
           categoryId,
           minStockAlert: Number(minStockAlert),
-          imageUrl: imageUrl.trim() || null,
+          imageUrl: initialImageUrl,
         };
 
         const res = await apiClient.post('/items', payload);
         if (res.data?.success) {
           const newItemId = res.data?.data?.id;
+          let uploadWarning = '';
           if (selectedFile && newItemId) {
             try {
               await uploadFileToBackend(newItemId, selectedFile);
-            } catch (uploadErr) {
-              console.warn('Lưu ảnh thất bại, linh kiện đã được tạo thành công:', uploadErr);
+            } catch (uploadErr: any) {
+              const errMsg =
+                uploadErr?.response?.data?.message || uploadErr?.message || 'Lỗi máy chủ lưu trữ';
+              uploadWarning = ` (Lưu ý: Lỗi tải ảnh: ${errMsg})`;
             }
           }
-          onSuccess(`Đã tạo thành công linh kiện: ${code.trim()}`);
+          onSuccess(`Đã tạo thành công linh kiện: ${code.trim()}${uploadWarning}`);
           onClose();
         }
       } else if (mode === 'edit' && item) {
-        let finalImageUrl = imageUrl.trim() || null;
+        let uploadedViaEndpoint = false;
         if (selectedFile && item.id) {
-          try {
-            const uploadedUrl = await uploadFileToBackend(item.id, selectedFile);
-            if (uploadedUrl) {
-              finalImageUrl = uploadedUrl;
-            }
-          } catch (uploadErr) {
-            console.warn('Cập nhật ảnh thất bại:', uploadErr);
-          }
+          await uploadFileToBackend(item.id, selectedFile);
+          uploadedViaEndpoint = true;
         }
-        const payload = {
+        const trimmedUrl = imageUrl.trim();
+        const urlChanged = !uploadedViaEndpoint && trimmedUrl !== (item.imageUrl || '');
+        const payload: Record<string, any> = {
           code: code.trim(),
           name: name.trim(),
           description: description.trim() || null,
@@ -195,11 +317,13 @@ export const ItemFormModal: React.FC<ItemFormModalProps> = ({
           type,
           categoryId,
           minStockAlert: Number(minStockAlert),
-          imageUrl: finalImageUrl,
         };
+        if (urlChanged) {
+          payload.imageUrl = trimmedUrl || null;
+        }
         const res = await apiClient.put(`/items/${item.id}`, payload);
         if (res.data?.success) {
-          onSuccess(`Đã cập nhật linh kiện: ${item.code}`);
+          onSuccess(`Đã cập nhật linh kiện: ${code.trim()}`);
           onClose();
         }
       }
@@ -403,7 +527,7 @@ export const ItemFormModal: React.FC<ItemFormModalProps> = ({
             />
           </div>
 
-          {/* Image Upload & Management (Cloudinary zua6n3a3) */}
+          {/* Image Upload & Management */}
           <div className="space-y-2 pt-1">
             <div className="flex items-center justify-between">
               <label className="block text-xs font-semibold text-slate-700">
@@ -417,7 +541,7 @@ export const ItemFormModal: React.FC<ItemFormModalProps> = ({
                     activeTab === 'upload' ? 'bg-white text-blue-600 shadow-sm font-semibold' : 'hover:text-slate-900'
                   }`}
                 >
-                  Tải ảnh lên (Cloudinary)
+                  Tải ảnh lên
                 </button>
                 <button
                   type="button"
@@ -443,17 +567,34 @@ export const ItemFormModal: React.FC<ItemFormModalProps> = ({
 
                 {previewUrl ? (
                   <div className="relative flex items-center space-x-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
-                    <img
-                      src={previewUrl}
-                      alt="Xem trước linh kiện"
-                      className="h-16 w-16 rounded-lg object-cover border border-slate-200 shadow-sm bg-white shrink-0"
-                    />
+                    {previewError ? (
+                      <div className="h-16 w-16 rounded-lg border border-amber-200 bg-amber-50 text-amber-600 flex flex-col items-center justify-center shrink-0">
+                        <ImageOff className="h-5 w-5" />
+                      </div>
+                    ) : (
+                      <img
+                        src={previewUrl}
+                        alt="Xem trước linh kiện"
+                        onError={() => setPreviewError(true)}
+                        className="h-16 w-16 rounded-lg object-contain border border-slate-200 shadow-sm bg-white shrink-0"
+                      />
+                    )}
                     <div className="flex-1 min-w-0">
                       <p className="text-xs font-semibold text-slate-800 truncate">
-                        {selectedFile ? selectedFile.name : 'Ảnh hiện tại của linh kiện'}
+                        {selectedFile
+                          ? selectedFile.name
+                          : previewError
+                            ? 'Ảnh cũ không khả dụng (hãy tải lại ảnh)'
+                            : 'Ảnh hiện tại của linh kiện'}
                       </p>
                       <p className="text-[11px] text-slate-500 mt-0.5">
-                        {selectedFile ? `${(selectedFile.size / 1024).toFixed(1)} KB` : 'Đã lưu trên CDN Cloudinary'}
+                        {selectedFile
+                          ? `${(selectedFile.size / 1024).toFixed(1)} KB • Sẵn sàng tải lên`
+                          : previewError
+                            ? 'Đường dẫn ảnh cũ bị lỗi hoặc chưa được đồng bộ'
+                            : imageUrl.startsWith('data:')
+                              ? 'Đã lưu trữ trực tiếp trong hệ thống'
+                              : 'Đã lưu trên Cloud Storage'}
                       </p>
                       <div className="flex items-center space-x-2 mt-1.5">
                         <button
@@ -469,6 +610,7 @@ export const ItemFormModal: React.FC<ItemFormModalProps> = ({
                           onClick={() => {
                             setSelectedFile(null);
                             setPreviewUrl('');
+                            setPreviewError(false);
                             setImageUrl('');
                           }}
                           className="text-[11px] font-medium text-rose-600 hover:text-rose-700 underline"
@@ -496,25 +638,27 @@ export const ItemFormModal: React.FC<ItemFormModalProps> = ({
                       Nhấn để chọn tệp hình ảnh từ máy tính
                     </p>
                     <p className="text-[11px] text-slate-400 mt-0.5">
-                      Định dạng PNG, JPG, WebP (Tối đa 5 MB) • Lưu trữ đám mây Cloudinary
+                      Định dạng PNG, JPG, WebP (Tối đa 5 MB) • Tự động tối ưu & lưu an toàn
                     </p>
                   </div>
                 )}
               </div>
             ) : (
-              <div className="space-y-1">
+              <div className="space-y-1.5">
                 <input
                   type="text"
-                  value={imageUrl}
+                  value={imageUrl.startsWith('data:') ? '' : imageUrl}
                   onChange={(e) => {
+                    setSelectedFile(null);
+                    setPreviewError(false);
                     setImageUrl(e.target.value);
                     setPreviewUrl(e.target.value);
                   }}
-                  placeholder="https://res.cloudinary.com/zua6n3a3/image/upload/..."
+                  placeholder="https://example.com/hinh-anh-linh-kien.jpg"
                   className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs transition-colors focus:bg-white focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                 />
                 <p className="text-[11px] text-slate-400">
-                  Dán đường dẫn HTTPS trực tiếp của hình ảnh linh kiện
+                  Dán đường dẫn HTTPS trực tiếp của hình ảnh linh kiện (nếu có sẵn link ngoài)
                 </p>
               </div>
             )}
@@ -525,18 +669,26 @@ export const ItemFormModal: React.FC<ItemFormModalProps> = ({
             <button
               type="button"
               onClick={onClose}
-              disabled={submitting}
+              disabled={submitting || uploadingImage}
               className="rounded-lg border border-slate-200 px-4 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50 transition-colors"
             >
               Hủy bỏ
             </button>
             <button
               type="submit"
-              disabled={submitting}
+              disabled={submitting || uploadingImage}
               className="inline-flex items-center space-x-1.5 rounded-lg bg-blue-600 px-4 py-2 text-xs font-semibold text-white shadow-sm shadow-blue-500/20 hover:bg-blue-700 disabled:opacity-50 transition-all"
             >
               <Save className="h-3.5 w-3.5" />
-              <span>{submitting ? 'Đang lưu...' : mode === 'create' ? 'Tạo linh kiện' : 'Lưu cập nhật'}</span>
+              <span>
+                {uploadingImage
+                  ? 'Đang tải ảnh lên...'
+                  : submitting
+                    ? 'Đang lưu...'
+                    : mode === 'create'
+                      ? 'Tạo linh kiện'
+                      : 'Lưu cập nhật'}
+              </span>
             </button>
           </div>
         </form>

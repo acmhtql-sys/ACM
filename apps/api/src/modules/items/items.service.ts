@@ -4,7 +4,18 @@ import { AppError } from '../../shared/AppError';
 import { AuthenticatedUser } from '../../middleware/auth';
 import { getImageStorageProvider } from '../storage/image-storage.factory';
 import { CloudinaryItemImageStorage } from '../storage/image-storage.cloudinary';
+import { SupabaseItemImageStorage } from '../storage/image-storage.supabase';
 import { AllowedImageMime } from '../storage/image-storage.contract';
+
+function summarizeImageForAudit(url: string | null | undefined): string | null {
+  if (!url) return null;
+  if (url.startsWith('data:')) {
+    const commaIdx = url.indexOf(',');
+    const prefix = commaIdx >= 0 ? url.slice(0, commaIdx + 1) : 'data:;base64,';
+    return `${prefix}[INLINE_${url.length}_CHARS]`;
+  }
+  return url;
+}
 import {
   CreateItemInput,
   UpdateItemInput,
@@ -487,7 +498,7 @@ export class ItemsService {
             type: existing.type,
             categoryId: existing.categoryId,
             minStockAlert: existing.minStockAlert,
-            imageUrl: existing.imageUrl,
+            imageUrl: summarizeImageForAudit(existing.imageUrl),
           },
           newValue: {
             code: updated.code,
@@ -497,7 +508,7 @@ export class ItemsService {
             type: updated.type,
             categoryId: updated.categoryId,
             minStockAlert: updated.minStockAlert,
-            imageUrl: updated.imageUrl,
+            imageUrl: summarizeImageForAudit(updated.imageUrl),
           },
           ipAddress: ipAddress || null,
           userAgent: userAgent || null,
@@ -685,10 +696,35 @@ export class ItemsService {
 
     let cdnUrl: string;
     if (storage instanceof CloudinaryItemImageStorage) {
+      if (storage.isConfigured) {
+        const ext = mimeType === 'image/png' ? 'png' : mimeType === 'image/webp' ? 'webp' : 'jpg';
+        cdnUrl =
+          storage.getUploadedDeliveryUrl(itemId, stored.id) ||
+          storage.getDeliveryUrl(itemId, stored.id, ext);
+      } else {
+        // Cloudinary API credentials (CLOUDINARY_API_KEY / SECRET) are not configured on server.
+        // Persist a compact inline Data URI directly in PostgreSQL so uploaded images display
+        // reliably across container restarts instead of fabricating a non-existent CDN URL.
+        const maxInlineBytes = 512 * 1024;
+        if (fileBuffer.byteLength > maxInlineBytes) {
+          throw new AppError(
+            'Máy chủ chưa cấu hình khóa bảo mật Cloudinary nên chỉ hỗ trợ lưu ảnh trực tiếp tối đa 512 KB. Vui lòng chọn ảnh nhỏ hơn hoặc dán link URL.',
+            413
+          );
+        }
+        const base64 = Buffer.from(fileBuffer).toString('base64');
+        cdnUrl = `data:${mimeType};base64,${base64}`;
+      }
+    } else if (storage instanceof SupabaseItemImageStorage) {
       const ext = mimeType === 'image/png' ? 'png' : mimeType === 'image/webp' ? 'webp' : 'jpg';
-      cdnUrl = storage.getDeliveryUrl(itemId, stored.id, ext);
+      cdnUrl = await storage.createSignedUrl(itemId, stored.id, ext);
     } else {
-      cdnUrl = `https://res.cloudinary.com/zua6n3a3/image/upload/f_auto,q_auto/acm_items/${itemId}/${stored.id}.${mimeType.split('/')[1]}`;
+      const maxInlineBytes = 512 * 1024;
+      if (fileBuffer.byteLength > maxInlineBytes) {
+        throw new AppError('Dung lượng ảnh vượt quá giới hạn lưu trữ nội bộ 512 KB.', 413);
+      }
+      const base64 = Buffer.from(fileBuffer).toString('base64');
+      cdnUrl = `data:${mimeType};base64,${base64}`;
     }
 
     await prisma.$transaction(async (tx) => {
@@ -703,8 +739,12 @@ export class ItemsService {
           action: 'UPDATE_ITEM_IMAGE',
           entity: 'Item',
           entityId: itemId,
-          oldValue: { imageUrl: existing.imageUrl },
-          newValue: { imageUrl: cdnUrl, imageId: stored.id, sha256: stored.sha256 },
+          oldValue: { imageUrl: summarizeImageForAudit(existing.imageUrl) },
+          newValue: {
+            imageUrl: summarizeImageForAudit(cdnUrl),
+            imageId: stored.id,
+            sha256: stored.sha256,
+          },
           ipAddress: ipAddress || null,
           userAgent: userAgent || null,
         },

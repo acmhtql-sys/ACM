@@ -50,6 +50,7 @@ export class CloudinaryItemImageStorage implements ItemImageStorageProvider {
   // Metadata cache for audit records and instant lookup
   private readonly metadataStore = new Map<string, StoredItemImage>();
   private readonly contentCache = new Map<string, Uint8Array>();
+  private readonly uploadedUrls = new Map<string, string>();
 
   constructor(config?: Partial<CloudinaryStorageConfig>) {
     this.cloudName = config?.cloudName || process.env.CLOUDINARY_CLOUD_NAME || 'zua6n3a3';
@@ -57,6 +58,20 @@ export class CloudinaryItemImageStorage implements ItemImageStorageProvider {
     this.apiSecret = config?.apiSecret || process.env.CLOUDINARY_API_SECRET;
     this.folder = config?.folder || process.env.CLOUDINARY_FOLDER || 'acm_items';
     this.fetchFn = config?.fetchFn || globalThis.fetch;
+  }
+
+  /**
+   * Returns true only when both Cloudinary API Key and Secret are configured for remote uploads.
+   */
+  get isConfigured(): boolean {
+    return Boolean(this.apiKey && this.apiSecret);
+  }
+
+  /**
+   * Returns the verified remote delivery URL returned by Cloudinary during upload, if any.
+   */
+  getUploadedDeliveryUrl(itemId: string, imageId: string): string | undefined {
+    return this.uploadedUrls.get(`${itemId}/${imageId}`);
   }
 
   /**
@@ -144,6 +159,20 @@ export class CloudinaryItemImageStorage implements ItemImageStorageProvider {
           res.status >= 400 && res.status < 500 ? res.status : 502
         );
       }
+
+      const uploadResult = (await res.json().catch(() => ({}))) as {
+        secure_url?: string;
+        public_id?: string;
+        version?: number;
+        format?: string;
+      };
+      let verifiedUrl = uploadResult.secure_url;
+      if (uploadResult.version && uploadResult.public_id && uploadResult.format) {
+        verifiedUrl = `https://res.cloudinary.com/${this.cloudName}/image/upload/f_auto,q_auto,c_limit,w_800,h_800/v${uploadResult.version}/${uploadResult.public_id}.${uploadResult.format}`;
+      }
+      if (verifiedUrl) {
+        this.uploadedUrls.set(`${input.itemId}/${imageId}`, verifiedUrl);
+      }
     }
 
     // Persist metadata and local content cache for audit & verification
@@ -220,6 +249,7 @@ export class CloudinaryItemImageStorage implements ItemImageStorageProvider {
 
     this.metadataStore.delete(lookupKey);
     this.contentCache.delete(lookupKey);
+    this.uploadedUrls.delete(lookupKey);
     return true;
   }
 }

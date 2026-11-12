@@ -55,10 +55,15 @@ describe('CloudinaryItemImageStorage (Cloud: zua6n3a3)', () => {
     );
   });
 
-  it('saves an image, stores metadata and computes sha256 checksum', async () => {
+  it('saves an image, stores metadata, captures verified delivery URL, and computes sha256 checksum', async () => {
     const mockFetch = vi.fn().mockResolvedValue({
       ok: true,
-      json: async () => ({ secure_url: 'https://res.cloudinary.com/zua6n3a3/image/upload/sample.png' }),
+      json: async () => ({
+        secure_url: 'https://res.cloudinary.com/zua6n3a3/image/upload/v1762909000/acm_items/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/sensor.png',
+        public_id: `acm_items/${ITEM_ID}/sensor`,
+        version: 1762909000,
+        format: 'png',
+      }),
     });
 
     const storage = new CloudinaryItemImageStorage({
@@ -67,6 +72,8 @@ describe('CloudinaryItemImageStorage (Cloud: zua6n3a3)', () => {
       apiSecret: 'test_secret',
       fetchFn: mockFetch as any,
     });
+
+    expect(storage.isConfigured).toBe(true);
 
     const saved = await storage.save({
       itemId: ITEM_ID,
@@ -83,6 +90,14 @@ describe('CloudinaryItemImageStorage (Cloud: zua6n3a3)', () => {
     expect(saved.byteLength).toBe(VALID_PNG_BYTES.byteLength);
     expect(saved.sha256).toHaveLength(64);
     expect(mockFetch).toHaveBeenCalledTimes(1);
+    expect(storage.getUploadedDeliveryUrl(ITEM_ID, saved.id)).toBe(
+      `https://res.cloudinary.com/zua6n3a3/image/upload/f_auto,q_auto,c_limit,w_800,h_800/v1762909000/acm_items/${ITEM_ID}/sensor.png`
+    );
+  });
+
+  it('reports isConfigured=false when Cloudinary API credentials are missing', () => {
+    const storage = new CloudinaryItemImageStorage({ cloudName: 'zua6n3a3' });
+    expect(storage.isConfigured).toBe(false);
   });
 
   it('enforces item-level isolation when reading images', async () => {
