@@ -18,6 +18,8 @@ import { borrowRouter } from './modules/borrow/borrow.router';
 import { kitsRouter } from './modules/kits/kits.router';
 import { reportsRouter } from './modules/reports/reports.router';
 import { auditLogsRouter } from './modules/audit-logs/audit-logs.router';
+import { notificationsRouter } from './modules/notifications/notifications.router';
+import { notificationHub } from './modules/notifications/notifications.hub';
 import { cloudStagingReadOnlyMiddleware, StagingReadOnlyOptions } from './middleware/cloudStagingReadOnly';
 
 export function createApp(options?: { stagingReadOnly?: StagingReadOnlyOptions }): Express {
@@ -50,6 +52,18 @@ export function createApp(options?: { stagingReadOnly?: StagingReadOnlyOptions }
   const prefix = env.API_PREFIX; // default /api/v1
 
 
+  // Trigger realtime notification sync whenever any mutation succeeds
+  app.use((req, res, next) => {
+    if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) {
+      res.on('finish', () => {
+        if (res.statusCode >= 200 && res.statusCode < 300) {
+          notificationHub.scheduleSync();
+        }
+      });
+    }
+    next();
+  });
+
   // Routes registration
   app.use(`${prefix}/health`, healthRouter);
   app.use(`${prefix}/auth`, authRouter);
@@ -64,6 +78,7 @@ export function createApp(options?: { stagingReadOnly?: StagingReadOnlyOptions }
   app.use(`${prefix}/kits`, kitsRouter);
   app.use(`${prefix}/reports`, reportsRouter);
   app.use(`${prefix}/audit-logs`, auditLogsRouter);
+  app.use(`${prefix}/notifications`, notificationsRouter);
 
   // 404 Catch-all handler
   app.use((req, res) => {

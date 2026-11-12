@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import {
   Menu,
   Bell,
@@ -11,55 +11,46 @@ import {
   AlertTriangle,
   Clock,
   CheckCircle2,
+  RefreshCw,
 } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { StatusBadge } from '../components/StatusBadge';
+import { canAccessPage } from '../config/access';
+import {
+  SystemNotification,
+  NotificationReadState,
+  fetchNotifications,
+  subscribeToNotificationStream,
+  loadNotificationReadState,
+  isNotificationRead,
+  markNotificationIdRead,
+  markAllNotificationsRead,
+  formatRelativeTimeVi,
+} from '../services/notifications.service';
 
 interface HeaderProps {
   onOpenSidebar: () => void;
   isSidebarOpen: boolean;
 }
 
-interface NotificationItem {
-  id: string;
-  type: 'warning' | 'info' | 'success';
-  title: string;
-  message: string;
-  time: string;
-  read: boolean;
-  link?: string;
-}
+const MAX_DISPLAYED_NOTIFICATIONS = 50;
 
-const INITIAL_NOTIFICATIONS: NotificationItem[] = [
-  {
-    id: 'notif-1',
-    type: 'warning',
-    title: 'Cảnh báo mức tồn tối thiểu',
-    message: 'Linh kiện Điện trở 10k Ohm (SKU-RES-10K) đang dưới mức định mức an toàn (còn 5/20 chiếc).',
-    time: '15 phút trước',
-    read: false,
-    link: '/inventory',
-  },
-  {
-    id: 'notif-2',
-    type: 'info',
-    title: 'Yêu cầu mượn linh kiện mới',
-    message: 'Giảng viên Nguyễn Văn An gửi phiếu mượn Kit Arduino Uno R3 phục vụ lớp thực hành.',
-    time: '42 phút trước',
-    read: false,
-    link: '/borrow-return',
-  },
-  {
-    id: 'notif-3',
-    type: 'success',
-    title: 'Đồng bộ Supabase Cloud an toàn',
-    message: 'Hệ thống đã tự động sao lưu số dư tồn kho và nhật ký giao dịch lên máy chủ đám mây.',
-    time: '2 giờ trước',
-    read: false,
-    link: '/settings',
-  },
-];
+function mergeNotifications(
+  existing: SystemNotification[],
+  incoming: SystemNotification[]
+): SystemNotification[] {
+  const byId = new Map<string, SystemNotification>();
+  for (const item of existing) {
+    byId.set(item.id, item);
+  }
+  for (const item of incoming) {
+    byId.set(item.id, item);
+  }
+  return Array.from(byId.values())
+    .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))
+    .slice(0, MAX_DISPLAYED_NOTIFICATIONS);
+}
 
 const routeMap: Record<string, { parent: string; title: string }> = {
   '/dashboard': { parent: 'Tổng quan', title: 'Bảng điều khiển' },
@@ -76,13 +67,49 @@ const routeMap: Record<string, { parent: string; title: string }> = {
 };
 
 export const Header: React.FC<HeaderProps> = ({ onOpenSidebar, isSidebarOpen }) => {
-  const { user, logout } = useAuth();
+  const { user, token: authToken, logout } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
 
-  const [notifications, setNotifications] = useState<NotificationItem[]>(INITIAL_NOTIFICATIONS);
+  const [notifications, setNotifications] = useState<SystemNotification[]>([]);
+  const [readState, setReadState] = useState<NotificationReadState>(() =>
+    loadNotificationReadState(user?.id)
+  );
   const [isNotifOpen, setIsNotifOpen] = useState(false);
+  const [isLoadingNotif, setIsLoadingNotif] = useState(false);
+  const [streamStatus, setStreamStatus] = useState<'connecting' | 'live' | 'polling'>('connecting');
+  const [nowMs, setNowMs] = useState<number>(() => Date.now());
   const notifRef = useRef<HTMLDivElement>(null);
+
+  const resolveToken = useCallback(() => {
+    if (authToken) return authToken;
+    if (typeof window !== 'undefined') {
+      return window.localStorage.getItem('acm_token');
+    }
+    return null;
+  }, [authToken]);
+
+  useEffect(() => {
+    setReadState(loadNotificationReadState(user?.id));
+  }, [user?.id]);
+
+  const refreshNotifications = useCallback(
+    async (showSpinner = false) => {
+      const activeToken = resolveToken();
+      if (!activeToken || !user) return;
+      if (showSpinner) setIsLoadingNotif(true);
+      try {
+        const latest = await fetchNotifications(30);
+        setNotifications((prev) => mergeNotifications(prev, latest));
+        setNowMs(Date.now());
+      } catch {
+        // Keep existing notifications on transient network error
+      } finally {
+        if (showSpinner) setIsLoadingNotif(false);
+      }
+    },
+    [resolveToken, user]
+  );
 
   // Close when clicking outside
   useEffect(() => {
@@ -99,18 +126,124 @@ export const Header: React.FC<HeaderProps> = ({ onOpenSidebar, isSidebarOpen }) 
     };
   }, [isNotifOpen]);
 
-  const unreadCount = notifications.filter((n) => !n.read).length;
+  // Refresh when dropdown opens and update relative timestamps every 30s
+  useEffect(() => {
+    if (!isNotifOpen) return;
+    setNowMs(Date.now());
+    void refreshNotifications(notifications.length === 0);
+    const ticker = window.setInterval(() => {
+      setNowMs(Date.now());
+    }, 30_000);
+    return () => window.clearInterval(ticker);
+  }, [isNotifOpen, notifications.length, refreshNotifications]);
+
+  // Initial fetch, realtime SSE subscription, and window-focus re-sync
+  useEffect(() => {
+    const activeToken = resolveToken();
+    if (!activeToken || !user) {
+      setNotifications([]);
+      return;
+    }
+
+    let cancelled = false;
+    let retryAttempt = 0;
+    let reconnectTimer: number | null = null;
+    let activeController: AbortController | null = null;
+
+    void refreshNotifications(true);
+
+    const connectStream = () => {
+      if (cancelled) return;
+      activeController = new AbortController();
+      setStreamStatus((prev) => (prev === 'live' ? 'live' : 'connecting'));
+
+      void subscribeToNotificationStream({
+        token: activeToken,
+        signal: activeController.signal,
+        onConnected: () => {
+          if (cancelled) return;
+          retryAttempt = 0;
+          setStreamStatus('live');
+        },
+        onNotification: (item) => {
+          if (cancelled) return;
+          setNotifications((prev) => mergeNotifications(prev, [item]));
+          setNowMs(Date.now());
+        },
+        onDisconnect: (reason) => {
+          if (cancelled) return;
+          if (reason === 'UNAUTHORIZED') {
+            setStreamStatus('polling');
+            return;
+          }
+          setStreamStatus('polling');
+          const delayMs =
+            reason === 'NOT_SUPPORTED'
+              ? 30_000
+              : Math.min(30_000, 2_000 * Math.pow(2, retryAttempt));
+          retryAttempt += 1;
+          reconnectTimer = window.setTimeout(connectStream, delayMs);
+        },
+      });
+    };
+
+    connectStream();
+
+    const handleVisibilityOrFocus = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
+      void refreshNotifications(false);
+    };
+
+    window.addEventListener('focus', handleVisibilityOrFocus);
+    document.addEventListener('visibilitychange', handleVisibilityOrFocus);
+
+    return () => {
+      cancelled = true;
+      if (reconnectTimer !== null) {
+        window.clearTimeout(reconnectTimer);
+      }
+      if (activeController) {
+        activeController.abort();
+      }
+      window.removeEventListener('focus', handleVisibilityOrFocus);
+      document.removeEventListener('visibilitychange', handleVisibilityOrFocus);
+    };
+  }, [refreshNotifications, resolveToken, user]);
+
+  // Fallback periodic polling only when SSE stream is not live
+  useEffect(() => {
+    if (streamStatus !== 'polling' || !user) return;
+    const pollTimer = window.setInterval(() => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
+      void refreshNotifications(false);
+    }, 20_000);
+    return () => window.clearInterval(pollTimer);
+  }, [refreshNotifications, streamStatus, user]);
+
+  const notificationsWithRead = useMemo(
+    () =>
+      notifications.map((n) => ({
+        ...n,
+        read: isNotificationRead(n, readState),
+      })),
+    [notifications, readState]
+  );
+
+  const unreadCount = useMemo(
+    () => notificationsWithRead.filter((n) => !n.read).length,
+    [notificationsWithRead]
+  );
 
   const markAllAsRead = () => {
-    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+    const latestCreatedAt = notifications[0]?.createdAt;
+    setReadState(markAllNotificationsRead(user?.id, latestCreatedAt));
   };
 
-  const markAsRead = (id: string, link?: string) => {
-    setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)));
-    if (link) {
-      navigate(link);
-      setIsNotifOpen(false);
-    }
+  const handleNotificationClick = (item: SystemNotification) => {
+    setReadState((prev) => markNotificationIdRead(user?.id, item.id, prev));
+    setIsNotifOpen(false);
+    const destination = canAccessPage(user?.role, item.link) ? item.link : '/dashboard';
+    navigate(destination);
   };
 
   const currentRoute = routeMap[location.pathname] || {
@@ -191,46 +324,86 @@ export const Header: React.FC<HeaderProps> = ({ onOpenSidebar, isSidebarOpen }) 
             <div className="absolute right-0 top-full mt-2 w-80 sm:w-96 rounded-2xl border border-slate-200/90 bg-white shadow-modal z-50 overflow-hidden animate-in fade-in slide-in-from-top-1 duration-150">
               {/* Dropdown Header */}
               <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3 bg-slate-50/70">
-                <div className="flex items-center space-x-2">
-                  <span className="text-xs font-bold text-slate-800">Thông báo hệ thống</span>
+                <div className="flex items-center space-x-2 min-w-0">
+                  <span className="text-xs font-bold text-slate-800 truncate">Thông báo hệ thống</span>
                   {unreadCount > 0 ? (
-                    <span className="rounded-full bg-blue-50 border border-blue-200/60 px-2 py-0.5 text-[10px] font-semibold text-blue-700">
+                    <span className="rounded-full bg-blue-50 border border-blue-200/60 px-2 py-0.5 text-[10px] font-semibold text-blue-700 shrink-0">
                       {unreadCount} mới
                     </span>
                   ) : (
-                    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-500">
+                    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-500 shrink-0">
                       Đã đọc hết
                     </span>
                   )}
-                </div>
-                {unreadCount > 0 && (
-                  <button
-                    onClick={markAllAsRead}
-                    className="flex items-center space-x-1 text-[11px] font-semibold text-blue-600 hover:text-blue-700 hover:underline transition-colors"
+                  <span
+                    className={`hidden sm:inline-flex items-center space-x-1 rounded-full px-1.5 py-0.5 text-[9px] font-semibold shrink-0 ${
+                      streamStatus === 'live'
+                        ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/70'
+                        : 'bg-slate-100 text-slate-500'
+                    }`}
+                    title={
+                      streamStatus === 'live'
+                        ? 'Kết nối SSE thời gian thực đang hoạt động'
+                        : 'Đang tự động đồng bộ định kỳ'
+                    }
                   >
-                    <CheckCheck className="h-3.5 w-3.5" />
-                    <span>Đánh dấu đã đọc</span>
+                    <span
+                      className={`h-1.5 w-1.5 rounded-full ${
+                        streamStatus === 'live' ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'
+                      }`}
+                    />
+                    <span>{streamStatus === 'live' ? 'Trực tiếp' : 'Đồng bộ'}</span>
+                  </span>
+                </div>
+                <div className="flex items-center space-x-2 shrink-0">
+                  {unreadCount > 0 && (
+                    <button
+                      type="button"
+                      onClick={markAllAsRead}
+                      className="flex items-center space-x-1 text-[11px] font-semibold text-blue-600 hover:text-blue-700 hover:underline transition-colors"
+                    >
+                      <CheckCheck className="h-3.5 w-3.5" />
+                      <span>Đã đọc</span>
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => void refreshNotifications(true)}
+                    disabled={isLoadingNotif}
+                    title="Làm mới thông báo"
+                    aria-label="Làm mới thông báo"
+                    className="rounded-lg p-1 text-slate-400 hover:bg-slate-200/60 hover:text-slate-600 transition-colors disabled:opacity-50"
+                  >
+                    <RefreshCw className={`h-3.5 w-3.5 ${isLoadingNotif ? 'animate-spin' : ''}`} />
                   </button>
-                )}
+                </div>
               </div>
 
               {/* Notifications List */}
               <div className="max-h-[360px] overflow-y-auto divide-y divide-slate-100">
-                {notifications.length === 0 ? (
+                {isLoadingNotif && notificationsWithRead.length === 0 ? (
+                  <div className="py-10 text-center px-4">
+                    <RefreshCw className="mx-auto mb-2 h-5 w-5 animate-spin text-blue-500" />
+                    <p className="text-xs font-semibold text-slate-700">Đang tải thông báo...</p>
+                  </div>
+                ) : notificationsWithRead.length === 0 ? (
                   <div className="py-10 text-center px-4">
                     <div className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-slate-400">
                       <BellOff className="h-5 w-5" />
                     </div>
-                    <p className="text-xs font-semibold text-slate-700">Không có thông báo mới</p>
-                    <p className="text-[11px] text-slate-400 mt-0.5">Tất cả hoạt động kho và hệ thống đều ổn định.</p>
+                    <p className="text-xs font-semibold text-slate-700">Chưa có thông báo thay đổi</p>
+                    <p className="text-[11px] text-slate-400 mt-0.5">
+                      Mọi thay đổi trong hệ thống sẽ xuất hiện trực tiếp tại đây.
+                    </p>
                   </div>
                 ) : (
-                  notifications.map((item) => (
-                    <div
+                  notificationsWithRead.map((item) => (
+                    <button
+                      type="button"
                       key={item.id}
-                      onClick={() => markAsRead(item.id, item.link)}
-                      className={`flex items-start space-x-3 p-3.5 cursor-pointer transition-colors ${
-                        item.read ? 'bg-white hover:bg-slate-50/80 opacity-75' : 'bg-blue-50/30 hover:bg-blue-50/60'
+                      onClick={() => handleNotificationClick(item)}
+                      className={`w-full text-left flex items-start space-x-3 p-3.5 cursor-pointer transition-colors ${
+                        item.read ? 'bg-white hover:bg-slate-50/80 opacity-80' : 'bg-blue-50/35 hover:bg-blue-50/70'
                       }`}
                     >
                       {/* Icon based on type */}
@@ -250,20 +423,36 @@ export const Header: React.FC<HeaderProps> = ({ onOpenSidebar, isSidebarOpen }) 
 
                       {/* Content */}
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between">
-                          <p className={`text-xs truncate ${item.read ? 'font-medium text-slate-700' : 'font-bold text-slate-900'}`}>
+                        <div className="flex items-center justify-between gap-2">
+                          <p
+                            className={`text-xs truncate ${
+                              item.read ? 'font-medium text-slate-700' : 'font-bold text-slate-900'
+                            }`}
+                          >
                             {item.title}
                           </p>
-                          {!item.read && <span className="h-1.5 w-1.5 rounded-full bg-blue-600 shrink-0 ml-2" />}
+                          {!item.read && (
+                            <span className="h-1.5 w-1.5 rounded-full bg-blue-600 shrink-0" />
+                          )}
                         </div>
                         <p className="text-[11px] text-slate-500 line-clamp-2 mt-0.5 leading-relaxed">
                           {item.message}
                         </p>
-                        <span className="text-[10px] text-slate-400 mt-1 inline-block font-medium">
-                          {item.time}
-                        </span>
+                        <div className="mt-1.5 flex items-center justify-between gap-2 text-[10px]">
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            <span className="rounded bg-slate-100 px-1.5 py-0.5 font-semibold text-slate-600 shrink-0">
+                              {item.categoryLabel}
+                            </span>
+                            {item.actorName && (
+                              <span className="truncate text-slate-400">bởi {item.actorName}</span>
+                            )}
+                          </div>
+                          <span className="text-slate-400 font-medium shrink-0">
+                            {formatRelativeTimeVi(item.createdAt, nowMs)}
+                          </span>
+                        </div>
                       </div>
-                    </div>
+                    </button>
                   ))
                 )}
               </div>
@@ -271,8 +460,9 @@ export const Header: React.FC<HeaderProps> = ({ onOpenSidebar, isSidebarOpen }) 
               {/* Dropdown Footer */}
               <div className="border-t border-slate-100 bg-slate-50/60 p-2.5 flex items-center justify-between text-[11px]">
                 <button
+                  type="button"
                   onClick={() => {
-                    navigate('/borrow-return');
+                    navigate(canAccessPage(user?.role, '/borrow-return') ? '/borrow-return' : '/dashboard');
                     setIsNotifOpen(false);
                   }}
                   className="font-semibold text-slate-600 hover:text-blue-600 transition-colors"
@@ -280,13 +470,20 @@ export const Header: React.FC<HeaderProps> = ({ onOpenSidebar, isSidebarOpen }) 
                   Quản lý mượn trả &rarr;
                 </button>
                 <button
+                  type="button"
                   onClick={() => {
-                    navigate('/inventory');
+                    navigate(
+                      canAccessPage(user?.role, '/audit-logs')
+                        ? '/audit-logs'
+                        : canAccessPage(user?.role, '/inventory')
+                        ? '/inventory'
+                        : '/dashboard'
+                    );
                     setIsNotifOpen(false);
                   }}
                   className="font-semibold text-slate-600 hover:text-blue-600 transition-colors"
                 >
-                  Xem tồn kho &rarr;
+                  {canAccessPage(user?.role, '/audit-logs') ? 'Nhật ký hệ thống →' : 'Xem tồn kho →'}
                 </button>
               </div>
             </div>
