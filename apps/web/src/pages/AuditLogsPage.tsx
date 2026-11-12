@@ -18,6 +18,7 @@ import {
   Shield,
 } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
+import { useModalDismiss } from '../hooks/useModalDismiss';
 import { apiClient } from '../services/api';
 
 export interface AuditLogEntry {
@@ -47,6 +48,11 @@ export const AuditLogsPage: React.FC = () => {
   const [inspectLog, setInspectLog] = useState<AuditLogEntry | null>(null);
   const [copiedPayload, setCopiedPayload] = useState(false);
   const [copiedId, setCopiedId] = useState(false);
+
+  const inspectBackdropDismiss = useModalDismiss(
+    Boolean(inspectLog),
+    () => setInspectLog(null)
+  );
 
   const handleCopyPayload = (text: string) => {
     navigator.clipboard?.writeText(text);
@@ -412,7 +418,10 @@ export const AuditLogsPage: React.FC = () => {
 
       {/* Detail Inspection Modal */}
       {inspectLog && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-md p-4 animate-in fade-in duration-200">
+        <div
+          {...inspectBackdropDismiss}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-md p-4 animate-in fade-in duration-200"
+        >
           <div className="w-full max-w-2xl rounded-2xl bg-white shadow-modal border border-slate-200/90 overflow-hidden animate-in zoom-in-95 duration-200">
             {/* Modal Header */}
             <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4 bg-gradient-to-r from-slate-50/90 via-white to-slate-50/60">

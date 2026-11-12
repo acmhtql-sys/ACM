@@ -7,6 +7,7 @@ import {
   StockBalanceResponse,
 } from '@acm/shared';
 import { useIdempotentTransaction } from '../../hooks/useIdempotentTransaction';
+import { useModalDismiss } from '../../hooks/useModalDismiss';
 import { stockTransactionsService } from '../../services/stock-transactions.service';
 import { isStockTransactionWriteEnabled, isStockAdjustmentEnabled } from '../../config/features';
 import { canPerformStockMutation } from '../../services/stock-rbac';
@@ -93,8 +94,6 @@ export const StockAdjustmentModal: React.FC<StockAdjustmentModalProps> = ({
     },
   });
 
-  if (!isOpen) return null;
-
   const handleClose = () => {
     fsm.resetToDraft();
     setHeaderLocationId('');
@@ -112,6 +111,10 @@ export const StockAdjustmentModal: React.FC<StockAdjustmentModalProps> = ({
     setReconcileError(null);
     onClose();
   };
+
+  const backdropDismiss = useModalDismiss(isOpen, handleClose, fsm.isSubmitting);
+
+  if (!isOpen) return null;
 
   const writeEnabled = isStockTransactionWriteEnabled();
   const adjustmentEnabled = isStockAdjustmentEnabled();
@@ -251,6 +254,7 @@ export const StockAdjustmentModal: React.FC<StockAdjustmentModalProps> = ({
 
   return (
     <div
+      {...backdropDismiss}
       className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4 overflow-y-auto"
       data-testid="stock-adjustment-modal"
     >

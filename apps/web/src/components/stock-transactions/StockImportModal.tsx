@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   X,
   Plus,
@@ -18,6 +18,7 @@ import {
   UserRole,
 } from '@acm/shared';
 import { useIdempotentTransaction } from '../../hooks/useIdempotentTransaction';
+import { useModalDismiss } from '../../hooks/useModalDismiss';
 import { stockTransactionsService } from '../../services/stock-transactions.service';
 import { isStockTransactionWriteEnabled } from '../../config/features';
 import { canPerformStockMutation } from '../../services/stock-rbac';
@@ -142,17 +143,7 @@ export const StockImportModal: React.FC<StockImportModalProps> = ({
     onClose();
   };
 
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && isOpen && !fsm.isSubmitting) {
-        handleClose();
-      }
-    };
-    if (isOpen) {
-      window.addEventListener('keydown', handleKeyDown);
-      return () => window.removeEventListener('keydown', handleKeyDown);
-    }
-  }, [isOpen, fsm.isSubmitting]);
+  const backdropDismiss = useModalDismiss(isOpen, handleClose, fsm.isSubmitting);
 
   if (!isOpen) return null;
 
@@ -305,6 +296,7 @@ export const StockImportModal: React.FC<StockImportModalProps> = ({
 
   return (
     <div
+      {...backdropDismiss}
       className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4 overflow-y-auto"
       data-testid="stock-import-modal"
     >

@@ -73,3 +73,4 @@ describe('useModalDismiss', () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 });
+

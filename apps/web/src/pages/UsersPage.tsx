@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { apiClient } from '../services/api';
 import { useAuth } from '../hooks/useAuth';
+import { useModalDismiss } from '../hooks/useModalDismiss';
 import { StatusBadge } from '../components/StatusBadge';
 import { canManageUsers, type AcmRole } from '../config/access';
 import {
@@ -88,6 +89,8 @@ export const UsersPage: React.FC = () => {
     setNewPassword('');
     setCreateForm(blankCreate());
   };
+
+  const modalDismiss = useModalDismiss(Boolean(operation), close, busy);
 
   const runMutation = async (action: () => Promise<void>) => {
     if (!isAdmin || busyRef.current) return;
@@ -290,7 +293,7 @@ export const UsersPage: React.FC = () => {
       </table>
     </section>
 
-    {operation && <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm">
+    {operation && <div {...modalDismiss} className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm">
       <div role="dialog" aria-modal="true" aria-label="Thao tác quản trị người dùng" className="max-h-[90vh] w-full max-w-lg overflow-auto rounded-2xl bg-white p-6 shadow-modal border border-slate-100">
         <div className="mb-4 flex items-center justify-between border-b border-slate-100 pb-3">
           <h2 className="text-base font-bold text-slate-900">{operation === 'create' ? 'Thêm tài khoản' :

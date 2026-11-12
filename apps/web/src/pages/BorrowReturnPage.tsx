@@ -20,6 +20,7 @@ import { CreateBorrowModal } from '../components/borrow/CreateBorrowModal';
 import { StatusBadge } from '../components/StatusBadge';
 import { apiClient } from '../services/api';
 import { useAuth } from '../hooks/useAuth';
+import { useModalDismiss } from '../hooks/useModalDismiss';
 import {
   clearPendingBorrowReturn,
   listPendingBorrowReturns,
@@ -114,6 +115,17 @@ export const BorrowReturnPage: React.FC = () => {
   // Reject dialog state
   const [rejectingBorrowId, setRejectingBorrowId] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState<string>('');
+
+  const returnBackdropDismiss = useModalDismiss(
+    Boolean(returningBorrow) && !isCameraModalOpen,
+    () => setReturningBorrow(null),
+    Boolean(returningBorrow && actionLoading === returningBorrow.id)
+  );
+  const rejectBackdropDismiss = useModalDismiss(
+    Boolean(rejectingBorrowId),
+    () => setRejectingBorrowId(null),
+    Boolean(rejectingBorrowId && actionLoading === rejectingBorrowId)
+  );
 
   const syncStorageIntents = () => {
     if (!user?.id) {
@@ -883,7 +895,10 @@ export const BorrowReturnPage: React.FC = () => {
 
       {/* Return Modal Dialog */}
       {returningBorrow && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm">
+        <div
+          {...returnBackdropDismiss}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm"
+        >
           <div className="w-full max-w-lg rounded-xl bg-white p-5 shadow-xl border border-slate-200 max-h-[90vh] overflow-y-auto">
             <h3 className="text-sm font-bold text-slate-900 flex items-center space-x-2">
               <CornerDownLeft className="h-4 w-4 text-emerald-600" />
@@ -1074,7 +1089,10 @@ export const BorrowReturnPage: React.FC = () => {
 
       {/* Reject Modal Dialog */}
       {rejectingBorrowId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm">
+        <div
+          {...rejectBackdropDismiss}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm"
+        >
           <div className="w-full max-w-md rounded-xl bg-white p-5 shadow-xl border border-slate-200">
             <h3 className="text-sm font-bold text-slate-900 flex items-center space-x-2 text-rose-600">
               <AlertTriangle className="h-4 w-4" />

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { X, AlertCircle, Save, Plus, Layers, Warehouse, Grid, Box } from 'lucide-react';
 import { LocationType, LocationResponse, LocationNode } from '@acm/shared';
 import { isLocationWriteEnabled } from '../../config/features';
+import { useModalDismiss } from '../../hooks/useModalDismiss';
 
 export interface LocationFormModalProps {
   isOpen: boolean;
@@ -303,10 +304,13 @@ export const LocationFormModal: React.FC<LocationFormModalProps> = ({
     }
   };
 
+  const backdropDismiss = useModalDismiss(isOpen, onClose, isSubmitting);
+
   if (!isOpen) return null;
 
   return (
     <div
+      {...backdropDismiss}
       role="dialog"
       aria-modal="true"
       aria-labelledby="location-modal-title"

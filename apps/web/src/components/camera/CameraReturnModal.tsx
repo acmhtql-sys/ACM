@@ -28,6 +28,7 @@ import {
   type VisionDetectResponse,
 } from '../../services/vision.service';
 import type { ReturnCondition, ReturnInputRow } from '../../pages/borrowReturnPartial';
+import { useModalDismiss } from '../../hooks/useModalDismiss';
 import { apiClient } from '../../services/api';
 
 export interface CatalogItem {
@@ -924,6 +925,8 @@ export const CameraReturnModal: React.FC<CameraReturnModalProps> = ({
     onClose();
   };
 
+  const backdropDismiss = useModalDismiss(isOpen, handleModalClose);
+
   // Filtered detections for the detections tab
   const filteredDetections = useMemo(() => {
     if (detectionFilter === 'ALL') return analyzedDetections;
@@ -948,7 +951,10 @@ export const CameraReturnModal: React.FC<CameraReturnModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-3 backdrop-blur-sm">
+    <div
+      {...backdropDismiss}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-3 backdrop-blur-sm"
+    >
       <div className="flex h-[94vh] w-full max-w-5xl flex-col rounded-2xl bg-white shadow-2xl border border-slate-200 overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-slate-200 px-5 py-3.5 bg-slate-50">

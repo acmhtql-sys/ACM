@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   X,
   Plus,
@@ -22,6 +22,7 @@ import {
   UserRole,
 } from '@acm/shared';
 import { useIdempotentTransaction } from '../../hooks/useIdempotentTransaction';
+import { useModalDismiss } from '../../hooks/useModalDismiss';
 import { stockTransactionsService } from '../../services/stock-transactions.service';
 import { isStockTransactionWriteEnabled } from '../../config/features';
 import { canPerformStockMutation } from '../../services/stock-rbac';
@@ -176,17 +177,7 @@ export const StockTransferModal: React.FC<StockTransferModalProps> = ({
     onClose();
   };
 
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && isOpen && !fsm.isSubmitting) {
-        handleClose();
-      }
-    };
-    if (isOpen) {
-      window.addEventListener('keydown', handleKeyDown);
-      return () => window.removeEventListener('keydown', handleKeyDown);
-    }
-  }, [isOpen, fsm.isSubmitting]);
+  const backdropDismiss = useModalDismiss(isOpen, handleClose, fsm.isSubmitting);
 
   if (!isOpen) return null;
 
@@ -393,6 +384,7 @@ export const StockTransferModal: React.FC<StockTransferModalProps> = ({
 
   return (
     <div
+      {...backdropDismiss}
       className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4 overflow-y-auto"
       data-testid="stock-transfer-modal"
     >

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { X, AlertTriangle, CheckCircle2, ShieldAlert, Power } from 'lucide-react';
 import { LocationResponse } from '@acm/shared';
 import { isLocationWriteEnabled } from '../../config/features';
+import { useModalDismiss } from '../../hooks/useModalDismiss';
 
 export interface LocationStatusModalProps {
   isOpen: boolean;
@@ -25,6 +26,12 @@ export const LocationStatusModal: React.FC<LocationStatusModalProps> = ({
   const isWriteEnabled = isLocationWriteEnabled();
   const [reason, setReason] = useState('');
   const [localServerError, setLocalServerError] = useState<string | null>(null);
+
+  const backdropDismiss = useModalDismiss(
+    isOpen && Boolean(location),
+    onClose,
+    isSubmitting
+  );
 
   if (!isOpen || !location) return null;
 
@@ -57,6 +64,7 @@ export const LocationStatusModal: React.FC<LocationStatusModalProps> = ({
 
   return (
     <div
+      {...backdropDismiss}
       role="dialog"
       aria-modal="true"
       aria-labelledby="status-modal-title"

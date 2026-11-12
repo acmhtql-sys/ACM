@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { StockTransactionSummary } from '../../types/stock-transactions';
 import { stockTransactionsService } from '../../services/stock-transactions.service';
 import { EmptyState } from '../common/EmptyState';
+import { useModalDismiss } from '../../hooks/useModalDismiss';
 
 interface StockTransactionDetailModalProps {
   isOpen: boolean;
@@ -33,23 +34,14 @@ export const StockTransactionDetailModal: React.FC<StockTransactionDetailModalPr
     enabled: shouldFetch,
   });
 
-  React.useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && isOpen) {
-        onClose();
-      }
-    };
-    if (isOpen) {
-      window.addEventListener('keydown', handleKeyDown);
-      return () => window.removeEventListener('keydown', handleKeyDown);
-    }
-  }, [isOpen, onClose]);
+  const backdropDismiss = useModalDismiss(isOpen, onClose);
 
   if (!isOpen) return null;
 
   if (isLoading && !transaction && !fetchedTx) {
     return (
       <div
+        {...backdropDismiss}
         className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4 overflow-y-auto"
         data-testid="transaction-detail-modal-loading"
       >
@@ -65,6 +57,7 @@ export const StockTransactionDetailModal: React.FC<StockTransactionDetailModalPr
   if (isError && !transaction && !fetchedTx) {
     return (
       <div
+        {...backdropDismiss}
         className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4 overflow-y-auto"
         data-testid="transaction-detail-modal-error"
       >
@@ -123,6 +116,7 @@ export const StockTransactionDetailModal: React.FC<StockTransactionDetailModalPr
 
   return (
     <div
+      {...backdropDismiss}
       className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4 overflow-y-auto"
       data-testid="transaction-detail-modal"
     >

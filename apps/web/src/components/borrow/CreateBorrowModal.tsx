@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { apiClient } from '../../services/api';
 import { useAuth } from '../../hooks/useAuth';
+import { useModalDismiss } from '../../hooks/useModalDismiss';
 
 export interface CreateBorrowModalProps {
   isOpen: boolean;
@@ -124,6 +125,8 @@ export const CreateBorrowModal: React.FC<CreateBorrowModalProps> = ({
     loadData();
   }, [isOpen, todayStr, defaultReturnStr, user?.id, isPrivileged]);
 
+  const backdropDismiss = useModalDismiss(isOpen, onClose, submitting);
+
   if (!isOpen) return null;
 
   // Helpers for item row manipulation
@@ -220,7 +223,10 @@ export const CreateBorrowModal: React.FC<CreateBorrowModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in overflow-y-auto">
+    <div
+      {...backdropDismiss}
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in overflow-y-auto"
+    >
       <div className="relative w-full max-w-3xl my-8 bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[90vh]">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-gradient-to-r from-blue-50 to-indigo-50">

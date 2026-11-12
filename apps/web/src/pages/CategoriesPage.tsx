@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { apiClient } from '../services/api';
 import { useAuth } from '../hooks/useAuth';
+import { useModalDismiss } from '../hooks/useModalDismiss';
 import { CategoryModal, type Category } from '../components/categories/CategoryModal';
 
 export const CategoriesPage: React.FC = () => {
@@ -32,6 +33,12 @@ export const CategoriesPage: React.FC = () => {
   const [deleteCandidate, setDeleteCandidate] = useState<Category | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteWarning, setDeleteWarning] = useState<string | null>(null);
+
+  const deleteBackdropDismiss = useModalDismiss(
+    Boolean(deleteCandidate),
+    () => setDeleteCandidate(null),
+    isDeleting
+  );
 
   const fetchCategories = useCallback(async () => {
     setIsLoading(true);
@@ -271,7 +278,10 @@ export const CategoriesPage: React.FC = () => {
 
       {/* Guarded Delete Confirmation Modal */}
       {deleteCandidate && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-slate-900/50 p-4 backdrop-blur-xs">
+        <div
+          {...deleteBackdropDismiss}
+          className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-slate-900/50 p-4 backdrop-blur-xs"
+        >
           <div className="relative w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
             <div className="flex items-center space-x-3 text-rose-600">
               <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-rose-50">

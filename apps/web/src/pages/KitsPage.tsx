@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { StatusBadge } from '../components/StatusBadge';
 import { useAuth } from '../hooks/useAuth';
+import { useModalDismiss } from '../hooks/useModalDismiss';
 import { apiClient } from '../services/api';
 import { KitStatus } from '@acm/shared';
 
@@ -71,6 +72,10 @@ export const KitsPage: React.FC = () => {
 
   // Create Modal state
   const [isCreateModalOpen, setIsCreateModalOpen] = useState<boolean>(false);
+  const createBackdropDismiss = useModalDismiss(
+    isCreateModalOpen,
+    () => setIsCreateModalOpen(false)
+  );
   const [createFormData, setCreateFormData] = useState<{
     code: string;
     name: string;
@@ -604,7 +609,10 @@ export const KitsPage: React.FC = () => {
 
       {/* Create Kit Modal */}
       {isCreateModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm">
+        <div
+          {...createBackdropDismiss}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm"
+        >
           <div className="w-full max-w-lg rounded-xl bg-white p-5 shadow-xl">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <h3 className="text-sm font-bold text-slate-900">Tạo hộp kit thực hành mới</h3>
