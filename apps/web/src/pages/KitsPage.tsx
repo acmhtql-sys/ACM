@@ -11,12 +11,17 @@ import {
   Trash2,
   ChevronDown,
   ChevronUp,
+  Minus,
+  Layers,
+  Zap,
+  Check,
 } from 'lucide-react';
 import { StatusBadge } from '../components/StatusBadge';
 import { useAuth } from '../hooks/useAuth';
 import { useModalDismiss } from '../hooks/useModalDismiss';
 import { apiClient } from '../services/api';
 import { KitStatus } from '@acm/shared';
+import { KitItemPickerModal, KitPickerItemOption, ItemStockBalance } from '../components/kits/KitItemPickerModal';
 
 interface KitItemComponent {
   id: string;
@@ -42,12 +47,73 @@ interface KitRecord {
   updatedAt: string;
 }
 
-interface ItemOption {
+export interface ItemOption extends KitPickerItemOption {
   id: string;
   code: string;
   name: string;
   unit: string;
+  categoryId?: string;
+  categoryName?: string;
+  category?: { id: string; code: string; name: string };
+  totalOnHand?: number;
+  available?: number;
+  stockBalances?: ItemStockBalance[];
 }
+
+export interface KitTemplate {
+  id: string;
+  name: string;
+  description: string;
+  items: Array<{
+    codeMatch: string;
+    keywords?: string[];
+    defaultQuantity: number;
+    notes?: string;
+  }>;
+}
+
+export const KIT_TEMPLATES: KitTemplate[] = [
+  {
+    id: 'ai-fantasy-zoo',
+    name: 'AI FANTASY ZOO - Chủ đề 1',
+    description: 'Bộ kit robot AI Fantasy Zoo tiêu chuẩn gồm bo mạch chủ, công tắc, cảm biến siêu âm, cảm biến hồng ngoại, 2 động cơ servo, loa, đèn LED và cáp nối.',
+    items: [
+      { codeMatch: 'MAIN-02', keywords: ['main', 'bo mach'], defaultQuantity: 1, notes: 'Bo mạch điều khiển chính' },
+      { codeMatch: 'SW-MAIN-02', keywords: ['switch', 'cong tac'], defaultQuantity: 1, notes: 'Công tắc nguồn' },
+      { codeMatch: 'SEN-IR', keywords: ['ir', 'hong ngoai'], defaultQuantity: 1, notes: 'Cảm biến hồng ngoại' },
+      { codeMatch: 'SEN-US-01', keywords: ['sieu am', 'ultrasonic', 'sr04'], defaultQuantity: 1, notes: 'Cảm biến siêu âm' },
+      { codeMatch: 'MOT-SERVO-01', keywords: ['servo', 'dong co'], defaultQuantity: 2, notes: 'Động cơ Servo khớp nối' },
+      { codeMatch: 'ACT-SPK-01', keywords: ['speaker', 'loa'], defaultQuantity: 1, notes: 'Loa âm thanh' },
+      { codeMatch: 'ACT-LED-01', keywords: ['led'], defaultQuantity: 1, notes: 'Đèn LED hiển thị' },
+      { codeMatch: 'WHL-OMNI-01', keywords: ['omni', 'banh xe'], defaultQuantity: 2, notes: 'Bánh xe đa hướng' },
+      { codeMatch: 'CAB-RJ11-01', keywords: ['rj11', 'cap'], defaultQuantity: 3, notes: 'Cáp kết nối cảm biến' },
+    ],
+  },
+  {
+    id: 'smart-car',
+    name: 'Bộ Kit Xe Robot Thông Minh (Smart Car)',
+    description: 'Kit thực hành xe robot tự hành dò đường (line tracking) và tránh chướng ngại vật siêu âm.',
+    items: [
+      { codeMatch: 'ESP32', keywords: ['esp32', 'arduino', 'uno'], defaultQuantity: 1, notes: 'Bo mạch điều khiển' },
+      { codeMatch: 'SEN-US', keywords: ['sieu am', 'sr04', 'ultrasonic'], defaultQuantity: 1, notes: 'Cảm biến siêu âm tránh vật cản' },
+      { codeMatch: 'SEN-IR', keywords: ['ir', 'line', 'hong ngoai'], defaultQuantity: 2, notes: 'Cảm biến hồng ngoại dò line' },
+      { codeMatch: 'MOT-SERVO', keywords: ['servo', 'dong co'], defaultQuantity: 2, notes: 'Động cơ dẫn động' },
+      { codeMatch: 'WHL-', keywords: ['banh xe', 'wheel'], defaultQuantity: 2, notes: 'Bánh xe robot' },
+    ],
+  },
+  {
+    id: 'iot-starter',
+    name: 'Bộ Kit Vi Điều Khiển & Cảm Biến IoT',
+    description: 'Bộ linh kiện thực hành môn Internet of Things và Hệ thống nhúng với vi điều khiển và cảm biến môi trường.',
+    items: [
+      { codeMatch: 'ESP32', keywords: ['esp32', 'arduino', 'uno'], defaultQuantity: 1, notes: 'Board vi điều khiển IoT' },
+      { codeMatch: 'DHT', keywords: ['dht', 'nhiet do', 'do am'], defaultQuantity: 1, notes: 'Cảm biến nhiệt ẩm DHT' },
+      { codeMatch: 'SR04', keywords: ['sieu am', 'khoang cach'], defaultQuantity: 1, notes: 'Cảm biến khoảng cách' },
+      { codeMatch: 'LED', keywords: ['led'], defaultQuantity: 2, notes: 'Đèn LED tín hiệu' },
+      { codeMatch: 'RES', keywords: ['dien tro', 'resistor'], defaultQuantity: 5, notes: 'Điện trở phân dòng' },
+    ],
+  },
+];
 
 interface LocationOption {
   id: string;
@@ -200,7 +266,7 @@ export const KitsPage: React.FC = () => {
       code: '',
       name: '',
       description: '',
-      locationId: '',
+      locationId: locationsList[0]?.id || '',
       items: [{ itemId: '', quantity: 1, notes: '' }],
     });
     setIsCreateModalOpen(true);
@@ -209,6 +275,7 @@ export const KitsPage: React.FC = () => {
   const handleCloseCreateModal = () => {
     setIsCreateModalOpen(false);
     setIsCodeManuallyEdited(false);
+    setIsPickerModalOpen(false);
   };
 
   const createBackdropDismiss = useModalDismiss(
@@ -228,6 +295,175 @@ export const KitsPage: React.FC = () => {
     locationId: '',
     items: [{ itemId: '', quantity: 1, notes: '' }],
   });
+
+  // Multi-item picker modal state
+  const [isPickerModalOpen, setIsPickerModalOpen] = useState<boolean>(false);
+
+  // Group available categories from itemsList
+  const availableCategories = useMemo(() => {
+    const map = new Map<string, { id: string; name: string; count: number }>();
+    for (const item of itemsList) {
+      const catId = item.categoryId || item.category?.id || 'other';
+      const catName = item.category?.name || item.categoryName || 'Khác / Chưa phân loại';
+      const existing = map.get(catId);
+      if (existing) {
+        existing.count += 1;
+      } else {
+        map.set(catId, { id: catId, name: catName, count: 1 });
+      }
+    }
+    return Array.from(map.values()).sort((a, b) => b.count - a.count);
+  }, [itemsList]);
+
+  // Stock availability helper at selected location
+  const getItemStockAtLocation = (item: ItemOption | undefined, locationId: string): number => {
+    if (!item || !locationId || !item.stockBalances) return 0;
+    const bal = item.stockBalances.find((b) => b.locationId === locationId);
+    return bal ? bal.available : 0;
+  };
+
+  // Count items in kit exceeding available stock at selected location
+  const insufficientStockItemsCount = useMemo(() => {
+    if (!createFormData.locationId) return 0;
+    return createFormData.items.filter((row) => {
+      if (!row.itemId) return false;
+      const itm = itemsList.find((it) => it.id === row.itemId);
+      const avail = getItemStockAtLocation(itm, createFormData.locationId);
+      return avail < row.quantity;
+    }).length;
+  }, [createFormData.items, createFormData.locationId, itemsList]);
+
+  // Set of already selected item IDs in current form
+  const alreadySelectedItemIds = useMemo(() => {
+    return new Set(createFormData.items.map((i) => i.itemId).filter(Boolean));
+  }, [createFormData.items]);
+
+  // Handler: Apply pre-configured Kit Template
+  const handleApplyTemplate = (templateId: string) => {
+    const tmpl = KIT_TEMPLATES.find((t) => t.id === templateId);
+    if (!tmpl) return;
+
+    const autoCode = generateKitCode(tmpl.name, existingCodes);
+    const matchedItems: Array<{ itemId: string; quantity: number; notes: string }> = [];
+    const usedItemIds = new Set<string>();
+
+    for (const tItem of tmpl.items) {
+      // 1. Exact match code
+      let found = itemsList.find(
+        (it) => it.code.toUpperCase() === tItem.codeMatch.toUpperCase() && !usedItemIds.has(it.id)
+      );
+      // 2. Prefix match code
+      if (!found) {
+        found = itemsList.find(
+          (it) => it.code.toUpperCase().startsWith(tItem.codeMatch.toUpperCase()) && !usedItemIds.has(it.id)
+        );
+      }
+      // 3. Keyword match in name
+      if (!found && tItem.keywords) {
+        found = itemsList.find(
+          (it) =>
+            tItem.keywords!.some((kw) =>
+              removeVietnameseTones(it.name.toLowerCase()).includes(removeVietnameseTones(kw))
+            ) && !usedItemIds.has(it.id)
+        );
+      }
+
+      if (found) {
+        usedItemIds.add(found.id);
+        matchedItems.push({
+          itemId: found.id,
+          quantity: tItem.defaultQuantity,
+          notes: tItem.notes || '',
+        });
+      }
+    }
+
+    setCreateFormData((prev) => ({
+      ...prev,
+      name: prev.name.trim() ? prev.name : tmpl.name,
+      code: prev.code.trim() && isCodeManuallyEdited ? prev.code : autoCode,
+      description: prev.description.trim() ? prev.description : tmpl.description,
+      items: matchedItems.length > 0 ? matchedItems : prev.items,
+    }));
+  };
+
+  // Handler: Batch add all items in a category
+  const handleAddCategoryItems = (catId: string) => {
+    if (!catId) return;
+    const catItems = itemsList.filter(
+      (it) => (it.categoryId || it.category?.id || 'other') === catId
+    );
+    if (catItems.length === 0) return;
+
+    setCreateFormData((prev) => {
+      const existingItemIds = new Set(prev.items.map((i) => i.itemId).filter(Boolean));
+      const toAdd = catItems.filter((it) => !existingItemIds.has(it.id));
+      if (toAdd.length === 0) return prev;
+
+      const cleaned = prev.items.filter((i) => Boolean(i.itemId));
+      const newLines = toAdd.map((it) => ({
+        itemId: it.id,
+        quantity: 1,
+        notes: '',
+      }));
+
+      return {
+        ...prev,
+        items: [...cleaned, ...newLines],
+      };
+    });
+  };
+
+  // Handler: Add items chosen via Multi-Item Picker Modal
+  const handlePickerAddItems = (
+    newItems: Array<{ itemId: string; quantity: number; notes?: string }>
+  ) => {
+    setCreateFormData((prev) => {
+      const currentMap = new Map<string, { quantity: number; notes: string }>();
+      for (const row of prev.items) {
+        if (row.itemId) {
+          currentMap.set(row.itemId, { quantity: row.quantity, notes: row.notes });
+        }
+      }
+
+      for (const n of newItems) {
+        if (currentMap.has(n.itemId)) {
+          const cur = currentMap.get(n.itemId)!;
+          currentMap.set(n.itemId, {
+            quantity: cur.quantity + n.quantity,
+            notes: n.notes || cur.notes,
+          });
+        } else {
+          currentMap.set(n.itemId, {
+            quantity: n.quantity,
+            notes: n.notes || '',
+          });
+        }
+      }
+
+      const mergedRows = Array.from(currentMap.entries()).map(([itemId, val]) => ({
+        itemId,
+        quantity: val.quantity,
+        notes: val.notes,
+      }));
+
+      return {
+        ...prev,
+        items: mergedRows.length > 0 ? mergedRows : [{ itemId: '', quantity: 1, notes: '' }],
+      };
+    });
+  };
+
+  // Handler: Clear all items
+  const handleClearItems = () => {
+    if (createFormData.items.length <= 1 && !createFormData.items[0]?.itemId) return;
+    if (window.confirm('Bạn có chắc chắn muốn xóa tất cả linh kiện khỏi kit này?')) {
+      setCreateFormData((prev) => ({
+        ...prev,
+        items: [{ itemId: '', quantity: 1, notes: '' }],
+      }));
+    }
+  };
 
   const fetchKits = async () => {
     setLoading(true);
@@ -255,7 +491,7 @@ export const KitsPage: React.FC = () => {
   const fetchOptions = async () => {
     try {
       const [itemsRes, locsRes] = await Promise.all([
-        apiClient.get('/items', { params: { limit: 100 } }),
+        apiClient.get('/items', { params: { limit: 200 } }),
         apiClient.get('/locations', { params: { limit: 100 } }),
       ]);
       if (itemsRes.data?.success) {
@@ -743,187 +979,469 @@ export const KitsPage: React.FC = () => {
       {isCreateModalOpen && (
         <div
           {...createBackdropDismiss}
-          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-xs"
         >
-          <div className="w-full max-w-lg rounded-xl bg-white p-5 shadow-xl">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <h3 className="text-sm font-bold text-slate-900">Tạo hộp kit thực hành mới</h3>
+          <div className="flex max-h-[92vh] w-full max-w-4xl flex-col rounded-2xl bg-white shadow-2xl border border-slate-200 overflow-hidden">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50/75 px-6 py-4">
+              <div className="flex items-center space-x-2.5">
+                <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-blue-50 text-blue-600 border border-blue-200/60">
+                  <Boxes className="h-4 w-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900">Tạo hộp kit thực hành mới</h3>
+                  <p className="text-[11px] text-slate-500">
+                    Đóng gói bộ linh kiện thực hành cho phòng Lab Robotics & AI
+                  </p>
+                </div>
+              </div>
               <button
                 onClick={handleCloseCreateModal}
-                className="rounded p-1 text-slate-400 hover:text-slate-600 cursor-pointer"
+                className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 cursor-pointer transition-colors"
               >
                 <X className="h-4 w-4" />
               </button>
             </div>
 
-            <form onSubmit={handleCreateSubmit} className="mt-4 space-y-3">
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <div className="flex items-center justify-between">
-                    <label className="block text-[11px] font-semibold text-slate-700">Mã hộp Kit *</label>
-                    {createFormData.name && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const autoCode = generateKitCode(createFormData.name, existingCodes);
-                          setCreateFormData((prev) => ({ ...prev, code: autoCode }));
-                          setIsCodeManuallyEdited(false);
-                        }}
-                        className="text-[10px] text-blue-600 hover:text-blue-800 underline cursor-pointer"
-                        title="Tạo lại mã tự động theo tên hộp kit"
-                      >
-                        Tạo lại theo tên
-                      </button>
-                    )}
-                  </div>
-                  <input
-                    type="text"
-                    required
-                    placeholder="VD: KIT-IOT-001"
-                    value={createFormData.code}
-                    onChange={(e) => {
-                      const val = e.target.value.toUpperCase();
-                      if (val.trim() === '') {
-                        setIsCodeManuallyEdited(false);
-                      } else {
-                        setIsCodeManuallyEdited(true);
-                      }
-                      setCreateFormData({ ...createFormData, code: val });
-                    }}
-                    className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-mono font-medium focus:border-blue-500 focus:outline-none"
-                    data-testid="kit-code-input"
-                  />
-                  <p className="mt-0.5 text-[10px] text-slate-400">Tự động sinh từ tên kit</p>
-                </div>
-                <div>
-                  <label className="block text-[11px] font-semibold text-slate-700">Tên hộp Kit *</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="VD: Kit vi điều khiển IoT"
-                    value={createFormData.name}
-                    onChange={(e) => {
-                      const newName = e.target.value;
-                      if (!isCodeManuallyEdited || !createFormData.code) {
-                        const autoCode = generateKitCode(newName, existingCodes);
-                        setCreateFormData((prev) => ({
-                          ...prev,
-                          name: newName,
-                          code: autoCode,
-                        }));
-                      } else {
-                        setCreateFormData((prev) => ({
-                          ...prev,
-                          name: newName,
-                        }));
-                      }
-                    }}
-                    className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-1.5 text-xs focus:border-blue-500 focus:outline-none"
-                    data-testid="kit-name-input"
-                  />
-                </div>
-              </div>
+            <form onSubmit={handleCreateSubmit} className="flex-1 overflow-y-auto p-6 space-y-4">
+              {/* Basic Info Card */}
+              <div className="rounded-xl border border-slate-200 bg-slate-50/40 p-4 space-y-3">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-600">
+                  1. Thông tin chung & Vị trí kho
+                </h4>
 
-              <div>
-                <label className="block text-[11px] font-semibold text-slate-700">Vị trí lưu kho</label>
-                <select
-                  value={createFormData.locationId}
-                  onChange={(e) => setCreateFormData({ ...createFormData, locationId: e.target.value })}
-                  className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-1.5 text-xs focus:border-blue-500 focus:outline-none"
-                >
-                  <option value="">-- Chọn vị trí kho lưu trữ (Bắt buộc) --</option>
-                  {locationsList.map((loc) => (
-                    <option key={loc.id} value={loc.id}>
-                      {loc.name} ({loc.code})
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-semibold text-slate-700">Mô tả bài thực hành</label>
-                <textarea
-                  rows={2}
-                  placeholder="Mô tả mục đích sử dụng hộp kit..."
-                  value={createFormData.description}
-                  onChange={(e) => setCreateFormData({ ...createFormData, description: e.target.value })}
-                  className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-1.5 text-xs focus:border-blue-500 focus:outline-none"
-                />
-              </div>
-
-              {/* Component Items List */}
-              <div className="border-t border-slate-100 pt-3">
-                <div className="flex items-center justify-between pb-2">
-                  <label className="text-[11px] font-bold text-slate-700">Danh sách linh kiện trong kit *</label>
-                  <button
-                    type="button"
-                    onClick={addItemRow}
-                    className="text-[11px] font-semibold text-blue-600 hover:text-blue-700"
-                  >
-                    + Thêm linh kiện
-                  </button>
-                </div>
-
-                <div className="max-h-48 space-y-2 overflow-y-auto">
-                  {createFormData.items.map((row, idx) => (
-                    <div key={idx} className="flex items-center space-x-2">
-                      <select
-                        required
-                        value={row.itemId}
-                        onChange={(e) => updateItemRow(idx, 'itemId', e.target.value)}
-                        className="flex-1 rounded-lg border border-slate-200 px-2.5 py-1 text-xs focus:border-blue-500 focus:outline-none"
-                      >
-                        <option value="">-- Chọn linh kiện --</option>
-                        {itemsList.map((itm) => (
-                          <option key={itm.id} value={itm.id}>
-                            {itm.code} - {itm.name}
-                          </option>
-                        ))}
-                      </select>
-
-                      <input
-                        type="number"
-                        min="1"
-                        required
-                        value={row.quantity}
-                        onChange={(e) => updateItemRow(idx, 'quantity', parseInt(e.target.value, 10) || 1)}
-                        className="w-16 rounded-lg border border-slate-200 px-2 py-1 text-xs text-center focus:border-blue-500 focus:outline-none"
-                        placeholder="SL"
-                      />
-
-                      {createFormData.items.length > 1 && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                  <div>
+                    <div className="flex items-center justify-between">
+                      <label className="block text-[11px] font-semibold text-slate-700">Mã hộp Kit *</label>
+                      {createFormData.name && (
                         <button
                           type="button"
-                          onClick={() => removeItemRow(idx)}
-                          className="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-rose-600"
+                          onClick={() => {
+                            const autoCode = generateKitCode(createFormData.name, existingCodes);
+                            setCreateFormData((prev) => ({ ...prev, code: autoCode }));
+                            setIsCodeManuallyEdited(false);
+                          }}
+                          className="text-[10px] text-blue-600 hover:text-blue-800 underline cursor-pointer"
+                          title="Tạo lại mã tự động theo tên hộp kit"
                         >
-                          <X className="h-3.5 w-3.5" />
+                          Tạo lại theo tên
                         </button>
                       )}
                     </div>
-                  ))}
+                    <input
+                      type="text"
+                      required
+                      placeholder="VD: KIT-AFZ-01"
+                      value={createFormData.code}
+                      onChange={(e) => {
+                        const val = e.target.value.toUpperCase();
+                        if (val.trim() === '') {
+                          setIsCodeManuallyEdited(false);
+                        } else {
+                          setIsCodeManuallyEdited(true);
+                        }
+                        setCreateFormData({ ...createFormData, code: val });
+                      }}
+                      className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-mono font-medium focus:border-blue-500 focus:outline-none"
+                      data-testid="kit-code-input"
+                    />
+                    <p className="mt-0.5 text-[10px] text-slate-400">Tự động sinh từ tên hộp kit</p>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-700">Tên hộp Kit *</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="VD: AI FANTASY ZOO - Chủ đề 1"
+                      value={createFormData.name}
+                      onChange={(e) => {
+                        const newName = e.target.value;
+                        if (!isCodeManuallyEdited || !createFormData.code) {
+                          const autoCode = generateKitCode(newName, existingCodes);
+                          setCreateFormData((prev) => ({
+                            ...prev,
+                            name: newName,
+                            code: autoCode,
+                          }));
+                        } else {
+                          setCreateFormData((prev) => ({
+                            ...prev,
+                            name: newName,
+                          }));
+                        }
+                      }}
+                      className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs focus:border-blue-500 focus:outline-none"
+                      data-testid="kit-name-input"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-1">
+                  <div>
+                    <div className="flex items-center justify-between">
+                      <label className="block text-[11px] font-semibold text-slate-700">
+                        Vị trí lưu kho *
+                      </label>
+                      <span className="text-[10px] text-slate-400">
+                        Nơi xuất tồn linh kiện
+                      </span>
+                    </div>
+                    <select
+                      required
+                      value={createFormData.locationId}
+                      onChange={(e) => setCreateFormData({ ...createFormData, locationId: e.target.value })}
+                      className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-800 focus:border-blue-500 focus:outline-none"
+                    >
+                      <option value="">-- Chọn vị trí kho lưu trữ (Bắt buộc) --</option>
+                      {locationsList.map((loc) => (
+                        <option key={loc.id} value={loc.id}>
+                          {loc.name} ({loc.code})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-700">Mô tả bài thực hành</label>
+                    <input
+                      type="text"
+                      placeholder="Mô tả mục đích sử dụng, chủ đề bài học..."
+                      value={createFormData.description}
+                      onChange={(e) => setCreateFormData({ ...createFormData, description: e.target.value })}
+                      className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs focus:border-blue-500 focus:outline-none"
+                    />
+                  </div>
                 </div>
               </div>
 
-              <div className="flex justify-end space-x-2 border-t border-slate-100 pt-3">
-                <button
-                  type="button"
-                  onClick={handleCloseCreateModal}
-                  className="rounded-lg border border-slate-200 px-3.5 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 cursor-pointer"
-                >
-                  Hủy
-                </button>
-                <button
-                  type="submit"
-                  className="rounded-lg bg-blue-600 px-4 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-blue-700"
-                >
-                  Tạo hộp kit
-                </button>
+              {/* Component Items Section */}
+              <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-3.5 shadow-2xs">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-1 border-b border-slate-100">
+                  <div>
+                    <h4 className="text-xs font-bold text-slate-900 flex items-center space-x-1.5">
+                      <Package className="h-4 w-4 text-blue-600" />
+                      <span>2. Danh sách linh kiện trong kit *</span>
+                    </h4>
+                    <p className="text-[11px] text-slate-500">
+                      Tồn kho khả dụng sẽ hiển thị trực tiếp theo vị trí kho đã chọn.
+                    </p>
+                  </div>
+
+                  {/* Quick Action Toolbar */}
+                  <div className="flex flex-wrap items-center gap-2">
+                    {/* Preset Template Dropdown */}
+                    <select
+                      defaultValue=""
+                      onChange={(e) => {
+                        if (e.target.value) {
+                          handleApplyTemplate(e.target.value);
+                          e.target.value = '';
+                        }
+                      }}
+                      className="rounded-lg border border-indigo-200 bg-indigo-50/80 px-2.5 py-1.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-100 transition cursor-pointer"
+                      title="Nạp nhanh các linh kiện theo mẫu kit chuẩn"
+                    >
+                      <option value="" disabled>⚡ Nạp mẫu kit Robot có sẵn...</option>
+                      {KIT_TEMPLATES.map((tmpl) => (
+                        <option key={tmpl.id} value={tmpl.id}>
+                          🤖 {tmpl.name}
+                        </option>
+                      ))}
+                    </select>
+
+                    {/* Batch Add by Category */}
+                    {availableCategories.length > 0 && (
+                      <select
+                        defaultValue=""
+                        onChange={(e) => {
+                          if (e.target.value) {
+                            handleAddCategoryItems(e.target.value);
+                            e.target.value = '';
+                          }
+                        }}
+                        className="rounded-lg border border-amber-200 bg-amber-50/80 px-2.5 py-1.5 text-xs font-semibold text-amber-800 hover:bg-amber-100 transition cursor-pointer"
+                        title="Thêm toàn bộ linh kiện của một danh mục vào kit"
+                      >
+                        <option value="" disabled>📁 + Thêm theo danh mục...</option>
+                        {availableCategories.map((cat) => (
+                          <option key={cat.id} value={cat.id}>
+                            {cat.name} ({cat.count} món)
+                          </option>
+                        ))}
+                      </select>
+                    )}
+
+                    {/* Multi-item Search Picker */}
+                    <button
+                      type="button"
+                      onClick={() => setIsPickerModalOpen(true)}
+                      className="inline-flex items-center space-x-1.5 rounded-lg border border-blue-200 bg-blue-50 px-2.5 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-100 transition cursor-pointer"
+                    >
+                      <Search className="h-3.5 w-3.5" />
+                      <span>🔍 Tìm & Chọn linh kiện</span>
+                    </button>
+
+                    {/* Add Single Line */}
+                    <button
+                      type="button"
+                      onClick={addItemRow}
+                      className="inline-flex items-center space-x-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition cursor-pointer"
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                      <span>+ Thêm dòng</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Items Table */}
+                <div className="overflow-x-auto rounded-xl border border-slate-200">
+                  <table className="w-full text-left text-xs">
+                    <thead className="border-b border-slate-200 bg-slate-50 text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+                      <tr>
+                        <th className="px-3 py-2.5">Linh kiện</th>
+                        <th className="px-3 py-2.5 text-center">Tồn kho khả dụng</th>
+                        <th className="px-3 py-2.5 text-center">Số lượng</th>
+                        <th className="px-3 py-2.5">Ghi chú</th>
+                        <th className="px-2 py-2.5 text-center w-10">Xóa</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {createFormData.items.map((row, idx) => {
+                        const selectedItem = itemsList.find((it) => it.id === row.itemId);
+                        const availStock =
+                          selectedItem && createFormData.locationId
+                            ? getItemStockAtLocation(selectedItem, createFormData.locationId)
+                            : 0;
+                        const hasSelectedLocation = Boolean(createFormData.locationId);
+
+                        return (
+                          <tr key={idx} className="hover:bg-slate-50/60 transition-colors">
+                            {/* Component Selector */}
+                            <td className="px-3 py-2">
+                              <select
+                                required
+                                value={row.itemId}
+                                onChange={(e) => updateItemRow(idx, 'itemId', e.target.value)}
+                                className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-800 focus:border-blue-500 focus:outline-none"
+                              >
+                                <option value="">-- Chọn linh kiện --</option>
+                                {itemsList.map((itm) => (
+                                  <option key={itm.id} value={itm.id}>
+                                    {itm.code} - {itm.name} ({itm.unit || 'cái'})
+                                  </option>
+                                ))}
+                              </select>
+                            </td>
+
+                            {/* Stock Availability Badge */}
+                            <td className="px-3 py-2 text-center whitespace-nowrap">
+                              {selectedItem ? (
+                                hasSelectedLocation ? (
+                                  availStock >= row.quantity ? (
+                                    <span className="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 border border-emerald-200">
+                                      Còn {availStock} {selectedItem.unit || 'cái'} ✓
+                                    </span>
+                                  ) : availStock > 0 ? (
+                                    <span
+                                      className="inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-700 border border-amber-200"
+                                      title={`Kho chỉ còn ${availStock}, thiếu ${row.quantity - availStock}`}
+                                    >
+                                      Chỉ còn {availStock} (Thiếu {row.quantity - availStock}) ⚠️
+                                    </span>
+                                  ) : (
+                                    <span className="inline-flex items-center rounded-full bg-rose-50 px-2 py-0.5 text-[11px] font-semibold text-rose-700 border border-rose-200">
+                                      Hết hàng tại vị trí này (0) ✕
+                                    </span>
+                                  )
+                                ) : (
+                                  <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-500">
+                                    Chưa chọn kho
+                                  </span>
+                                )
+                              ) : (
+                                <span className="text-slate-400 text-[11px]">—</span>
+                              )}
+                            </td>
+
+                            {/* Quantity Stepper */}
+                            <td className="px-3 py-2 text-center whitespace-nowrap">
+                              <div className="inline-flex items-center space-x-1 rounded-lg border border-slate-200 bg-white p-0.5 shadow-2xs">
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    updateItemRow(
+                                      idx,
+                                      'quantity',
+                                      Math.max(1, (Number(row.quantity) || 1) - 1)
+                                    )
+                                  }
+                                  className="rounded p-1 text-slate-500 hover:bg-slate-100 hover:text-slate-800 cursor-pointer"
+                                >
+                                  <Minus className="h-3 w-3" />
+                                </button>
+                                <input
+                                  type="number"
+                                  min="1"
+                                  required
+                                  value={row.quantity}
+                                  onChange={(e) =>
+                                    updateItemRow(
+                                      idx,
+                                      'quantity',
+                                      parseInt(e.target.value, 10) || 1
+                                    )
+                                  }
+                                  className="w-12 text-center text-xs font-bold text-slate-800 focus:outline-none"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    updateItemRow(
+                                      idx,
+                                      'quantity',
+                                      (Number(row.quantity) || 1) + 1
+                                    )
+                                  }
+                                  className="rounded p-1 text-slate-500 hover:bg-slate-100 hover:text-slate-800 cursor-pointer"
+                                >
+                                  <Plus className="h-3 w-3" />
+                                </button>
+                              </div>
+                            </td>
+
+                            {/* Notes */}
+                            <td className="px-3 py-2">
+                              <input
+                                type="text"
+                                value={row.notes || ''}
+                                onChange={(e) => updateItemRow(idx, 'notes', e.target.value)}
+                                placeholder="Ghi chú (tùy chọn)..."
+                                className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs text-slate-700 placeholder-slate-400 focus:border-blue-500 focus:outline-none"
+                              />
+                            </td>
+
+                            {/* Remove Line */}
+                            <td className="px-2 py-2 text-center">
+                              {createFormData.items.length > 1 ? (
+                                <button
+                                  type="button"
+                                  onClick={() => removeItemRow(idx)}
+                                  className="rounded-lg p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition-colors cursor-pointer"
+                                  title="Xóa linh kiện này"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </button>
+                              ) : (
+                                <span className="text-slate-200">—</span>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Table Summary & Warning */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between text-xs text-slate-600 gap-2 pt-1">
+                  <div className="flex items-center space-x-3">
+                    <span>
+                      Số loại:{' '}
+                      <strong className="text-slate-900">
+                        {createFormData.items.filter((i) => i.itemId).length}
+                      </strong>{' '}
+                      loại
+                    </span>
+                    <span>•</span>
+                    <span>
+                      Tổng số lượng:{' '}
+                      <strong className="text-blue-600">
+                        {createFormData.items.reduce(
+                          (s, i) => s + (Number(i.quantity) || 0),
+                          0
+                        )}
+                      </strong>{' '}
+                      món
+                    </span>
+                  </div>
+
+                  {createFormData.items.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={handleClearItems}
+                      className="text-xs text-slate-400 hover:text-rose-600 self-start sm:self-auto cursor-pointer"
+                    >
+                      Xóa tất cả ({createFormData.items.length} dòng)
+                    </button>
+                  )}
+                </div>
+
+                {/* Insufficient Stock Warning */}
+                {insufficientStockItemsCount > 0 && createFormData.locationId && (
+                  <div className="rounded-xl border border-amber-200 bg-amber-50 p-2.5 text-xs text-amber-800 flex items-start space-x-2">
+                    <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+                    <div>
+                      <span className="font-semibold">Cảnh báo tồn kho:</span> Có{' '}
+                      <strong>{insufficientStockItemsCount}</strong> linh kiện vượt quá số lượng
+                      khả dụng tại kho lưu trữ đã chọn. Máy chủ sẽ kiểm tra tồn kho tại vị trí này
+                      khi tạo kit.
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Modal Footer */}
+              <div className="flex items-center justify-between border-t border-slate-200 bg-slate-50/75 -mx-6 -mb-6 px-6 py-3.5 mt-6">
+                <span className="text-xs text-slate-500">
+                  {createFormData.locationId ? (
+                    <span>
+                      Kho:{' '}
+                      <strong>
+                        {locationsList.find((l) => l.id === createFormData.locationId)?.name ||
+                          'Đã chọn'}
+                      </strong>
+                    </span>
+                  ) : (
+                    <span className="text-amber-600">⚠️ Vui lòng chọn vị trí kho lưu trữ</span>
+                  )}
+                </span>
+
+                <div className="flex items-center space-x-2">
+                  <button
+                    type="button"
+                    onClick={handleCloseCreateModal}
+                    className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 cursor-pointer transition-colors"
+                  >
+                    Hủy
+                  </button>
+                  <button
+                    type="submit"
+                    className="inline-flex items-center space-x-1.5 rounded-xl bg-blue-600 px-5 py-2 text-xs font-semibold text-white shadow-soft hover:bg-blue-700 active:scale-[0.99] cursor-pointer transition-all"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    <span>Tạo hộp kit</span>
+                  </button>
+                </div>
               </div>
             </form>
           </div>
         </div>
       )}
+
+      {/* Multi-Item Search Picker Modal */}
+      <KitItemPickerModal
+        isOpen={isPickerModalOpen}
+        onClose={() => setIsPickerModalOpen(false)}
+        items={itemsList}
+        selectedLocationId={createFormData.locationId}
+        selectedLocationName={
+          locationsList.find((l) => l.id === createFormData.locationId)?.name
+        }
+        alreadySelectedIds={alreadySelectedItemIds}
+        onAddItems={handlePickerAddItems}
+      />
     </div>
   );
 };
