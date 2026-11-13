@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   X,
   Plus,
@@ -12,10 +12,12 @@ import {
   Clock,
   CheckCircle2,
   AlertTriangle,
+  Zap,
 } from 'lucide-react';
 import { apiClient } from '../../services/api';
 import { useAuth } from '../../hooks/useAuth';
 import { useModalDismiss } from '../../hooks/useModalDismiss';
+import { DatePickerVi } from '../common/DatePickerVi';
 
 export interface CreateBorrowModalProps {
   isOpen: boolean;
@@ -47,6 +49,18 @@ interface BorrowItemRow {
   quantity: number;
 }
 
+function getLocalDateString(d = new Date()): string {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+function addDaysToIso(baseIso: string, days: number): string {
+  if (!baseIso || !/^\d{4}-\d{2}-\d{2}$/.test(baseIso)) return '';
+  const [y, m, d] = baseIso.split('-').map(Number);
+  const dateObj = new Date(y, m - 1, d + days);
+  return getLocalDateString(dateObj);
+}
+
 export const CreateBorrowModal: React.FC<CreateBorrowModalProps> = ({
   isOpen,
   onClose,
@@ -61,15 +75,31 @@ export const CreateBorrowModal: React.FC<CreateBorrowModalProps> = ({
   const [notes, setNotes] = useState<string>('');
 
   // Default dates: borrow today, return 7 days later
-  const todayStr = useMemo(() => new Date().toISOString().split('T')[0], []);
-  const defaultReturnStr = useMemo(() => {
-    const d = new Date();
-    d.setDate(d.getDate() + 7);
-    return d.toISOString().split('T')[0];
-  }, []);
+  const todayStr = useMemo(() => getLocalDateString(), []);
+  const defaultReturnStr = useMemo(() => addDaysToIso(getLocalDateString(), 7), []);
 
   const [expectedBorrowDate, setExpectedBorrowDate] = useState<string>(todayStr);
   const [expectedReturnDate, setExpectedReturnDate] = useState<string>(defaultReturnStr);
+
+  const handleBorrowDateChange = (newBorrowDate: string) => {
+    setExpectedBorrowDate(newBorrowDate);
+    if (!expectedReturnDate || expectedReturnDate < newBorrowDate) {
+      setExpectedReturnDate(newBorrowDate ? addDaysToIso(newBorrowDate, 7) : '');
+    }
+  };
+
+  const handleApplyPreset = (days: number) => {
+    const base = expectedBorrowDate || todayStr;
+    setExpectedReturnDate(addDaysToIso(base, days));
+  };
+
+  const borrowDurationDays = useMemo(() => {
+    if (!expectedBorrowDate || !expectedReturnDate) return null;
+    const b = new Date(expectedBorrowDate).getTime();
+    const r = new Date(expectedReturnDate).getTime();
+    if (isNaN(b) || isNaN(r)) return null;
+    return Math.round((r - b) / (1000 * 60 * 60 * 24));
+  }, [expectedBorrowDate, expectedReturnDate]);
 
   // Selected items list
   const [itemsList, setItemsList] = useState<BorrowItemRow[]>([
@@ -307,34 +337,95 @@ export const CreateBorrowModal: React.FC<CreateBorrowModalProps> = ({
 
             {/* Expected borrow date */}
             <div>
-              <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5 flex items-center space-x-1.5">
-                <Calendar className="h-3.5 w-3.5 text-slate-400" />
-                <span>Ngày mượn dự kiến</span>
-              </label>
-              <input
-                type="date"
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-xs font-semibold text-slate-700 uppercase tracking-wider flex items-center space-x-1.5">
+                  <Calendar className="h-3.5 w-3.5 text-blue-600" />
+                  <span>Ngày mượn dự kiến <span className="text-rose-500">*</span></span>
+                </label>
+                <span className="text-[10px] text-slate-400">Định dạng: Ngày/Tháng/Năm</span>
+              </div>
+              <DatePickerVi
                 value={expectedBorrowDate}
-                onChange={(e) => setExpectedBorrowDate(e.target.value)}
-                className="w-full rounded-xl border border-slate-300 px-3.5 py-2 text-sm text-slate-800 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                minDate={todayStr}
+                onChange={handleBorrowDateChange}
                 required
+                testId="borrow-date-picker"
               />
             </div>
 
             {/* Expected return date */}
             <div>
-              <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5 flex items-center space-x-1.5">
-                <Clock className="h-3.5 w-3.5 text-slate-400" />
-                <span>Hạn trả dự kiến</span>
-              </label>
-              <input
-                type="date"
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-xs font-semibold text-slate-700 uppercase tracking-wider flex items-center space-x-1.5">
+                  <Clock className="h-3.5 w-3.5 text-amber-600" />
+                  <span>Hạn trả dự kiến <span className="text-rose-500">*</span></span>
+                </label>
+                <span className="text-[10px] text-slate-400">Định dạng: Ngày/Tháng/Năm</span>
+              </div>
+              <DatePickerVi
                 value={expectedReturnDate}
-                min={expectedBorrowDate}
-                onChange={(e) => setExpectedReturnDate(e.target.value)}
-                className="w-full rounded-xl border border-slate-300 px-3.5 py-2 text-sm text-slate-800 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                minDate={expectedBorrowDate || todayStr}
+                onChange={(val) => setExpectedReturnDate(val)}
                 required
+                testId="return-date-picker"
               />
             </div>
+          </div>
+
+          {/* Quick Presets & Duration Summary Toolbar */}
+          <div className="rounded-xl border border-slate-200/80 bg-slate-50/70 p-3 flex flex-wrap items-center justify-between gap-2.5">
+            <div className="flex items-center space-x-1.5 flex-wrap gap-y-1.5">
+              <span className="text-[11px] font-semibold text-slate-500 mr-1 flex items-center space-x-1">
+                <Zap className="h-3 w-3 text-amber-500" />
+                <span>Hạn trả nhanh:</span>
+              </span>
+              {[
+                { label: 'Trong ngày', days: 0 },
+                { label: '3 ngày', days: 3 },
+                { label: '1 tuần', days: 7 },
+                { label: '2 tuần', days: 14 },
+                { label: '1 tháng', days: 30 },
+              ].map((preset) => {
+                const isActive = borrowDurationDays === preset.days;
+                return (
+                  <button
+                    type="button"
+                    key={preset.label}
+                    onClick={() => handleApplyPreset(preset.days)}
+                    className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition-all cursor-pointer ${
+                      isActive
+                        ? 'bg-blue-600 text-white shadow-xs'
+                        : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-100'
+                    }`}
+                  >
+                    {preset.label}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Duration indicator pill */}
+            {borrowDurationDays !== null && (
+              <div
+                className={`inline-flex items-center space-x-1.5 px-3 py-1 rounded-lg text-xs font-bold font-mono ${
+                  borrowDurationDays < 0
+                    ? 'bg-rose-50 text-rose-700 border border-rose-200'
+                    : borrowDurationDays === 0
+                    ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                    : borrowDurationDays > 14
+                    ? 'bg-orange-50 text-orange-700 border border-orange-200'
+                    : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                }`}
+              >
+                <span>
+                  {borrowDurationDays < 0
+                    ? '⚠️ Ngày trả không hợp lệ (trước ngày mượn)'
+                    : borrowDurationDays === 0
+                    ? '⚡ Mượn trong ngày (0 ngày)'
+                    : `📅 Thời lượng: ${borrowDurationDays} ngày`}
+                </span>
+              </div>
+            )}
           </div>
 
           {/* Section 2: Items List */}
