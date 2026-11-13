@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Boxes,
   Plus,
@@ -63,34 +63,111 @@ export function removeVietnameseTones(str: string): string {
     .replace(/Đ/g, 'D');
 }
 
-export function generateKitCode(name: string): string {
-  if (!name || !name.trim()) return '';
+const STOP_WORDS = new Set([
+  'KIT',
+  'HOP',
+  'BO',
+  'THUC',
+  'HANH',
+  'BAI',
+  'CHU',
+  'DE',
+  'MON',
+  'LOP',
+  'PHONG',
+  'LAB',
+  'CUA',
+  'CHO',
+  'THE',
+  'VA',
+  'VAO',
+]);
 
-  const cleanStr = removeVietnameseTones(name.trim());
-  const sanitized = cleanStr.replace(/[^a-zA-Z0-9\-_]/g, ' ');
+export function extractKitTag(name: string): string {
+  if (!name || !name.trim()) return 'KIT';
 
-  const words = sanitized
-    .split(/\s+/)
-    .filter(Boolean)
-    .map((w) => w.toUpperCase());
+  const clean = removeVietnameseTones(name.trim())
+    .replace(/[^a-zA-Z0-9]/g, ' ')
+    .toUpperCase();
 
-  if (words.length === 0) return '';
+  const allWords = clean.split(/\s+/).filter(Boolean);
+  // Filter out pure numbers and common stop words
+  const textWords = allWords.filter((w) => !/^\d+$/.test(w) && !STOP_WORDS.has(w));
 
-  while (
-    words.length > 1 &&
-    (words[0] === 'KIT' || words[0] === 'HOP' || words[0] === 'BO')
-  ) {
-    words.shift();
-  }
-
-  if (words.length === 1 && (words[0] === 'KIT' || words[0] === 'HOP' || words[0] === 'BO')) {
+  if (textWords.length === 0) {
+    const fallback = allWords.filter((w) => !/^\d+$/.test(w));
+    if (fallback.length > 0) return fallback[0].slice(0, 4);
     return 'KIT';
   }
 
-  const coreCode = words.join('-');
-  const fullCode = coreCode.startsWith('KIT-') ? coreCode : `KIT-${coreCode}`;
+  // If 2 or more words (e.g. AI FANTASY ZOO -> AFZ, Vi dieu khien -> VDK):
+  if (textWords.length >= 2) {
+    const initials = textWords.map((w) => w[0]).join('');
+    if (initials.length >= 2 && initials.length <= 5) {
+      return initials;
+    }
+    return initials.slice(0, 4);
+  }
 
-  return fullCode.slice(0, 50).replace(/-+$/, '');
+  // 1 word only
+  const single = textWords[0];
+  if (single.length <= 5) return single;
+  return single.slice(0, 4);
+}
+
+export function extractKitNumber(name: string): number | null {
+  if (!name) return null;
+  const clean = removeVietnameseTones(name).toLowerCase();
+
+  const patterns = [
+    /(?:chu\s*de|bai|hop|tap|so|part|vol|cd|#)\s*(\d+)/i,
+    /(?:^|\s|-|_|v)(\d+)(?:\s*$)/,
+    /\b(\d+)\b/,
+  ];
+
+  for (const regex of patterns) {
+    const m = clean.match(regex);
+    if (m && m[1]) {
+      const num = parseInt(m[1], 10);
+      if (!isNaN(num) && num > 0 && num < 1000) {
+        return num;
+      }
+    }
+  }
+
+  return null;
+}
+
+export function generateKitCode(
+  name: string,
+  existingCodes: string[] | Set<string> = []
+): string {
+  if (!name || !name.trim()) return '';
+
+  const tag = extractKitTag(name);
+  const explicitNum = extractKitNumber(name);
+
+  const codeSet =
+    existingCodes instanceof Set
+      ? existingCodes
+      : new Set(existingCodes.map((c) => c.toUpperCase()));
+
+  let seq = explicitNum !== null ? explicitNum : 1;
+
+  const formatCode = (t: string, s: number) => {
+    const pad = s < 100 ? String(s).padStart(2, '0') : String(s);
+    return t === 'KIT' ? `KIT-${pad}` : `KIT-${t}-${pad}`;
+  };
+
+  let candidate = formatCode(tag, seq);
+
+  // Auto-increment seq until candidate is unique among existingCodes
+  while (codeSet.has(candidate.toUpperCase())) {
+    seq += 1;
+    candidate = formatCode(tag, seq);
+  }
+
+  return candidate;
 }
 
 export const KitsPage: React.FC = () => {
@@ -107,6 +184,11 @@ export const KitsPage: React.FC = () => {
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [expandedKitId, setExpandedKitId] = useState<string | null>(null);
+
+  const existingCodes = useMemo(
+    () => new Set(kits.map((k) => (k.code || '').trim().toUpperCase())),
+    [kits]
+  );
 
   // Create Modal state
   const [isCreateModalOpen, setIsCreateModalOpen] = useState<boolean>(false);
@@ -683,7 +765,7 @@ export const KitsPage: React.FC = () => {
                       <button
                         type="button"
                         onClick={() => {
-                          const autoCode = generateKitCode(createFormData.name);
+                          const autoCode = generateKitCode(createFormData.name, existingCodes);
                           setCreateFormData((prev) => ({ ...prev, code: autoCode }));
                           setIsCodeManuallyEdited(false);
                         }}
@@ -723,7 +805,7 @@ export const KitsPage: React.FC = () => {
                     onChange={(e) => {
                       const newName = e.target.value;
                       if (!isCodeManuallyEdited || !createFormData.code) {
-                        const autoCode = generateKitCode(newName);
+                        const autoCode = generateKitCode(newName, existingCodes);
                         setCreateFormData((prev) => ({
                           ...prev,
                           name: newName,

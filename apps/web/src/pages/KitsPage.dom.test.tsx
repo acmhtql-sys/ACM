@@ -283,14 +283,17 @@ describe('KitsPage DOM Test Suite', () => {
   });
 
   describe('generateKitCode & Auto-generation Suite', () => {
-    it('generates standard uppercase kit codes from Vietnamese names', () => {
-      expect(generateKitCode('Kit vi điều khiển IoT')).toBe('KIT-VI-DIEU-KHIEN-IOT');
-      expect(generateKitCode('Bộ Kit Arduino Uno R3')).toBe('KIT-ARDUINO-UNO-R3');
-      expect(generateKitCode('Hộp kit cảm biến môi trường')).toBe('KIT-CAM-BIEN-MOI-TRUONG');
-      expect(generateKitCode('Cánh tay robot 6 trục')).toBe('KIT-CANH-TAY-ROBOT-6-TRUC');
-      expect(generateKitCode('Bộ thực hành IoT 01')).toBe('KIT-THUC-HANH-IOT-01');
+    it('generates concise uppercase kit codes from Vietnamese names and handles duplicates', () => {
+      expect(generateKitCode('AI FANTASY ZOO - Chủ đề 1')).toBe('KIT-AFZ-01');
+      expect(generateKitCode('AI FANTASY ZOO - Chủ đề 2')).toBe('KIT-AFZ-02');
+      expect(generateKitCode('Kit vi điều khiển IoT')).toBe('KIT-VDKI-01');
+      expect(generateKitCode('Bộ thực hành IoT 01')).toBe('KIT-IOT-01');
       expect(generateKitCode('')).toBe('');
       expect(generateKitCode('   ')).toBe('');
+
+      // Collision avoidance & auto-incrementing
+      const existing = ['KIT-AFZ-01', 'KIT-AFZ-02'];
+      expect(generateKitCode('AI FANTASY ZOO - Chủ đề 1', existing)).toBe('KIT-AFZ-03');
     });
 
     it('automatically generates kit code when user types kit name in Create Kit modal', async () => {
@@ -320,8 +323,8 @@ describe('KitsPage DOM Test Suite', () => {
       expect(codeInput.value).toBe('');
 
       // Type name
-      fireEvent.change(nameInput, { target: { value: 'Kit vi điều khiển IoT' } });
-      expect(codeInput.value).toBe('KIT-VI-DIEU-KHIEN-IOT');
+      fireEvent.change(nameInput, { target: { value: 'AI FANTASY ZOO - Chủ đề 1' } });
+      expect(codeInput.value).toBe('KIT-AFZ-01');
 
       // Manual edit of code
       fireEvent.change(codeInput, { target: { value: 'CUSTOM-KIT-99' } });
@@ -334,7 +337,7 @@ describe('KitsPage DOM Test Suite', () => {
       // Clicking "Tạo lại theo tên" re-syncs
       const resyncBtn = screen.getByTitle('Tạo lại mã tự động theo tên hộp kit');
       fireEvent.click(resyncBtn);
-      expect(codeInput.value).toBe('KIT-VI-DIEU-KHIEN-IOT-ESP32');
+      expect(codeInput.value).toBe('KIT-VDKIE-01');
     });
   });
 });
