@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   X,
   Plus,
@@ -112,8 +112,50 @@ export const StockImportModal: React.FC<StockImportModalProps> = ({
   const [reconcileError, setReconcileError] = useState<string | null>(null);
 
   // Filter only active items and active locations
-  const activeItems = items.filter((it) => it.isActive);
-  const activeLocations = locations.filter((loc) => loc.isActive);
+  const activeItems = useMemo(
+    () => items.filter((it) => it.isActive).sort((a, b) => a.code.localeCompare(b.code)),
+    [items]
+  );
+  const activeLocations = useMemo(
+    () => locations.filter((loc) => loc.isActive),
+    [locations]
+  );
+
+  // Group items by category for faster scanning in dropdown
+  const itemsByCategory = useMemo(() => {
+    const map = new Map<string, ItemResponse[]>();
+    for (const it of activeItems) {
+      const cat = it.category?.name || it.categoryName || 'Linh kiện khác';
+      if (!map.has(cat)) map.set(cat, []);
+      map.get(cat)!.push(it);
+    }
+    return Array.from(map.entries()).sort((a, b) => a[0].localeCompare(b[0]));
+  }, [activeItems]);
+
+  // List of categories available for quick-add into a box
+  const availableCategories = useMemo(() => {
+    const catMap = new Map<string, { id: string; name: string; count: number }>();
+    for (const it of activeItems) {
+      const catId = it.categoryId || it.category?.id || 'other';
+      const catName = it.category?.name || it.categoryName || 'Linh kiện khác';
+      const existing = catMap.get(catId);
+      if (existing) {
+        existing.count += 1;
+      } else {
+        catMap.set(catId, { id: catId, name: catName, count: 1 });
+      }
+    }
+    return Array.from(catMap.values()).sort((a, b) => a.name.localeCompare(b.name));
+  }, [activeItems]);
+
+  // Group locations (Boxes/Bins first for fast access)
+  const locationsGrouped = useMemo(() => {
+    const bins = activeLocations.filter(
+      (l) => l.type === 'BIN' || l.code.toUpperCase().startsWith('THUNG') || l.code.toUpperCase().startsWith('BIN')
+    );
+    const others = activeLocations.filter((l) => !bins.includes(l));
+    return { bins, others };
+  }, [activeLocations]);
 
   // Initialize Idempotency FSM Hook
   const fsm = useIdempotentTransaction<ImportStockInput, any>({
@@ -168,7 +210,60 @@ export const StockImportModal: React.FC<StockImportModalProps> = ({
   const handleAddLine = () => {
     if (lines.length >= 100) return;
     if (isConfirming) setIsConfirming(false);
-    setLines([...lines, { itemId: '', locationId: '', quantity: 1, unitCost: null, notes: '' }]);
+    // Tự động kế thừa vị trí kho từ dòng gần nhất đã chọn (tránh phải chọn lại thùng)
+    const inheritedLocationId =
+      [...lines].reverse().find((l) => Boolean(l.locationId))?.locationId || '';
+    setLines([
+      ...lines,
+      { itemId: '', locationId: inheritedLocationId, quantity: 1, unitCost: null, notes: '' },
+    ]);
+  };
+
+  const handleApplyFirstLocationToAll = () => {
+    const targetLoc = lines[0]?.locationId;
+    if (!targetLoc) return;
+    if (isConfirming) setIsConfirming(false);
+    setLines((prev) => prev.map((l) => ({ ...l, locationId: targetLoc })));
+    setFieldErrors({});
+  };
+
+  const handleAddCategoryItems = (catId: string) => {
+    if (!catId || lines.length >= 100) return;
+    if (isConfirming) setIsConfirming(false);
+
+    const catItems = activeItems.filter(
+      (it) => (it.categoryId || it.category?.id || 'other') === catId
+    );
+    if (catItems.length === 0) return;
+
+    // Vị trí kho mục tiêu: ưu tiên dòng cuối có vị trí hoặc dòng 1
+    const targetLocId =
+      [...lines].reverse().find((l) => Boolean(l.locationId))?.locationId ||
+      lines[0]?.locationId ||
+      '';
+
+    const existingItemIds = new Set(lines.map((l) => l.itemId).filter(Boolean));
+    const itemsToAdd = catItems.filter((it) => !existingItemIds.has(it.id));
+    if (itemsToAdd.length === 0) return;
+
+    const isSingleEmptyLine = lines.length === 1 && !lines[0].itemId;
+    const remainingSlots = 100 - (isSingleEmptyLine ? 0 : lines.length);
+    const sliced = itemsToAdd.slice(0, remainingSlots);
+
+    const newLines: ImportItemLine[] = sliced.map((it) => ({
+      itemId: it.id,
+      locationId: targetLocId,
+      quantity: 1,
+      unitCost: null,
+      notes: '',
+    }));
+
+    if (isSingleEmptyLine) {
+      setLines(newLines);
+    } else {
+      setLines([...lines, ...newLines]);
+    }
+    setFieldErrors({});
   };
 
   const handleRemoveLine = (index: number) => {
@@ -668,20 +763,43 @@ export const StockImportModal: React.FC<StockImportModalProps> = ({
 
             {/* Line Items Table */}
             <div>
-              <div className="flex items-center justify-between mb-2">
+              <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
                 <label className="text-xs font-bold text-slate-800 uppercase tracking-wider">
                   Danh sách linh kiện nhập kho ({lines.length}/100)
                 </label>
-                <button
-                  type="button"
-                  onClick={handleAddLine}
-                  disabled={lines.length >= 100 || fsm.isSubmitting || fsm.isAmbiguous}
-                  className="inline-flex items-center space-x-1 rounded-lg border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700 hover:bg-blue-100 transition"
-                  data-testid="btn-add-line"
-                >
-                  <Plus className="h-3.5 w-3.5" />
-                  <span>Thêm dòng</span>
-                </button>
+                <div className="flex items-center space-x-2">
+                  {availableCategories.length > 0 && (
+                    <select
+                      value=""
+                      onChange={(e) => {
+                        if (e.target.value) {
+                          handleAddCategoryItems(e.target.value);
+                        }
+                      }}
+                      disabled={lines.length >= 100 || fsm.isSubmitting || fsm.isAmbiguous}
+                      className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-700 hover:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
+                      title="Thêm toàn bộ linh kiện của một danh mục vào thùng đã chọn"
+                      data-testid="select-quick-add-category"
+                    >
+                      <option value="">+ Thêm nhanh theo danh mục...</option>
+                      {availableCategories.map((cat) => (
+                        <option key={cat.id} value={cat.id}>
+                          {cat.name} ({cat.count} linh kiện)
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                  <button
+                    type="button"
+                    onClick={handleAddLine}
+                    disabled={lines.length >= 100 || fsm.isSubmitting || fsm.isAmbiguous}
+                    className="inline-flex items-center space-x-1 rounded-lg border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700 hover:bg-blue-100 transition"
+                    data-testid="btn-add-line"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    <span>Thêm dòng</span>
+                  </button>
+                </div>
               </div>
 
               <div className="overflow-x-auto rounded-xl border border-slate-200">
@@ -690,7 +808,22 @@ export const StockImportModal: React.FC<StockImportModalProps> = ({
                     <tr>
                       <th className="py-2.5 px-3 w-8 text-center">#</th>
                       <th className="py-2.5 px-3 min-w-[200px]">Linh kiện *</th>
-                      <th className="py-2.5 px-3 min-w-[180px]">Vị trí kho nhập *</th>
+                      <th className="py-2.5 px-3 min-w-[190px]">
+                        <div className="flex items-center justify-between gap-1">
+                          <span>Vị trí kho nhập *</span>
+                          {lines.length > 1 && lines[0]?.locationId && (
+                            <button
+                              type="button"
+                              onClick={handleApplyFirstLocationToAll}
+                              className="text-[10px] font-medium text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
+                              title="Sao chép vị trí kho của dòng 1 xuống tất cả các dòng còn lại"
+                              data-testid="btn-apply-first-location-all"
+                            >
+                              Áp dụng dòng 1 ↓
+                            </button>
+                          )}
+                        </div>
+                      </th>
                       <th className="py-2.5 px-3 w-28">Số lượng *</th>
                       <th className="py-2.5 px-3 w-32">Đơn giá (VNĐ)</th>
                       <th className="py-2.5 px-3">Ghi chú dòng</th>
@@ -714,10 +847,14 @@ export const StockImportModal: React.FC<StockImportModalProps> = ({
                             data-testid={`select-item-${idx}`}
                           >
                             <option value="">-- Chọn linh kiện --</option>
-                            {activeItems.map((item) => (
-                              <option key={item.id} value={item.id}>
-                                [{item.code}] {item.name} ({item.unit})
-                              </option>
+                            {itemsByCategory.map(([catName, catItems]) => (
+                              <optgroup key={catName} label={`📁 ${catName}`}>
+                                {catItems.map((item) => (
+                                  <option key={item.id} value={item.id}>
+                                    [{item.code}] {item.name} ({item.unit})
+                                  </option>
+                                ))}
+                              </optgroup>
                             ))}
                           </select>
                           {fieldErrors[`items.${idx}.itemId`] && (
@@ -739,11 +876,24 @@ export const StockImportModal: React.FC<StockImportModalProps> = ({
                             data-testid={`select-location-${idx}`}
                           >
                             <option value="">-- Chọn vị trí kho --</option>
-                            {activeLocations.map((loc) => (
-                              <option key={loc.id} value={loc.id}>
-                                [{loc.type}] {loc.code} - {loc.name}
-                              </option>
-                            ))}
+                            {locationsGrouped.bins.length > 0 && (
+                              <optgroup label="📦 Thùng / Khay linh kiện (BIN)">
+                                {locationsGrouped.bins.map((loc) => (
+                                  <option key={loc.id} value={loc.id}>
+                                    [{loc.type}] {loc.code} - {loc.name}
+                                  </option>
+                                ))}
+                              </optgroup>
+                            )}
+                            {locationsGrouped.others.length > 0 && (
+                              <optgroup label="🏢 Kệ / Kho khác">
+                                {locationsGrouped.others.map((loc) => (
+                                  <option key={loc.id} value={loc.id}>
+                                    [{loc.type}] {loc.code} - {loc.name}
+                                  </option>
+                                ))}
+                              </optgroup>
+                            )}
                           </select>
                           {fieldErrors[`items.${idx}.locationId`] && (
                             <p className="mt-0.5 text-[10px] text-red-600" data-testid={`error-location-${idx}`}>
