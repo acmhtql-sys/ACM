@@ -811,6 +811,32 @@ describe('S2C-3A useIdempotentTransaction Safety-Hardened Hook Test Suite', () =
     expect(onSuccess).toHaveBeenCalled();
   });
 
+  it('HOOK-22b: resetToDraft() called synchronously inside onSuccess handler successfully transitions to DRAFT with new key', async () => {
+    let hookResult: any;
+    const onSuccess = vi.fn().mockImplementation(() => {
+      hookResult.current.resetToDraft();
+    });
+
+    const { result } = renderHook(() =>
+      useIdempotentTransaction({
+        ...defaultOptions,
+        onSuccess,
+      })
+    );
+    hookResult = result;
+
+    const initialKey = result.current.idempotencyKey;
+    const mockMutation = vi.fn().mockResolvedValue({ id: 'tx-success-02', status: 'COMPLETED' });
+
+    await act(async () => {
+      await result.current.submit({ item: 'Batch 1' }, mockMutation);
+    });
+
+    expect(onSuccess).toHaveBeenCalled();
+    expect(result.current.state).toBe('DRAFT');
+    expect(result.current.idempotencyKey).not.toBe(initialKey);
+  });
+
   it('HOOK-23: pending marker is only cleared for deterministic rejections (400/403/422) or COMMITTED, not for UNKNOWN', async () => {
     // 23a: Deterministic 422 clears marker
     const { result: res422 } = renderHook(() => useIdempotentTransaction(defaultOptions));

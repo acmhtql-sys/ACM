@@ -718,6 +718,10 @@ export function useIdempotentTransaction<TPayload = any, TResult = any>(
   const [state, setState] = useState<IdempotencyState>(() =>
     pendingSession ? pendingSession.state : 'DRAFT'
   );
+  // Live ref for state to prevent stale closures during rapid callback/reset transitions
+  const stateRef = useRef<IdempotencyState>(state);
+  stateRef.current = state;
+
   const [idempotencyKey, setIdempotencyKey] = useState<string>(() =>
     pendingSession ? pendingSession.idempotencyKey : generateUUID()
   );
@@ -874,8 +878,8 @@ export function useIdempotentTransaction<TPayload = any, TResult = any>(
       mutationFn: (payload: TPayload, key: string) => Promise<TResult>
     ): Promise<TResult | null> => {
       // Guard against submitting when not in DRAFT or during in-flight execution
-      if (activeOperationIdRef.current !== null || isExecutingRef.current || state !== 'DRAFT') {
-        const msg = `Chỉ được phép gửi giao dịch mới khi ở trạng thái DRAFT (Trạng thái hiện tại: ${state}).`;
+      if (activeOperationIdRef.current !== null || isExecutingRef.current || stateRef.current !== 'DRAFT') {
+        const msg = `Chỉ được phép gửi giao dịch mới khi ở trạng thái DRAFT (Trạng thái hiện tại: ${stateRef.current}).`;
         setErrorMessage(msg);
         return null;
       }
@@ -883,7 +887,7 @@ export function useIdempotentTransaction<TPayload = any, TResult = any>(
       // TASK 2: Bind each submit to userId, endpoint, idempotencyKey, and generation captured at dispatch time
       const capturedUserId = userId;
       const capturedEndpoint = endpoint;
-      const capturedKey = idempotencyKey;
+      const capturedKey = currentKeyRef.current;
       const capturedGeneration = requestGenerationRef.current;
       const operationId = `SUBMIT::${capturedUserId}::${capturedEndpoint}::${capturedKey}::${capturedGeneration}`;
 
@@ -947,10 +951,12 @@ export function useIdempotentTransaction<TPayload = any, TResult = any>(
         const failClosedMsg =
           'Không thể ghi nhận marker an toàn trước khi phát yêu cầu (Storage Error/Unavailable). Hủy phát yêu cầu để bảo đảm an toàn.';
         setErrorMessage(failClosedMsg);
+        stateRef.current = 'DRAFT';
         setState('DRAFT');
         return null;
       }
 
+      stateRef.current = 'SUBMITTING';
       setState('SUBMITTING');
 
       // Helper: check if the hook instance's current account/endpoint/key/generation still matches captured request identity
@@ -1131,6 +1137,7 @@ export function useIdempotentTransaction<TPayload = any, TResult = any>(
 
       if (isIdentityStillActive()) {
         setResult(responseData);
+        stateRef.current = 'CONFIRMED_SUCCESS';
         setState('CONFIRMED_SUCCESS');
         // Separate onSuccess callback so any exception inside consumer callback NEVER flips transaction state!
         try {
@@ -1194,6 +1201,7 @@ export function useIdempotentTransaction<TPayload = any, TResult = any>(
         if (data?.status === 'COMMITTED' && data.transaction) {
           clearPendingAmbiguousSession(capturedUserId, capturedEndpoint, capturedKey);
           if (isIdentityStillActive()) {
+            stateRef.current = 'CONFIRMED_SUCCESS';
             setState('CONFIRMED_SUCCESS');
             setResult(data.transaction as TResult);
             try {
@@ -1349,10 +1357,11 @@ export function useIdempotentTransaction<TPayload = any, TResult = any>(
    */
   const resetToDraft = useCallback(() => {
     // Cannot discard in-flight, ambiguous, or reconciliation state without proper reconciliation process
+    const currentState = stateRef.current;
     if (
-      state === 'SUBMITTING' ||
-      state === 'AMBIGUOUS_OUTCOME' ||
-      state === 'RECONCILIATION_REQUIRED'
+      currentState === 'SUBMITTING' ||
+      currentState === 'AMBIGUOUS_OUTCOME' ||
+      currentState === 'RECONCILIATION_REQUIRED'
     ) {
       return;
     }
@@ -1369,17 +1378,18 @@ export function useIdempotentTransaction<TPayload = any, TResult = any>(
     isExecutingRef.current = false;
     requestGenerationRef.current += 1;
     const freshKey = generateUUID();
-    clearPendingAmbiguousSession(userId, endpoint, idempotencyKey);
+    clearPendingAmbiguousSession(userId, endpoint, currentKeyRef.current);
     setSnapshot(null);
-    setIdempotencyKey(freshKey);
     currentKeyRef.current = freshKey;
+    setIdempotencyKey(freshKey);
     setError(null);
     setErrorMessage(null);
     setErrorCategory(null);
     setConflict(null);
     setResult(null);
+    stateRef.current = 'DRAFT';
     setState('DRAFT');
-  }, [state, userId, endpoint, idempotencyKey]);
+  }, [userId, endpoint]);
 
   return {
     state,

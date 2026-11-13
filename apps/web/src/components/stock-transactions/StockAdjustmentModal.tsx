@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { X, Plus, Trash2, AlertCircle, RefreshCw, Sliders, ShieldAlert, Clock } from 'lucide-react';
 import {
   AdjustStockInput,
@@ -112,6 +112,15 @@ export const StockAdjustmentModal: React.FC<StockAdjustmentModalProps> = ({
     onClose();
   };
 
+  // Auto-reset transaction to fresh DRAFT when opening modal if previous transaction already completed
+  useEffect(() => {
+    if (isOpen) {
+      if (fsm.state === 'CONFIRMED_SUCCESS' || fsm.state === 'CONFIRMED_FAILURE') {
+        fsm.resetToDraft();
+      }
+    }
+  }, [isOpen, fsm.state, fsm.resetToDraft]);
+
   const backdropDismiss = useModalDismiss(isOpen, handleClose, fsm.isSubmitting);
 
   if (!isOpen) return null;
@@ -217,8 +226,12 @@ export const StockAdjustmentModal: React.FC<StockAdjustmentModalProps> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (fsm.state !== 'DRAFT') {
-      setClientErrors([`Chỉ có thể phát lệnh khi phiếu ở trạng thái DRAFT. Trạng thái hiện tại: ${fsm.state}`]);
-      return;
+      if (fsm.state === 'CONFIRMED_SUCCESS' || fsm.state === 'CONFIRMED_FAILURE') {
+        fsm.resetToDraft();
+      } else {
+        setClientErrors([`Chỉ có thể phát lệnh khi phiếu ở trạng thái DRAFT. Trạng thái hiện tại: ${fsm.state}`]);
+        return;
+      }
     }
     if (fsm.isSubmitting) return;
     if (!validateForm()) return;

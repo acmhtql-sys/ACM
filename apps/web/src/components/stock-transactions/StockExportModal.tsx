@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   X,
   Plus,
@@ -173,6 +173,16 @@ export const StockExportModal: React.FC<StockExportModalProps> = ({
     onClose();
   };
 
+  // Auto-reset transaction to fresh DRAFT when opening modal if previous transaction already completed
+  useEffect(() => {
+    if (isOpen) {
+      if (fsm.state === 'CONFIRMED_SUCCESS' || fsm.state === 'CONFIRMED_FAILURE') {
+        fsm.resetToDraft();
+        setIsConfirming(false);
+      }
+    }
+  }, [isOpen, fsm.state, fsm.resetToDraft]);
+
   const backdropDismiss = useModalDismiss(isOpen, handleClose, fsm.isSubmitting);
 
   if (!isOpen) return null;
@@ -311,8 +321,12 @@ export const StockExportModal: React.FC<StockExportModalProps> = ({
       return;
     }
     if (fsm.state !== 'DRAFT') {
-      setClientErrors([`Chỉ có thể phát lệnh khi phiếu ở trạng thái DRAFT. Trạng thái hiện tại: ${fsm.state}`]);
-      return;
+      if (fsm.state === 'CONFIRMED_SUCCESS' || fsm.state === 'CONFIRMED_FAILURE') {
+        fsm.resetToDraft();
+      } else {
+        setClientErrors([`Chỉ có thể phát lệnh khi phiếu ở trạng thái DRAFT. Trạng thái hiện tại: ${fsm.state}`]);
+        return;
+      }
     }
     if (!isConfirming) {
       setClientErrors(['Bắt buộc phải xem lại và xác nhận thông tin phiếu trước khi phát lệnh ghi sổ.']);
