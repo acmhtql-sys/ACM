@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
   X,
   Plus,
@@ -71,6 +71,14 @@ export const CreateBorrowModal: React.FC<CreateBorrowModalProps> = ({
 }) => {
   const { user } = useAuth();
   const isPrivileged = user?.role === 'ADMIN' || user?.role === 'LAB_MANAGER' || user?.role === 'TECHNICIAN';
+
+  const COMMON_PURPOSES = [
+    'Thực hành môn học',
+    'Nghiên cứu / Đồ án',
+    'Thi đấu Robotics & AI',
+    'Hoạt động CLB Robotics',
+  ];
+  const purposeInputRef = useRef<HTMLInputElement>(null);
 
   // Form states
   const [borrowerId, setBorrowerId] = useState<string>('');
@@ -365,10 +373,55 @@ export const CreateBorrowModal: React.FC<CreateBorrowModalProps> = ({
 
             {/* Purpose */}
             <div>
-              <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
-                Mục đích mượn <span className="text-rose-500">*</span>
-              </label>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-xs font-semibold text-slate-700 uppercase tracking-wider">
+                  Mục đích mượn <span className="text-rose-500">*</span>
+                </label>
+                <span className="text-[11px] text-slate-400">Gợi ý nhanh hoặc tự nhập</span>
+              </div>
+
+              {/* Quick Preset Purpose Chips */}
+              <div className="flex flex-wrap gap-1.5 mb-2">
+                {COMMON_PURPOSES.map((p) => {
+                  const isSelected = purpose.startsWith(p);
+                  return (
+                    <button
+                      type="button"
+                      key={p}
+                      onClick={() => {
+                        setPurpose(p);
+                        purposeInputRef.current?.focus();
+                      }}
+                      className={`rounded-lg px-2.5 py-1 text-xs font-medium transition-all cursor-pointer ${
+                        isSelected
+                          ? 'bg-blue-600 text-white shadow-xs font-semibold'
+                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-800'
+                      }`}
+                    >
+                      {p}
+                    </button>
+                  );
+                })}
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (COMMON_PURPOSES.some((p) => purpose.startsWith(p))) {
+                      setPurpose('');
+                    }
+                    purposeInputRef.current?.focus();
+                  }}
+                  className={`rounded-lg px-2.5 py-1 text-xs font-medium transition-all cursor-pointer ${
+                    purpose && !COMMON_PURPOSES.some((p) => purpose.startsWith(p))
+                      ? 'bg-blue-50 text-blue-700 border border-blue-300 font-semibold'
+                      : 'bg-slate-100 text-slate-500 hover:bg-slate-200 hover:text-slate-700'
+                  }`}
+                >
+                  Khác...
+                </button>
+              </div>
+
               <input
+                ref={purposeInputRef}
                 type="text"
                 value={purpose}
                 onChange={(e) => setPurpose(e.target.value)}
