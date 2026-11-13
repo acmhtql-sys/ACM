@@ -540,6 +540,28 @@ export const BorrowReturnPage: React.FC = () => {
     }
   };
 
+  const handleDismissGuard = (borrowId: string, key: string) => {
+    if (!user?.id) return;
+    try {
+      try {
+        clearPendingBorrowReturn(user.id, borrowId, key);
+      } catch {}
+      try {
+        clearDurableBorrowReturnGuard(user.id, borrowId, key);
+      } catch {}
+      syncStorageIntents();
+      setStatusMessage({
+        type: 'success',
+        text: 'Đã gỡ bỏ chốt chặn đối soát. Bạn có thể bấm "Nhận hoàn trả" để thao tác lại.',
+      });
+    } catch (err: any) {
+      setStatusMessage({
+        type: 'error',
+        text: `Không thể gỡ bỏ chốt chặn: ${err.message}`,
+      });
+    }
+  };
+
   const overdueCount = borrows.filter((b) => b.isOverdue).length;
 
   const filtered = borrows.filter((b) => {
@@ -640,14 +662,25 @@ export const BorrowReturnPage: React.FC = () => {
                 <span>
                   Phiếu <strong>{p.borrowId}</strong> (Khóa: <code className="font-mono bg-white px-1.5 py-0.5 rounded border border-indigo-200">{p.key}</code>)
                 </span>
-                <button
-                  type="button"
-                  onClick={() => handleReconcile(p.borrowId, p.key)}
-                  disabled={actionLoading === p.borrowId}
-                  className="rounded-xl bg-indigo-600 px-3 py-1.5 text-[11px] font-semibold text-white hover:bg-indigo-700 disabled:opacity-50 shadow-xs transition-colors"
-                >
-                  {actionLoading === p.borrowId ? 'Đang đối soát...' : 'Kiểm tra đối soát'}
-                </button>
+                <div className="flex items-center space-x-2">
+                  <button
+                    type="button"
+                    onClick={() => handleReconcile(p.borrowId, p.key)}
+                    disabled={actionLoading === p.borrowId}
+                    className="rounded-xl bg-indigo-600 px-3 py-1.5 text-[11px] font-semibold text-white hover:bg-indigo-700 disabled:opacity-50 shadow-xs transition-colors cursor-pointer"
+                  >
+                    {actionLoading === p.borrowId ? 'Đang đối soát...' : 'Kiểm tra đối soát'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleDismissGuard(p.borrowId, p.key)}
+                    disabled={actionLoading === p.borrowId}
+                    className="rounded-xl bg-slate-200 text-slate-700 px-3 py-1.5 text-[11px] font-semibold hover:bg-rose-100 hover:text-rose-800 disabled:opacity-50 transition-colors cursor-pointer"
+                    title="Gỡ bỏ chốt chặn nếu máy chủ chưa ghi sổ để bạn có thể thao tác hoàn trả lại"
+                  >
+                    Gỡ bỏ chốt chặn
+                  </button>
+                </div>
               </div>
             ))}
             {lostReturnGuards.map((g) => (
@@ -655,14 +688,25 @@ export const BorrowReturnPage: React.FC = () => {
                 <span>
                   Dấu chặn phiên trước: Phiếu <strong>{g.borrowId}</strong> (Khóa: <code className="font-mono bg-white px-1.5 py-0.5 rounded border border-indigo-200">{g.key}</code>)
                 </span>
-                <button
-                  type="button"
-                  onClick={() => handleReconcile(g.borrowId, g.key)}
-                  disabled={actionLoading === g.borrowId}
-                  className="rounded-xl bg-indigo-600 px-3 py-1.5 text-[11px] font-semibold text-white hover:bg-indigo-700 disabled:opacity-50 shadow-xs transition-colors"
-                >
-                  {actionLoading === g.borrowId ? 'Đang đối soát...' : 'Kiểm tra đối soát'}
-                </button>
+                <div className="flex items-center space-x-2">
+                  <button
+                    type="button"
+                    onClick={() => handleReconcile(g.borrowId, g.key)}
+                    disabled={actionLoading === g.borrowId}
+                    className="rounded-xl bg-indigo-600 px-3 py-1.5 text-[11px] font-semibold text-white hover:bg-indigo-700 disabled:opacity-50 shadow-xs transition-colors cursor-pointer"
+                  >
+                    {actionLoading === g.borrowId ? 'Đang đối soát...' : 'Kiểm tra đối soát'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleDismissGuard(g.borrowId, g.key)}
+                    disabled={actionLoading === g.borrowId}
+                    className="rounded-xl bg-slate-200 text-slate-700 px-3 py-1.5 text-[11px] font-semibold hover:bg-rose-100 hover:text-rose-800 disabled:opacity-50 transition-colors cursor-pointer"
+                    title="Gỡ bỏ chốt chặn nếu máy chủ chưa ghi sổ để bạn có thể thao tác hoàn trả lại"
+                  >
+                    Gỡ bỏ chốt chặn
+                  </button>
+                </div>
               </div>
             ))}
           </div>
@@ -809,17 +853,28 @@ export const BorrowReturnPage: React.FC = () => {
                       <td className="py-3 px-4 text-center whitespace-nowrap">
                         {/* If this borrow has an unresolved return guard, surface reconcile button */}
                         {activeKey ? (
-                          <button
-                            type="button"
-                            onClick={() => handleReconcile(b.id, activeKey)}
-                            disabled={actionLoading === b.id}
-                            className="inline-flex items-center space-x-1 rounded bg-indigo-50 px-2.5 py-1 text-[11px] font-semibold text-indigo-700 hover:bg-indigo-100 disabled:opacity-50"
-                          >
-                            <RefreshCw
-                              className={`h-3 w-3 ${actionLoading === b.id ? 'animate-spin' : ''}`}
-                            />
-                            <span>Đối soát giao dịch</span>
-                          </button>
+                          <div className="inline-flex items-center space-x-1.5">
+                            <button
+                              type="button"
+                              onClick={() => handleReconcile(b.id, activeKey)}
+                              disabled={actionLoading === b.id}
+                              className="inline-flex items-center space-x-1 rounded bg-indigo-50 px-2.5 py-1 text-[11px] font-semibold text-indigo-700 hover:bg-indigo-100 disabled:opacity-50 cursor-pointer"
+                            >
+                              <RefreshCw
+                                className={`h-3 w-3 ${actionLoading === b.id ? 'animate-spin' : ''}`}
+                              />
+                              <span>Đối soát giao dịch</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDismissGuard(b.id, activeKey)}
+                              disabled={actionLoading === b.id}
+                              className="rounded bg-slate-100 text-slate-600 px-2 py-1 text-[11px] font-semibold hover:bg-rose-50 hover:text-rose-700 disabled:opacity-50 cursor-pointer"
+                              title="Gỡ bỏ chốt chặn đối soát để nhận hoàn trả lại"
+                            >
+                              Gỡ chặn
+                            </button>
+                          </div>
                         ) : (
                           <>
                             {b.status === 'PENDING' && (
