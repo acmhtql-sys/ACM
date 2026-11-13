@@ -5,8 +5,10 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { ItemResponse, ItemType, LocationResponse, LocationType, StockStatus, UserRole } from '@acm/shared';
 import { StockImportModal } from './StockImportModal';
 import {
+  applyDefaultUnitCostsToLines,
   buildBulkImportLines,
   distributeLinesAcrossBins,
+  getDefaultItemUnitCost,
   getShortageItems,
   getSuggestedReplenishQty,
   mergeMissingItemsIntoLines,
@@ -146,7 +148,21 @@ describe('StockImportModal 2-part flow (Bulk All vs Individual/Shortage)', () =>
     });
     expect(merged.addedCount).toBe(1);
     expect(merged.nextLines).toHaveLength(2);
-    expect(merged.nextLines[1]).toMatchObject({ itemId: ITEM_LOW, quantity: 14, locationId: LOC_BIN });
+    expect(merged.nextLines[1]).toMatchObject({ itemId: ITEM_LOW, quantity: 14, locationId: LOC_BIN, unitCost: 1000 });
+  });
+
+  it('provides standard default unit costs for components and applies them across lines', () => {
+    expect(getDefaultItemUnitCost(mockItems[0])).toBe(95000); // MCU-ESP32
+    expect(getDefaultItemUnitCost(mockItems[1])).toBe(1000);  // RES-10K
+    expect(getDefaultItemUnitCost(mockItems[2])).toBe(2000);  // LED-RED
+
+    const linesWithoutCost = [
+      { itemId: ITEM_EMPTY, locationId: LOC_BIN, quantity: 5, unitCost: null, notes: '' },
+      { itemId: ITEM_LOW, locationId: LOC_BIN, quantity: 10, unitCost: null, notes: '' },
+    ];
+    const updated = applyDefaultUnitCostsToLines(linesWithoutCost, mockItems);
+    expect(updated[0].unitCost).toBe(95000);
+    expect(updated[1].unitCost).toBe(1000);
   });
 
   it('distributes lines evenly across multiple bins and summarizes counts', () => {
@@ -210,6 +226,15 @@ describe('StockImportModal 2-part flow (Bulk All vs Individual/Shortage)', () =>
     expect((screen.getByTestId('input-qty-1') as HTMLInputElement).value).toBe('25');
     expect((screen.getByTestId('input-qty-2') as HTMLInputElement).value).toBe('25');
 
+    // Verify unit cost inputs populated with default prices (sorted by code: LED-RED, MCU-ESP32, RES-10K)
+    expect((screen.getByTestId('input-cost-0') as HTMLInputElement).value).toBe('2000');
+    expect((screen.getByTestId('input-cost-1') as HTMLInputElement).value).toBe('95000');
+    expect((screen.getByTestId('input-cost-2') as HTMLInputElement).value).toBe('1000');
+
+    // Click 'Điền giá chuẩn' button to test handler
+    expect(screen.getByTestId('btn-apply-default-costs')).toBeDefined();
+    fireEvent.click(screen.getByTestId('btn-apply-default-costs'));
+
     fireEvent.click(screen.getByTestId('btn-review-import'));
     await waitFor(() => {
       expect(screen.getByTestId('import-confirmation-step')).toBeDefined();
@@ -220,6 +245,9 @@ describe('StockImportModal 2-part flow (Bulk All vs Individual/Shortage)', () =>
       expect(stockTransactionsService.importStock).toHaveBeenCalledTimes(1);
       const [payload] = (stockTransactionsService.importStock as any).mock.calls[0];
       expect(payload.items).toHaveLength(3);
+      expect(payload.items[0].unitCost).toBe(2000);
+      expect(payload.items[1].unitCost).toBe(95000);
+      expect(payload.items[2].unitCost).toBe(1000);
       expect(onSuccess).toHaveBeenCalledTimes(1);
     });
   });

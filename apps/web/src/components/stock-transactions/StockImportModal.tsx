@@ -32,9 +32,11 @@ import {
   ImportItemDraftLine,
   ImportMode,
   MAX_IMPORT_LINES_PER_VOUCHER,
+  applyDefaultUnitCostsToLines,
   buildBulkImportLines,
   createEmptyImportLine,
   distributeLinesAcrossBins,
+  getDefaultItemUnitCost,
   getDefaultLocationId,
   getDistributableBins,
   getItemAvailableStock,
@@ -412,13 +414,32 @@ export const StockImportModal: React.FC<StockImportModalProps> = ({
   const handleLineChange = (index: number, field: keyof ImportItemLine, value: any) => {
     if (isConfirming) setIsConfirming(false);
     const updated = [...lines];
-    updated[index] = { ...updated[index], [field]: value };
+    if (field === 'itemId') {
+      const selectedItem = activeItemById.get(value);
+      const defaultCost = getDefaultItemUnitCost(selectedItem);
+      updated[index] = {
+        ...updated[index],
+        itemId: value,
+        unitCost: defaultCost > 0 ? defaultCost : updated[index].unitCost,
+      };
+    } else {
+      updated[index] = { ...updated[index], [field]: value };
+    }
     setLines(updated);
     if (fieldErrors[`items.${index}.${field}`]) {
       const newErrors = { ...fieldErrors };
       delete newErrors[`items.${index}.${field}`];
       setFieldErrors(newErrors);
     }
+  };
+
+  const handleApplyDefaultCostsToAll = () => {
+    if (fsm.isSubmitting || fsm.isAmbiguous) return;
+    clearValidationMessages();
+    const updated = applyDefaultUnitCostsToLines(lines, activeItems);
+    setLines(updated);
+    const filledCount = updated.filter((l) => (Number(l.unitCost) || 0) > 0).length;
+    setQuickLoadNotice(`Đã điền sẵn đơn giá chuẩn cho ${filledCount} linh kiện.`);
   };
 
   const validateForm = (): ImportStockInput | null => {
@@ -1174,6 +1195,16 @@ export const StockImportModal: React.FC<StockImportModalProps> = ({
                           >
                             Theo ngưỡng
                           </button>
+                          <button
+                            type="button"
+                            onClick={handleApplyDefaultCostsToAll}
+                            disabled={fsm.isSubmitting || fsm.isAmbiguous}
+                            className="rounded-lg border border-indigo-200 bg-white px-2.5 py-1.5 text-[11px] font-semibold text-indigo-700 hover:bg-indigo-50 disabled:opacity-50 transition"
+                            title="Tự động điền đơn giá chuẩn cho toàn bộ linh kiện"
+                            data-testid="btn-apply-default-costs"
+                          >
+                            Điền giá chuẩn
+                          </button>
                         </div>
                       </div>
 
@@ -1365,6 +1396,16 @@ export const StockImportModal: React.FC<StockImportModalProps> = ({
                   )}
                   <button
                     type="button"
+                    onClick={handleApplyDefaultCostsToAll}
+                    disabled={fsm.isSubmitting || fsm.isAmbiguous || lines.length === 0}
+                    className="inline-flex items-center space-x-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition"
+                    title="Điền sẵn đơn giá chuẩn cho tất cả linh kiện trong bảng"
+                    data-testid="btn-apply-default-costs-toolbar"
+                  >
+                    <span>Điền giá chuẩn</span>
+                  </button>
+                  <button
+                    type="button"
                     onClick={handleAddLine}
                     disabled={lines.length >= MAX_IMPORT_LINES_PER_VOUCHER || fsm.isSubmitting || fsm.isAmbiguous}
                     className="inline-flex items-center space-x-1 rounded-lg border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700 hover:bg-blue-100 transition"
@@ -1384,7 +1425,21 @@ export const StockImportModal: React.FC<StockImportModalProps> = ({
                       <th className="py-2.5 px-3 min-w-[200px]">Linh kiện *</th>
                       <th className="py-2.5 px-3 min-w-[180px]">Vị trí kho nhập *</th>
                       <th className="py-2.5 px-3 w-28">Số lượng *</th>
-                      <th className="py-2.5 px-3 w-32">Đơn giá (VNĐ)</th>
+                      <th className="py-2.5 px-3 w-36">
+                        <div className="flex items-center justify-between">
+                          <span>Đơn giá (VNĐ)</span>
+                          <button
+                            type="button"
+                            onClick={handleApplyDefaultCostsToAll}
+                            disabled={fsm.isSubmitting || fsm.isAmbiguous || lines.length === 0}
+                            title="Điền giá chuẩn cho tất cả dòng"
+                            className="text-[10px] font-semibold text-blue-600 hover:text-blue-800 underline ml-1 cursor-pointer disabled:opacity-40"
+                            data-testid="btn-auto-fill-prices-col"
+                          >
+                            Điền giá
+                          </button>
+                        </div>
+                      </th>
                       <th className="py-2.5 px-3">Ghi chú dòng</th>
                       <th className="py-2.5 px-3 w-10 text-center">Xóa</th>
                     </tr>
