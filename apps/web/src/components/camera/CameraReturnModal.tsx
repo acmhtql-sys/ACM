@@ -58,7 +58,11 @@ export interface CameraReturnModalProps {
   isOpen: boolean;
   onClose: () => void;
   borrowRecord: BorrowRecord;
-  onApplyReturnRows: (newRows: Record<string, ReturnInputRow>, suggestedNotes?: string) => void;
+  onApplyReturnRows: (
+    newRows: Record<string, ReturnInputRow>,
+    suggestedNotes?: string,
+    evidencePhoto?: string
+  ) => void;
   catalogItems?: CatalogItem[];
 }
 
@@ -91,6 +95,29 @@ export const KNOWN_FRIENDLY_NAMES: Record<string, string> = {
   Ultrasonic_sensor: 'Cảm biến siêu âm (HC-SR04)',
   Temp_hum_sensor: 'Cảm biến nhiệt ẩm (DHT22)',
   LED_lamp: 'Đèn LED RGB',
+  Main_1: 'Bo mạch điều khiển Main 1',
+  Main_2: 'Bo mạch điều khiển Main 2',
+  Switch_main_1: 'Công tắc nguồn Main 1',
+  Switch_main_2: 'Công tắc nguồn Main 2',
+  Switch_wire_main_1: 'Cáp nối công tắc Main 1',
+  Switch_wire_main_2: 'Cáp nối công tắc Main 2',
+  IR_sensor: 'Cảm biến hồng ngoại (IR)',
+  Light_sensor: 'Cảm biến ánh sáng',
+  Sound_sensor: 'Cảm biến âm thanh',
+  Touch_sensor: 'Cảm biến chạm',
+  Motor: 'Động cơ DC Motor',
+  Bluetooth_speaker: 'Loa Bluetooth',
+  'Servo_wire -Blue-': 'Dây servo (Xanh dương)',
+  Servo_wire_Gray: 'Dây servo (Xám)',
+  'Servo_wire_-Short-': 'Dây servo (Ngắn)',
+  Baseboard: 'Tấm đế lắp ráp (Baseboard)',
+  Base_brick: 'Khối đế lắp ráp (Base brick)',
+  Red_plug: 'Chốt cắm đỏ',
+  Blue_short_plug: 'Chốt cắm ngắn xanh',
+  Yellow_long_plug: 'Chốt cắm dài vàng',
+  Wheel_hub_Tire: 'Bánh xe kèm lốp cao su',
+  Poly_directional_wheel: 'Bánh xe đa hướng',
+  'Poly-directinal_wheel': 'Bánh xe đa hướng',
 };
 
 export const getFriendlyClassName = (
@@ -244,6 +271,10 @@ export const CameraReturnModal: React.FC<CameraReturnModalProps> = ({
     text: string;
   } | null>(null);
   const [uploadedPreview, setUploadedPreview] = useState<string | null>(null);
+  const [capturedLivePhoto, setCapturedLivePhoto] = useState<{
+    dataUrl: string;
+    timestamp: string;
+  } | null>(null);
   const [activeTab, setActiveTab] = useState<'staged' | 'detections'>('staged');
   const [detectionFilter, setDetectionFilter] = useState<'ALL' | DetectionMatchStatus>('ALL');
   const [selectedClassHighlight, setSelectedClassHighlight] = useState<string | null>(null);
@@ -316,6 +347,7 @@ export const CameraReturnModal: React.FC<CameraReturnModalProps> = ({
     setCameraPermissionDenied(false);
     setPermissionErrorMsg('');
     setUploadedPreview(null);
+    setCapturedLivePhoto(null);
 
     try {
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
@@ -742,10 +774,98 @@ export const CameraReturnModal: React.FC<CameraReturnModalProps> = ({
     }
   }, [captureAndDetect, isRecognizing]);
 
-  // Handle Manual File Upload fallback
+  // LIVE CAPTURE PHOTO (Directly from live camera stream with unforgeable watermark)
+  const captureLivePhoto = useCallback(() => {
+    if (!videoRef.current || videoRef.current.readyState < 2) {
+      setStatusNotice({
+        type: 'warning',
+        text: 'Camera chưa sẵn sàng để chụp ảnh. Vui lòng đợi trong giây lát.',
+      });
+      return;
+    }
+
+    const video = videoRef.current;
+    const canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth || 1280;
+    canvas.height = video.videoHeight || 720;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    // Draw live video frame
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+    // Anti-fraud watermark
+    const now = new Date();
+    const dateStr = now.toLocaleDateString('vi-VN');
+    const timeStr = now.toLocaleTimeString('vi-VN');
+    const fullStamp = `${dateStr} ${timeStr}`;
+
+    ctx.fillStyle = 'rgba(15, 23, 42, 0.8)';
+    ctx.fillRect(0, canvas.height - 44, canvas.width, 44);
+
+    ctx.fillStyle = '#10B981';
+    ctx.font = 'bold 15px sans-serif';
+    ctx.fillText('🔒 XÁC THỰC HOÀN TRẢ - LIVE CAMERA CAPTURE', 16, canvas.height - 17);
+
+    ctx.fillStyle = '#FFFFFF';
+    ctx.font = '13px monospace';
+    const stampText = `🕒 ${fullStamp} | Phiếu: ${borrowRecord.requestNumber}`;
+    const textW = ctx.measureText(stampText).width;
+    ctx.fillText(stampText, canvas.width - textW - 16, canvas.height - 17);
+
+    const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
+    setCapturedLivePhoto({ dataUrl, timestamp: fullStamp });
+    setUploadedPreview(dataUrl);
+
+    // Stop continuous loop if active
+    if (intervalRef.current) {
+      window.clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+    setIsRecognizing(false);
+
+    isInFlightRef.current = true;
+    setStatusNotice({ type: 'info', text: `Đang phân tích ảnh chụp bàn giao lúc ${timeStr}...` });
+
+    detectFrameBase64(dataUrl)
+      .then((res) => {
+        if (res.success && res.detections) {
+          setInferenceTime(res.inferenceTimeMs || null);
+          processDetections(res.detections);
+          setStatusNotice({
+            type: 'success',
+            text: `✅ Chụp ảnh thành công lúc ${timeStr}! Phát hiện ${res.detections.length} linh kiện trong ảnh.`,
+          });
+        }
+      })
+      .catch((err) => {
+        setStatusNotice({
+          type: 'warning',
+          text: `Đã chụp ảnh lúc ${timeStr}. Bạn có thể dùng ảnh này làm bằng chứng hoàn trả.`,
+        });
+      })
+      .finally(() => {
+        isInFlightRef.current = false;
+      });
+  }, [borrowRecord.requestNumber, processDetections]);
+
+  // Handle Manual File Upload fallback (strictly enforces fresh photos, rejecting yesterday's photos)
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
+    // Check if file is older than today (from yesterday or earlier)
+    const now = new Date();
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    const fileTime = file.lastModified || 0;
+
+    if (fileTime > 0 && fileTime < todayStart) {
+      setStatusNotice({
+        type: 'error',
+        text: '❌ TỪ CHỐI ẢNH CŨ: Hệ thống không chấp nhận ảnh cũ của ngày hôm qua hoặc lưu sẵn từ trước. Vui lòng bật camera và chụp ảnh trực tiếp tại thời điểm hiện tại!',
+      });
+      return;
+    }
 
     stopCameraStream();
 
@@ -912,11 +1032,19 @@ export const CameraReturnModal: React.FC<CameraReturnModalProps> = ({
       }
     }
 
+    if (capturedLivePhoto) {
+      notesArr.push(`[Ảnh chụp thực tế lúc ${capturedLivePhoto.timestamp} - Live Camera Verified]`);
+    }
+
     const suggestedNotes =
       notesArr.length > 0 ? `Nhận diện qua Camera: ${notesArr.join(', ')}` : undefined;
 
     stopCameraStream();
-    onApplyReturnRows(rows, suggestedNotes);
+    if (capturedLivePhoto?.dataUrl) {
+      onApplyReturnRows(rows, suggestedNotes, capturedLivePhoto.dataUrl);
+    } else {
+      onApplyReturnRows(rows, suggestedNotes);
+    }
     onClose();
   };
 
@@ -1177,6 +1305,12 @@ export const CameraReturnModal: React.FC<CameraReturnModalProps> = ({
                     ref={canvasRef}
                     className="pointer-events-none absolute inset-0 h-full w-full object-contain"
                   />
+                  {capturedLivePhoto && (
+                    <div className="absolute top-2 left-2 bg-emerald-600/90 text-white text-[11px] font-bold px-2.5 py-1 rounded-md shadow-md flex items-center space-x-1.5 z-10">
+                      <CheckCircle className="h-3.5 w-3.5" />
+                      <span>ẢNH CHỤP HIỆN TẠI (LIVE): {capturedLivePhoto.timestamp}</span>
+                    </div>
+                  )}
                 </>
               ) : (
                 <>
@@ -1217,57 +1351,91 @@ export const CameraReturnModal: React.FC<CameraReturnModalProps> = ({
             </div>
 
             {/* Camera Controls Toolbar */}
-            <div className="mt-2.5 flex w-full items-center justify-between rounded-lg bg-slate-800/80 px-3 py-2 text-xs text-slate-300">
-              <div className="flex items-center space-x-2">
-                {cameraActive && (
-                  <button
-                    type="button"
-                    onClick={toggleRecognition}
-                    className={`inline-flex items-center space-x-1.5 rounded-md px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition ${
-                      isRecognizing
-                        ? 'bg-rose-600 hover:bg-rose-500'
-                        : 'bg-emerald-600 hover:bg-emerald-500'
-                    }`}
-                  >
-                    {isRecognizing ? (
-                      <>
-                        <Square className="h-3.5 w-3.5 fill-current" />
-                        <span>Dừng nhận diện</span>
-                      </>
-                    ) : (
-                      <>
-                        <Play className="h-3.5 w-3.5 fill-current" />
-                        <span>Bắt đầu nhận diện</span>
-                      </>
-                    )}
-                  </button>
-                )}
+            <div className="mt-2.5 flex flex-col w-full rounded-lg bg-slate-800/80 px-3 py-2 text-xs text-slate-300 space-y-1.5">
+              <div className="flex w-full items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  {cameraActive && !capturedLivePhoto && (
+                    <button
+                      type="button"
+                      onClick={toggleRecognition}
+                      className={`inline-flex items-center space-x-1.5 rounded-md px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition ${
+                        isRecognizing
+                          ? 'bg-rose-600 hover:bg-rose-500'
+                          : 'bg-emerald-600 hover:bg-emerald-500'
+                      }`}
+                    >
+                      {isRecognizing ? (
+                        <>
+                          <Square className="h-3.5 w-3.5 fill-current" />
+                          <span>Dừng nhận diện</span>
+                        </>
+                      ) : (
+                        <>
+                          <Play className="h-3.5 w-3.5 fill-current" />
+                          <span>Bắt đầu nhận diện</span>
+                        </>
+                      )}
+                    </button>
+                  )}
 
-                {cameraActive && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setFacingMode((prev) => (prev === 'environment' ? 'user' : 'environment'));
-                    }}
-                    className="inline-flex items-center space-x-1 rounded-md bg-slate-700 px-2.5 py-1.5 text-xs font-medium text-slate-300 hover:bg-slate-600"
-                  >
-                    <RefreshCw className="h-3.5 w-3.5" />
-                    <span>Đổi Camera</span>
-                  </button>
-                )}
+                  {/* Prominent Live Capture Button */}
+                  {cameraActive && !capturedLivePhoto && (
+                    <button
+                      type="button"
+                      onClick={captureLivePhoto}
+                      className="inline-flex items-center space-x-1.5 rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-emerald-500 transition"
+                    >
+                      <Camera className="h-3.5 w-3.5" />
+                      <span>Chụp ảnh hiện tại (Live)</span>
+                    </button>
+                  )}
+
+                  {capturedLivePhoto && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCapturedLivePhoto(null);
+                        setUploadedPreview(null);
+                        startCameraStream();
+                      }}
+                      className="inline-flex items-center space-x-1.5 rounded-md bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-amber-500 transition"
+                    >
+                      <RefreshCw className="h-3.5 w-3.5" />
+                      <span>Chụp lại</span>
+                    </button>
+                  )}
+
+                  {cameraActive && !capturedLivePhoto && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFacingMode((prev) => (prev === 'environment' ? 'user' : 'environment'));
+                      }}
+                      className="inline-flex items-center space-x-1 rounded-md bg-slate-700 px-2.5 py-1.5 text-xs font-medium text-slate-300 hover:bg-slate-600"
+                    >
+                      <RefreshCw className="h-3.5 w-3.5" />
+                      <span>Đổi Camera</span>
+                    </button>
+                  )}
+                </div>
+
+                {/* Upload fallback button */}
+                <label className="inline-flex cursor-pointer items-center space-x-1.5 rounded-md bg-slate-700 px-2.5 py-1.5 text-xs font-medium text-slate-200 hover:bg-slate-600">
+                  <Upload className="h-3.5 w-3.5 text-slate-300" />
+                  <span>Tải ảnh linh kiện</span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleFileUpload}
+                    className="hidden"
+                  />
+                </label>
               </div>
 
-              {/* Upload fallback button */}
-              <label className="inline-flex cursor-pointer items-center space-x-1.5 rounded-md bg-slate-700 px-2.5 py-1.5 text-xs font-medium text-slate-200 hover:bg-slate-600">
-                <Upload className="h-3.5 w-3.5 text-slate-300" />
-                <span>Tải ảnh linh kiện</span>
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleFileUpload}
-                  className="hidden"
-                />
-              </label>
+              <div className="flex items-center space-x-1.5 text-[10px] text-slate-400 pt-1 border-t border-slate-700/60">
+                <AlertCircle className="h-3 w-3 text-amber-400 shrink-0" />
+                <span>Chỉ chấp nhận ảnh chụp thời gian thực tại chỗ. Ảnh cũ từ ngày hôm qua sẽ bị từ chối.</span>
+              </div>
             </div>
           </div>
 

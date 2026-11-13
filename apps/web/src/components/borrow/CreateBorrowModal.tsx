@@ -13,11 +13,14 @@ import {
   CheckCircle2,
   AlertTriangle,
   Zap,
+  Camera,
+  ShieldCheck,
 } from 'lucide-react';
 import { apiClient } from '../../services/api';
 import { useAuth } from '../../hooks/useAuth';
 import { useModalDismiss } from '../../hooks/useModalDismiss';
 import { DatePickerVi } from '../common/DatePickerVi';
+import { CameraBorrowModal } from '../camera/CameraBorrowModal';
 
 export interface CreateBorrowModalProps {
   isOpen: boolean;
@@ -113,6 +116,44 @@ export const CreateBorrowModal: React.FC<CreateBorrowModalProps> = ({
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+  // Camera AI Scanning & Live Proof state
+  const [isCameraModalOpen, setIsCameraModalOpen] = useState<boolean>(false);
+  const [liveProofPhoto, setLiveProofPhoto] = useState<{
+    dataUrl: string;
+    timestamp: string;
+  } | null>(null);
+
+  const handleApplyCameraItems = useCallback(
+    (
+      scannedItems: Array<{ itemId: string; quantity: number }>,
+      liveProof?: { dataUrl: string; timestamp: string }
+    ) => {
+      setItemsList((prev) => {
+        const currentValid = prev.filter((r) => r.itemId);
+        const map = new Map<string, number>();
+        for (const row of currentValid) {
+          map.set(row.itemId, row.quantity);
+        }
+        for (const scan of scannedItems) {
+          map.set(scan.itemId, Math.max(map.get(scan.itemId) || 0, scan.quantity));
+        }
+        return Array.from(map.entries()).map(([itemId, quantity]) => ({
+          itemId,
+          quantity,
+        }));
+      });
+
+      if (liveProof) {
+        setLiveProofPhoto(liveProof);
+        setNotes((prev) => {
+          const stamp = `[Ảnh chụp bàn giao lúc ${liveProof.timestamp} - Live Camera Verified]`;
+          return prev ? `${prev}\n${stamp}` : stamp;
+        });
+      }
+    },
+    []
+  );
+
   // Load active catalog items and users on open
   useEffect(() => {
     if (!isOpen) return;
@@ -120,6 +161,8 @@ export const CreateBorrowModal: React.FC<CreateBorrowModalProps> = ({
     setErrorMessage(null);
     setPurpose('');
     setNotes('');
+    setLiveProofPhoto(null);
+    setIsCameraModalOpen(false);
     setExpectedBorrowDate(todayStr);
     setExpectedReturnDate(defaultReturnStr);
     setItemsList([{ itemId: '', quantity: 1 }]);
@@ -437,14 +480,24 @@ export const CreateBorrowModal: React.FC<CreateBorrowModalProps> = ({
                   Danh sách linh kiện / thiết bị yêu cầu ({itemsList.length})
                 </h4>
               </div>
-              <button
-                type="button"
-                onClick={handleAddItemRow}
-                className="inline-flex items-center space-x-1 text-xs font-semibold text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 px-2.5 py-1.5 rounded-lg transition-colors"
-              >
-                <Plus className="h-3.5 w-3.5" />
-                <span>Thêm linh kiện</span>
-              </button>
+              <div className="flex items-center space-x-2">
+                <button
+                  type="button"
+                  onClick={() => setIsCameraModalOpen(true)}
+                  className="inline-flex items-center space-x-1.5 text-xs font-semibold text-emerald-700 hover:text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-3 py-1.5 rounded-lg transition-all shadow-xs cursor-pointer"
+                >
+                  <Camera className="h-3.5 w-3.5 text-emerald-600" />
+                  <span>Quét Camera AI</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleAddItemRow}
+                  className="inline-flex items-center space-x-1 text-xs font-semibold text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 px-2.5 py-1.5 rounded-lg transition-colors cursor-pointer"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  <span>Thêm linh kiện</span>
+                </button>
+              </div>
             </div>
 
             {loadingData ? (
@@ -560,6 +613,32 @@ export const CreateBorrowModal: React.FC<CreateBorrowModalProps> = ({
             />
           </div>
 
+          {/* Live Proof Photo Preview */}
+          {liveProofPhoto && (
+            <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 p-3.5 space-y-2">
+              <div className="flex items-center justify-between text-xs font-semibold text-emerald-800">
+                <span className="flex items-center space-x-1.5">
+                  <ShieldCheck className="h-4 w-4 text-emerald-600" />
+                  <span>Bằng chứng ảnh chụp bàn giao thực tế (Live Camera)</span>
+                </span>
+                <span className="text-[11px] font-mono text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded">
+                  {liveProofPhoto.timestamp}
+                </span>
+              </div>
+              <div className="relative rounded-lg overflow-hidden border border-emerald-300 max-h-44 flex items-center justify-center bg-black/5">
+                <img
+                  src={liveProofPhoto.dataUrl}
+                  alt="Live Borrow Evidence"
+                  className="max-h-44 object-contain rounded"
+                />
+              </div>
+              <p className="text-[11px] text-emerald-700 flex items-center space-x-1">
+                <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
+                <span>Đã xác thực ảnh chụp trực tiếp tại chỗ. Hệ thống lưu kèm dấu thời gian thực chống gian lận.</span>
+              </p>
+            </div>
+          )}
+
           {/* Footer buttons */}
           <div className="flex items-center justify-end space-x-3 pt-4 border-t border-slate-200">
             <button
@@ -590,6 +669,16 @@ export const CreateBorrowModal: React.FC<CreateBorrowModalProps> = ({
           </div>
         </form>
       </div>
+
+      {/* Camera Borrow Scanner Modal */}
+      {isCameraModalOpen && (
+        <CameraBorrowModal
+          isOpen={isCameraModalOpen}
+          onClose={() => setIsCameraModalOpen(false)}
+          catalogItems={catalogItems}
+          onApplyBorrowItems={handleApplyCameraItems}
+        />
+      )}
     </div>
   );
 };

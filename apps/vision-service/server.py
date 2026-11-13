@@ -43,7 +43,20 @@ INFERENCE_TIMEOUT_SEC = 5.0
 # Model Path Resolution
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 REPO_ROOT = os.path.abspath(os.path.join(SCRIPT_DIR, "..", ".."))
-MODEL_PATH = os.path.join(REPO_ROOT, "best.pt")
+
+def resolve_model_path() -> str:
+    env_path = os.environ.get("MODEL_PATH")
+    if env_path and os.path.exists(env_path):
+        return env_path
+    repo_model = os.path.join(REPO_ROOT, "best.pt")
+    if os.path.exists(repo_model):
+        return repo_model
+    script_model = os.path.join(SCRIPT_DIR, "best.pt")
+    if os.path.exists(script_model):
+        return script_model
+    return repo_model
+
+MODEL_PATH = resolve_model_path()
 
 # Global Inference Lock (enforce max 1 concurrent inference)
 inference_lock = asyncio.Lock()
@@ -54,13 +67,39 @@ model_sha256: str = "unknown"
 classes_map: Dict[int, str] = {}
 
 # Mappings from detected classes to ACM catalog item codes
-# Invariant: Only map classes with direct verified correspondence.
-# Arduino, ESP32, Resistor have NO classes in this model -> manual fallback required.
+# Invariant: Maps detected classes to ACM catalog item codes and UBTECH kits.
 CLASS_TO_ITEM_MAP = {
-    "Servo": "SERVO-SG90",
+    # Main controllers & Switches
+    "Main_1": "MAIN-01",
+    "Main_2": "MAIN-02",
+    "Switch_main_1": "SW-MAIN-01",
+    "Switch_main_2": "SW-MAIN-02",
+    "Switch_wire_main_1": "CAB-SW-M1",
+    "Switch_wire_main_2": "CAB-SW-M2",
+    # Sensors & Actuators
+    "IR_sensor": "SEN-IR",
     "Ultrasonic_sensor": "SR04-ULTRASONIC",
     "Temp_hum_sensor": "DHT22-AM2302",
+    "Light_sensor": "SEN-LIGHT",
+    "Sound_sensor": "SEN-SOUND",
+    "Touch_sensor": "SEN-TOUCH",
     "LED_lamp": "LED-5MM-RGB",
+    "Servo": "SERVO-SG90",
+    "Motor": "MOT-01",
+    "Bluetooth_speaker": "SPK-BT-01",
+    # Cables & Connectors
+    "Servo_wire -Blue-": "CAB-SRV-BLU",
+    "Servo_wire_Gray": "CAB-SRV-GRY",
+    "Servo_wire_-Short-": "CAB-SRV-SHT",
+    # Structural & Motion parts
+    "Baseboard": "KIT-BASE-01",
+    "Base_brick": "BRK-BASE",
+    "Red_plug": "PLUG-RED",
+    "Blue_short_plug": "PLUG-BLU",
+    "Yellow_long_plug": "PLUG-YEL",
+    "Wheel_hub_Tire": "WHEEL-TIRE",
+    "Poly_directional_wheel": "WHEEL-OMNI",
+    "Poly-directinal_wheel": "WHEEL-OMNI",
 }
 
 

@@ -13,6 +13,7 @@ import {
   RefreshCw,
   ShieldAlert,
   Camera,
+  CheckCircle,
 } from 'lucide-react';
 import { isCameraReturnEnabled } from '../config/features';
 import { CameraReturnModal } from '../components/camera/CameraReturnModal';
@@ -94,6 +95,7 @@ export const BorrowReturnPage: React.FC = () => {
   const [returnRows, setReturnRows] = useState<Record<string, ReturnInputRow>>({});
   const [returnNotes, setReturnNotes] = useState<string>('');
   const [isCameraModalOpen, setIsCameraModalOpen] = useState<boolean>(false);
+  const [capturedEvidencePhoto, setCapturedEvidencePhoto] = useState<string | null>(null);
 
   // Persisted return intents & reconciliation state
   const [pendingReturns, setPendingReturns] = useState<PendingBorrowReturn[]>([]);
@@ -297,6 +299,7 @@ export const BorrowReturnPage: React.FC = () => {
     }
     setReturningBorrow(b);
     setReturnNotes('');
+    setCapturedEvidencePhoto(null);
     setRejectedReturn(null);
 
     // Initialize rows: default to '0' to avoid accidental mass returns, letting operator specify exact quantities
@@ -904,7 +907,7 @@ export const BorrowReturnPage: React.FC = () => {
               <CornerDownLeft className="h-4 w-4 text-emerald-600" />
               <span>Xác nhận hoàn trả linh kiện ({returningBorrow.requestNumber})</span>
             </h3>
-            <div className="flex items-center justify-between mt-1 mb-1">
+            <div className="flex items-center justify-between mt-1 mb-2">
               <p className="text-xs text-slate-500">
                 Người mượn: <span className="font-semibold text-slate-700">{returningBorrow.borrowerName}</span>
               </p>
@@ -912,7 +915,8 @@ export const BorrowReturnPage: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setIsCameraModalOpen(true)}
-                  className="inline-flex items-center space-x-1.5 rounded-md bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 border border-emerald-200 shadow-sm"
+                  className="inline-flex items-center space-x-1.5 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 shadow-sm transition cursor-pointer"
+                  title="Nhận diện linh kiện hoàn trả qua Camera thời gian thực"
                 >
                   <Camera className="h-3.5 w-3.5" />
                   <span>Quét Camera AI</span>
@@ -1043,12 +1047,37 @@ export const BorrowReturnPage: React.FC = () => {
                   className="w-full rounded-lg border border-slate-200 p-2 text-xs text-slate-900 focus:border-blue-500 focus:outline-none"
                 />
               </div>
+
+              {/* Live Captured Photo Evidence */}
+              {capturedEvidencePhoto && (
+                <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 p-3 space-y-2">
+                  <div className="flex items-center justify-between text-xs font-semibold text-emerald-800">
+                    <span className="flex items-center space-x-1.5">
+                      <CheckCircle className="h-4 w-4 text-emerald-600" />
+                      <span>Bằng chứng ảnh chụp thực tế (Live Camera)</span>
+                    </span>
+                    <span className="text-[10px] font-mono bg-emerald-200 text-emerald-900 px-2 py-0.5 rounded">
+                      Đã xác thực thời gian thực
+                    </span>
+                  </div>
+                  <div className="relative rounded-lg overflow-hidden border border-emerald-300 max-h-40 flex items-center justify-center bg-black/5">
+                    <img
+                      src={capturedEvidencePhoto}
+                      alt="Bằng chứng hoàn trả"
+                      className="max-h-40 object-contain rounded"
+                    />
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="mt-5 flex justify-end space-x-2 border-t border-slate-100 pt-3">
               <button
                 type="button"
-                onClick={() => setReturningBorrow(null)}
+                onClick={() => {
+                  setReturningBorrow(null);
+                  setCapturedEvidencePhoto(null);
+                }}
                 className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
               >
                 Hủy bỏ
@@ -1075,11 +1104,14 @@ export const BorrowReturnPage: React.FC = () => {
           isOpen={isCameraModalOpen}
           onClose={() => setIsCameraModalOpen(false)}
           borrowRecord={returningBorrow}
-          onApplyReturnRows={(appliedRows, suggestedNotes) => {
+          onApplyReturnRows={(appliedRows, suggestedNotes, evidencePhoto) => {
             setReturnRows((prev) => ({
               ...prev,
               ...appliedRows,
             }));
+            if (evidencePhoto) {
+              setCapturedEvidencePhoto(evidencePhoto);
+            }
             if (suggestedNotes) {
               setReturnNotes((prev) => (prev ? `${prev}\n${suggestedNotes}` : suggestedNotes));
             }
