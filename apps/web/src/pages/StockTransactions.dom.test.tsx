@@ -581,6 +581,61 @@ describe('ACM Phase 2.2 Step 4B.3B – Stock Transactions Frontend DOM Test Suit
         expect(screen.getByText(/Lý do xuất kho là bắt buộc và phải có ít nhất 3 ký tự/i)).toBeDefined();
       });
     });
+
+    it('TC-STK-12B: Export modal inherits location and quantity when adding a new line', async () => {
+      render(
+        <StockExportModal
+          isOpen={true}
+          onClose={vi.fn()}
+          items={mockItems}
+          locations={mockLocations}
+          balances={mockBalances}
+          userId="user-admin-1"
+          userRole="ADMIN"
+          onSuccess={vi.fn()}
+        />
+      );
+
+      fireEvent.change(screen.getByTestId('select-location-0'), { target: { value: LOC_1 } });
+      fireEvent.change(screen.getByTestId('input-qty-0'), { target: { value: '5' } });
+
+      fireEvent.click(screen.getByTestId('btn-add-line'));
+
+      expect((screen.getByTestId('select-location-1') as HTMLSelectElement).value).toBe(LOC_1);
+      expect((screen.getByTestId('input-qty-1') as HTMLInputElement).value).toBe('5');
+    });
+
+    it('TC-STK-12C: Export modal applies first row location and quantity to all rows', async () => {
+      render(
+        <StockExportModal
+          isOpen={true}
+          onClose={vi.fn()}
+          items={mockItems}
+          locations={mockLocations}
+          balances={mockBalances}
+          userId="user-admin-1"
+          userRole="ADMIN"
+          onSuccess={vi.fn()}
+        />
+      );
+
+      fireEvent.change(screen.getByTestId('select-location-0'), { target: { value: LOC_1 } });
+      fireEvent.change(screen.getByTestId('input-qty-0'), { target: { value: '8' } });
+
+      fireEvent.click(screen.getByTestId('btn-add-line'));
+      fireEvent.change(screen.getByTestId('select-location-1'), { target: { value: 'loc-2' } });
+      fireEvent.change(screen.getByTestId('input-qty-1'), { target: { value: '1' } });
+
+      // Click "Áp dụng dòng 1 ↓" for location
+      const applyLocBtn = screen.getByTitle('Áp dụng vị trí của dòng 1 cho tất cả các dòng còn lại');
+      fireEvent.click(applyLocBtn);
+      expect((screen.getByTestId('select-location-1') as HTMLSelectElement).value).toBe(LOC_1);
+
+      // Click "Áp dụng dòng 1 ↓" for quantity
+      const applyQtyBtn = screen.getByTitle('Áp dụng số lượng của dòng 1 cho tất cả các dòng còn lại');
+      fireEvent.click(applyQtyBtn);
+      expect((screen.getByTestId('input-qty-1') as HTMLInputElement).value).toBe('8');
+    });
   });
 
   // =========================================================================

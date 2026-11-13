@@ -117,8 +117,47 @@ export const StockExportModal: React.FC<StockExportModalProps> = ({
   const [reconcileTxNumber, setReconcileTxNumber] = useState('');
   const [reconcileError, setReconcileError] = useState<string | null>(null);
 
-  const activeItems = useMemo(() => items.filter((it) => it.isActive), [items]);
+  const activeItems = useMemo(
+    () => items.filter((it) => it.isActive).sort((a, b) => a.code.localeCompare(b.code)),
+    [items]
+  );
   const activeLocations = useMemo(() => locations.filter((loc) => loc.isActive), [locations]);
+
+  // Group items by category for faster scanning in dropdown
+  const itemsByCategory = useMemo(() => {
+    const map = new Map<string, ItemResponse[]>();
+    for (const it of activeItems) {
+      const cat = it.category?.name || it.categoryName || 'Linh kiện khác';
+      if (!map.has(cat)) map.set(cat, []);
+      map.get(cat)!.push(it);
+    }
+    return Array.from(map.entries()).sort((a, b) => a[0].localeCompare(b[0]));
+  }, [activeItems]);
+
+  // List of categories available for quick-add into a box
+  const availableCategories = useMemo(() => {
+    const catMap = new Map<string, { id: string; name: string; count: number }>();
+    for (const it of activeItems) {
+      const catId = it.categoryId || it.category?.id || 'other';
+      const catName = it.category?.name || it.categoryName || 'Linh kiện khác';
+      const existing = catMap.get(catId);
+      if (existing) {
+        existing.count += 1;
+      } else {
+        catMap.set(catId, { id: catId, name: catName, count: 1 });
+      }
+    }
+    return Array.from(catMap.values()).sort((a, b) => a.name.localeCompare(b.name));
+  }, [activeItems]);
+
+  // Group locations (Boxes/Bins first for fast access)
+  const locationsGrouped = useMemo(() => {
+    const bins = activeLocations.filter(
+      (l) => l.type === 'BIN' || l.code.toUpperCase().startsWith('THUNG') || l.code.toUpperCase().startsWith('BIN')
+    );
+    const others = activeLocations.filter((l) => !bins.includes(l));
+    return { bins, others };
+  }, [activeLocations]);
 
   // Balance index map for fast lookup of available stock: key = `${itemId}:${locationId}`
   const balanceMap = useMemo(() => {
@@ -208,7 +247,83 @@ export const StockExportModal: React.FC<StockExportModalProps> = ({
   const handleAddLine = () => {
     if (lines.length >= 100) return;
     if (isConfirming) setIsConfirming(false);
-    setLines([...lines, { itemId: '', locationId: '', quantity: 1, notes: '' }]);
+    // Tự động kế thừa vị trí kho và số lượng từ dòng gần nhất đã chọn
+    const inheritedLocationId =
+      [...lines].reverse().find((l) => Boolean(l.locationId))?.locationId || '';
+    const inheritedQuantity =
+      [...lines].reverse().find((l) => l.quantity && Number(l.quantity) > 0)?.quantity ?? 1;
+    setLines([
+      ...lines,
+      {
+        itemId: '',
+        locationId: inheritedLocationId,
+        quantity: inheritedQuantity,
+        notes: '',
+      },
+    ]);
+  };
+
+  const handleApplyFirstLocationToAll = () => {
+    const targetLoc = lines[0]?.locationId;
+    if (!targetLoc) return;
+    if (isConfirming) setIsConfirming(false);
+    setLines((prev) => prev.map((l) => ({ ...l, locationId: targetLoc })));
+    setFieldErrors({});
+  };
+
+  const handleApplyFirstQuantityToAll = () => {
+    const targetQty = lines[0]?.quantity;
+    if (!targetQty || Number(targetQty) <= 0) return;
+    if (isConfirming) setIsConfirming(false);
+    setLines((prev) => prev.map((l) => ({ ...l, quantity: targetQty })));
+    const newFieldErrors = { ...fieldErrors };
+    Object.keys(newFieldErrors).forEach((key) => {
+      if (key.endsWith('.quantity')) {
+        delete newFieldErrors[key];
+      }
+    });
+    setFieldErrors(newFieldErrors);
+  };
+
+  const handleAddCategoryItems = (catId: string) => {
+    if (!catId || lines.length >= 100) return;
+    if (isConfirming) setIsConfirming(false);
+
+    const catItems = activeItems.filter(
+      (it) => (it.categoryId || it.category?.id || 'other') === catId
+    );
+    if (catItems.length === 0) return;
+
+    // Vị trí kho mục tiêu: ưu tiên dòng cuối có vị trí hoặc dòng 1
+    const targetLocId =
+      [...lines].reverse().find((l) => Boolean(l.locationId))?.locationId ||
+      lines[0]?.locationId ||
+      '';
+
+    const existingItemIds = new Set(lines.map((l) => l.itemId).filter(Boolean));
+    const itemsToAdd = catItems.filter((it) => !existingItemIds.has(it.id));
+    if (itemsToAdd.length === 0) return;
+
+    const isSingleEmptyLine = lines.length === 1 && !lines[0].itemId;
+    const remainingSlots = 100 - (isSingleEmptyLine ? 0 : lines.length);
+    const sliced = itemsToAdd.slice(0, remainingSlots);
+
+    const targetQty =
+      [...lines].reverse().find((l) => l.quantity && Number(l.quantity) > 0)?.quantity ?? 1;
+
+    const newLines: ExportItemLine[] = sliced.map((it) => ({
+      itemId: it.id,
+      locationId: targetLocId,
+      quantity: targetQty,
+      notes: '',
+    }));
+
+    if (isSingleEmptyLine) {
+      setLines(newLines);
+    } else {
+      setLines([...lines, ...newLines]);
+    }
+    setFieldErrors({});
   };
 
   const handleRemoveLine = (index: number) => {
@@ -789,16 +904,42 @@ export const StockExportModal: React.FC<StockExportModalProps> = ({
                   <label className="text-xs font-bold text-slate-800 uppercase tracking-wider">
                     Danh sách linh kiện xuất kho ({lines.length}/100)
                   </label>
-                  <button
-                    type="button"
-                    onClick={handleAddLine}
-                    disabled={lines.length >= 100 || fsm.isSubmitting || fsm.isAmbiguous}
-                    className="inline-flex items-center space-x-1 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-800 hover:bg-amber-100 transition"
-                    data-testid="btn-add-line"
-                  >
-                    <Plus className="h-3.5 w-3.5" />
-                    <span>Thêm dòng</span>
-                  </button>
+                  <div className="flex items-center space-x-2">
+                    {/* Thêm nhanh theo danh mục */}
+                    {availableCategories.length > 0 && (
+                      <select
+                        defaultValue=""
+                        onChange={(e) => {
+                          if (e.target.value) {
+                            handleAddCategoryItems(e.target.value);
+                            e.target.value = '';
+                          }
+                        }}
+                        disabled={lines.length >= 100 || fsm.isSubmitting || fsm.isAmbiguous}
+                        className="rounded-lg border border-dashed border-amber-300 bg-amber-50/60 px-2.5 py-1 text-xs text-amber-800 hover:bg-amber-100/80 focus:border-amber-500 focus:outline-none transition cursor-pointer"
+                        title="Thêm hàng loạt linh kiện theo danh mục vào cùng vị trí xuất kho"
+                      >
+                        <option value="" disabled>
+                          + Thêm nhanh theo danh mục...
+                        </option>
+                        {availableCategories.map((cat) => (
+                          <option key={cat.id} value={cat.id}>
+                            📁 {cat.name} ({cat.count} linh kiện)
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                    <button
+                      type="button"
+                      onClick={handleAddLine}
+                      disabled={lines.length >= 100 || fsm.isSubmitting || fsm.isAmbiguous}
+                      className="inline-flex items-center space-x-1 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-800 hover:bg-amber-100 transition cursor-pointer"
+                      data-testid="btn-add-line"
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                      <span>Thêm dòng</span>
+                    </button>
+                  </div>
                 </div>
 
                 <div className="overflow-x-auto rounded-xl border border-slate-200">
@@ -807,9 +948,37 @@ export const StockExportModal: React.FC<StockExportModalProps> = ({
                       <tr>
                         <th className="py-2.5 px-3 w-8 text-center">#</th>
                         <th className="py-2.5 px-3 min-w-[200px]">Linh kiện *</th>
-                        <th className="py-2.5 px-3 min-w-[180px]">Vị trí xuất kho *</th>
+                        <th className="py-2.5 px-3 min-w-[180px]">
+                          <div className="flex items-center justify-between">
+                            <span>Vị trí xuất kho *</span>
+                            {lines.length > 1 && lines[0]?.locationId && (
+                              <button
+                                type="button"
+                                onClick={handleApplyFirstLocationToAll}
+                                className="text-[10px] font-normal text-amber-600 hover:text-amber-800 underline ml-1 cursor-pointer"
+                                title="Áp dụng vị trí của dòng 1 cho tất cả các dòng còn lại"
+                              >
+                                Áp dụng dòng 1 ↓
+                              </button>
+                            )}
+                          </div>
+                        </th>
                         <th className="py-2.5 px-3 w-32 text-center">Tồn khả dụng</th>
-                        <th className="py-2.5 px-3 w-28">Số lượng xuất *</th>
+                        <th className="py-2.5 px-3 w-28">
+                          <div className="flex items-center justify-between">
+                            <span>Số lượng xuất *</span>
+                            {lines.length > 1 && lines[0]?.quantity && Number(lines[0].quantity) > 0 && (
+                              <button
+                                type="button"
+                                onClick={handleApplyFirstQuantityToAll}
+                                className="text-[10px] font-normal text-amber-600 hover:text-amber-800 underline ml-1 cursor-pointer"
+                                title="Áp dụng số lượng của dòng 1 cho tất cả các dòng còn lại"
+                              >
+                                Áp dụng dòng 1 ↓
+                              </button>
+                            )}
+                          </div>
+                        </th>
                         <th className="py-2.5 px-3">Ghi chú dòng</th>
                         <th className="py-2.5 px-3 w-10 text-center">Xóa</th>
                       </tr>
@@ -832,15 +1001,19 @@ export const StockExportModal: React.FC<StockExportModalProps> = ({
                                 className={`w-full rounded-lg border px-2 py-1.5 text-xs text-slate-800 focus:outline-none ${
                                   fieldErrors[`items.${idx}.itemId`]
                                     ? 'border-red-400 focus:border-red-500 bg-red-50/30'
-                                    : 'border-slate-200 focus:border-blue-500'
+                                    : 'border-slate-200 focus:border-amber-500'
                                 }`}
                                 data-testid={`select-item-${idx}`}
                               >
                                 <option value="">-- Chọn linh kiện --</option>
-                                {activeItems.map((item) => (
-                                  <option key={item.id} value={item.id}>
-                                    [{item.code}] {item.name} ({item.unit})
-                                  </option>
+                                {itemsByCategory.map(([catName, catItems]) => (
+                                  <optgroup key={catName} label={`📁 ${catName}`}>
+                                    {catItems.map((item) => (
+                                      <option key={item.id} value={item.id}>
+                                        [{item.code}] {item.name} ({item.unit})
+                                      </option>
+                                    ))}
+                                  </optgroup>
                                 ))}
                               </select>
                               {fieldErrors[`items.${idx}.itemId`] && (
@@ -857,16 +1030,29 @@ export const StockExportModal: React.FC<StockExportModalProps> = ({
                                 className={`w-full rounded-lg border px-2 py-1.5 text-xs text-slate-800 focus:outline-none ${
                                   fieldErrors[`items.${idx}.locationId`]
                                     ? 'border-red-400 focus:border-red-500 bg-red-50/30'
-                                    : 'border-slate-200 focus:border-blue-500'
+                                    : 'border-slate-200 focus:border-amber-500'
                                 }`}
                                 data-testid={`select-location-${idx}`}
                               >
                                 <option value="">-- Chọn vị trí kho --</option>
-                                {activeLocations.map((loc) => (
-                                  <option key={loc.id} value={loc.id}>
-                                    [{loc.type}] {loc.code} - {loc.name}
-                                  </option>
-                                ))}
+                                {locationsGrouped.bins.length > 0 && (
+                                  <optgroup label="📦 Thùng / Hộp linh kiện (Nhanh)">
+                                    {locationsGrouped.bins.map((loc) => (
+                                      <option key={loc.id} value={loc.id}>
+                                        [{loc.type}] {loc.code} - {loc.name}
+                                      </option>
+                                    ))}
+                                  </optgroup>
+                                )}
+                                {locationsGrouped.others.length > 0 && (
+                                  <optgroup label="🏢 Kệ / Khu vực / Vị trí khác">
+                                    {locationsGrouped.others.map((loc) => (
+                                      <option key={loc.id} value={loc.id}>
+                                        [{loc.type}] {loc.code} - {loc.name}
+                                      </option>
+                                    ))}
+                                  </optgroup>
+                                )}
                               </select>
                               {fieldErrors[`items.${idx}.locationId`] && (
                                 <p className="mt-0.5 text-[10px] text-red-600" data-testid={`error-location-${idx}`}>
@@ -907,7 +1093,7 @@ export const StockExportModal: React.FC<StockExportModalProps> = ({
                                 className={`w-full rounded-lg border px-2 py-1.5 text-xs font-mono font-bold text-slate-900 focus:outline-none ${
                                   isOverStock || fieldErrors[`items.${idx}.quantity`]
                                     ? 'border-red-400 focus:border-red-500 bg-red-50/30'
-                                    : 'border-slate-200 focus:border-blue-500'
+                                    : 'border-slate-200 focus:border-amber-500'
                                 }`}
                                 data-testid={`input-qty-${idx}`}
                               />
@@ -930,7 +1116,7 @@ export const StockExportModal: React.FC<StockExportModalProps> = ({
                                 disabled={fsm.isSubmitting || fsm.isAmbiguous}
                                 placeholder="Tùy chọn"
                                 maxLength={500}
-                                className="w-full rounded-lg border border-slate-200 px-2 py-1.5 text-xs text-slate-800 focus:border-blue-500 focus:outline-none"
+                                className="w-full rounded-lg border border-slate-200 px-2 py-1.5 text-xs text-slate-800 focus:border-amber-500 focus:outline-none"
                                 data-testid={`input-notes-${idx}`}
                               />
                             </td>
@@ -939,7 +1125,7 @@ export const StockExportModal: React.FC<StockExportModalProps> = ({
                                 type="button"
                                 onClick={() => handleRemoveLine(idx)}
                                 disabled={lines.length <= 1 || fsm.isSubmitting || fsm.isAmbiguous}
-                                className="text-slate-400 hover:text-red-600 disabled:opacity-30 transition"
+                                className="text-slate-400 hover:text-red-600 disabled:opacity-30 transition cursor-pointer"
                                 data-testid={`btn-remove-line-${idx}`}
                               >
                                 <Trash2 className="h-4 w-4" />
