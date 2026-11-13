@@ -31,6 +31,163 @@ export interface ImportItemLine {
   notes?: string | null;
 }
 
+// Bảng giá linh kiện robot UBTech Việt Nam chuẩn (tham chiếu từ https://www.ubtechvietnam.edu.vn/)
+export const STANDARD_UBTECH_ITEM_PRICES: Record<string, number> = {
+  // 1. Bo mạch điều khiển & Công tắc (CAT-ROBOT-MAIN)
+  'MAIN-01': 350000,
+  'MAIN-02': 350000,
+  'SW-MAIN-01': 25000,
+  'SW-MAIN-02': 25000,
+
+  // 2. Cảm biến Robot & Đo lường (CAT-ROBOT-SENSOR)
+  'SEN-US-01': 50000,
+  'SEN-US-02': 50000,
+  'SEN-IR-01': 35000,
+  'SEN-IR-02': 35000,
+  'SEN-TOUCH-01': 30000,
+  'SEN-COLOR-01': 55000,
+
+  // 3. Động cơ & Cơ cấu Chấp hành (CAT-ROBOT-ACTUATOR)
+  'MOT-SERVO-01': 85000,
+  'MOT-SERVO-02': 85000,
+  'MOT-DC-01': 65000,
+  'MOT-DC-02': 65000,
+  'ACT-SPK-BT': 75000,
+  'ACT-LED-01': 15000,
+
+  // 4. Bánh xe & Cơ cấu Chuyển động (CAT-ROBOT-WHEEL)
+  'WHL-OMNI-01': 55000,
+  'WHL-RUBBER-01': 25000,
+  'WHL-HUB-01': 20000,
+  'WHL-TIRE-01': 15000,
+  'WHL-TURN-BRICK': 22000,
+  'WHL-CONN': 18000,
+
+  // 5. Dây cáp Tín hiệu & Nguồn (CAT-ROBOT-CABLE)
+  'CAB-SRV-SHT': 10000,
+  'CAB-SRV-MED': 12000,
+  'CAB-SRV-LNG': 15000,
+  'CAB-SW-MAIN': 12000,
+
+  // 6. Tấm ốp, Thảm đế & Kẹp gá Servo (CAT-ROBOT-PANEL)
+  'PNL-BASEBOARD': 65000,
+  'PNL-FRAME-SQR': 25000,
+  'PNL-BASE-BRICK': 25000,
+  'PNL-MAT-5X5-RUB': 20000,
+  'PNL-MAT-3X3': 15000,
+  'PNL-SQR-WHT': 18000,
+  'PNL-CRV-LG-WHT': 22000,
+  'PNL-CRV-SM': 15000,
+  'ARM-FINGER-LNG': 20000,
+  'ARM-FINGER-SHT': 18000,
+  'CLIP-SRV-45L': 15000,
+  'CLIP-SRV-45R': 15000,
+  'CLIP-SRV-DUAL': 18000,
+  'CLIP-SRV-SQR': 16000,
+  'BLADE-LG-L': 18000,
+  'BLADE-LG-R': 18000,
+  'BLADE-LONG-L': 18000,
+  'BLADE-LONG-R': 18000,
+  'BLADE-SM-L': 15000,
+  'BLADE-SM-R': 15000,
+  'SLIDE-2H-L': 15000,
+  'SLIDE-2H-R': 15000,
+
+  // 7. Thanh nối & Khung đục lỗ (CAT-ROBOT-BEAM)
+  'BEAM-03H': 8000,
+  'BEAM-05H': 10000,
+  'BEAM-07H-BLU': 12000,
+  'BEAM-07H-WHT': 12000,
+  'BEAM-09H': 14000,
+  'BEAM-11H': 16000,
+  'BEAM-13H': 18000,
+  'BEAM-15H': 20000,
+  'BEAM-C3X5-BLU': 12000,
+  'BEAM-C3X5-YEL': 12000,
+  'BEAM-C3X7': 14000,
+  'BEAM-DC3X7-BLU': 16000,
+  'BEAM-DC3X7-GRY': 16000,
+  'BEAM-C4X4-BLU': 14000,
+  'BEAM-C4X4-GRY': 14000,
+  'BEAM-C4X6-BLU': 16000,
+  'BEAM-C4X6-GRY': 16000,
+  'BEAM-CRV-SLICE': 10000,
+
+  // 8. Khớp nối, Chốt gài & Trục xoay (CAT-ROBOT-JOINT)
+  'JNT-1X2-DUAL': 10000,
+  'JNT-1X3-DUAL': 12000,
+  'JNT-2X2-DUAL': 12000,
+  'JNT-2X3-RA': 14000,
+  'JNT-2X4-RA': 15000,
+  'JNT-3X3-BRICK': 15000,
+  'JNT-5X5-BRICK': 20000,
+  'JNT-PART-LNG': 14000,
+  'JNT-PART-SHT': 12000,
+  'JNT-DECK-BLU': 15000,
+  'JNT-DECK-YEL': 15000,
+  'JNT-I-BRICK': 12000,
+  'JNT-BRICK-STD': 12000,
+  'JNT-RND-BRICK': 14000,
+  'JNT-SGL-BLU': 10000,
+  'JNT-SGL-YEL': 10000,
+  'SHAFT-FLAT-01': 8000,
+  'PLUG-SHT-BLU': 3000,
+  'PLUG-SHT-GRN': 3000,
+  'PLUG-RED': 3000,
+  'PLUG-LNG-YEL': 4000,
+  'BUSH-01': 2000,
+
+  // 9. Điện tử & MCU phổ biến khác
+  'RES-10K': 1000,
+  'CAP-100UF': 2000,
+  'LED-RED': 2000,
+  'MCU-ESP32': 95000,
+  'KIT-ARD-UNO-R3': 150000,
+};
+
+export function getDefaultItemUnitCost(item: ItemResponse | undefined | null): number {
+  if (!item) return 0;
+  const code = (item.code || '').trim().toUpperCase();
+  if (STANDARD_UBTECH_ITEM_PRICES[code] !== undefined) {
+    return STANDARD_UBTECH_ITEM_PRICES[code];
+  }
+
+  // Khớp tiền tố (prefix) cho các mã mở rộng
+  if (code.startsWith('MAIN-')) return 350000;
+  if (code.startsWith('SW-MAIN')) return 25000;
+  if (code.startsWith('SEN-US')) return 50000;
+  if (code.startsWith('SEN-')) return 35000;
+  if (code.startsWith('MOT-SERVO')) return 85000;
+  if (code.startsWith('MOT-')) return 65000;
+  if (code.startsWith('ACT-SPK')) return 75000;
+  if (code.startsWith('ACT-LED')) return 15000;
+  if (code.startsWith('ACT-')) return 30000;
+  if (code.startsWith('WHL-OMNI')) return 55000;
+  if (code.startsWith('WHL-TIRE')) return 15000;
+  if (code.startsWith('WHL-')) return 25000;
+  if (code.startsWith('CAB-')) return 12000;
+  if (code.startsWith('PNL-BASEBOARD')) return 65000;
+  if (
+    code.startsWith('PNL-') ||
+    code.startsWith('ARM-') ||
+    code.startsWith('CLIP-') ||
+    code.startsWith('BLADE-') ||
+    code.startsWith('SLIDE-')
+  ) {
+    return 18000;
+  }
+  if (code.startsWith('BEAM-')) return 14000;
+  if (code.startsWith('JNT-')) return 12000;
+  if (code.startsWith('PLUG-')) return 3000;
+  if (code.startsWith('BUSH-')) return 2000;
+  if (code.startsWith('SHAFT-')) return 8000;
+  if (code.startsWith('RES-')) return 1000;
+  if (code.startsWith('CAP-')) return 2000;
+  if (code.startsWith('LED-')) return 2000;
+
+  return 10000;
+}
+
 export interface StockImportModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -250,13 +407,16 @@ export const StockImportModal: React.FC<StockImportModalProps> = ({
     const remainingSlots = 100 - (isSingleEmptyLine ? 0 : lines.length);
     const sliced = itemsToAdd.slice(0, remainingSlots);
 
-    const newLines: ImportItemLine[] = sliced.map((it) => ({
-      itemId: it.id,
-      locationId: targetLocId,
-      quantity: 1,
-      unitCost: null,
-      notes: '',
-    }));
+    const newLines: ImportItemLine[] = sliced.map((it) => {
+      const defaultCost = getDefaultItemUnitCost(it);
+      return {
+        itemId: it.id,
+        locationId: targetLocId,
+        quantity: 1,
+        unitCost: defaultCost > 0 ? defaultCost : null,
+        notes: '',
+      };
+    });
 
     if (isSingleEmptyLine) {
       setLines(newLines);
@@ -276,13 +436,43 @@ export const StockImportModal: React.FC<StockImportModalProps> = ({
   const handleLineChange = (index: number, field: keyof ImportItemLine, value: any) => {
     if (isConfirming) setIsConfirming(false);
     const updated = [...lines];
-    updated[index] = { ...updated[index], [field]: value };
+    if (field === 'itemId') {
+      const selectedItem = activeItems.find((it) => it.id === value);
+      const defaultCost = getDefaultItemUnitCost(selectedItem);
+      updated[index] = {
+        ...updated[index],
+        itemId: value,
+        // Tự động điền giá chuẩn UBTech nếu dòng chưa có giá hoặc giá đang bằng 0 / null
+        unitCost:
+          defaultCost > 0 && (!updated[index].unitCost || updated[index].unitCost === 0)
+            ? defaultCost
+            : updated[index].unitCost ?? (defaultCost > 0 ? defaultCost : null),
+      };
+    } else {
+      updated[index] = { ...updated[index], [field]: value };
+    }
     setLines(updated);
     if (fieldErrors[`items.${index}.${field}`]) {
       const newErrors = { ...fieldErrors };
       delete newErrors[`items.${index}.${field}`];
       setFieldErrors(newErrors);
     }
+  };
+
+  const handleApplyDefaultPricesToAll = () => {
+    if (isConfirming) setIsConfirming(false);
+    const itemMap = new Map(activeItems.map((it) => [it.id, it]));
+    setLines((prev) =>
+      prev.map((line) => {
+        if (!line.itemId) return line;
+        const it = itemMap.get(line.itemId);
+        const cost = getDefaultItemUnitCost(it);
+        return {
+          ...line,
+          unitCost: cost > 0 ? cost : line.unitCost,
+        };
+      })
+    );
   };
 
   const validateForm = (): ImportStockInput | null => {
@@ -825,7 +1015,22 @@ export const StockImportModal: React.FC<StockImportModalProps> = ({
                         </div>
                       </th>
                       <th className="py-2.5 px-3 w-28">Số lượng *</th>
-                      <th className="py-2.5 px-3 w-32">Đơn giá (VNĐ)</th>
+                      <th className="py-2.5 px-3 min-w-[145px]">
+                        <div className="flex items-center justify-between gap-1">
+                          <span>Đơn giá (VNĐ)</span>
+                          {lines.some((l) => Boolean(l.itemId)) && (
+                            <button
+                              type="button"
+                              onClick={handleApplyDefaultPricesToAll}
+                              className="text-[10px] font-medium text-indigo-600 hover:text-indigo-800 hover:underline cursor-pointer"
+                              title="Tự động điền đơn giá chuẩn UBTech cho toàn bộ linh kiện trong bảng"
+                              data-testid="btn-apply-default-prices"
+                            >
+                              Điền giá UBTech ↓
+                            </button>
+                          )}
+                        </div>
+                      </th>
                       <th className="py-2.5 px-3">Ghi chú dòng</th>
                       <th className="py-2.5 px-3 w-10 text-center">Xóa</th>
                     </tr>
