@@ -367,12 +367,20 @@ export const StockImportModal: React.FC<StockImportModalProps> = ({
   const handleAddLine = () => {
     if (lines.length >= 100) return;
     if (isConfirming) setIsConfirming(false);
-    // Tự động kế thừa vị trí kho từ dòng gần nhất đã chọn (tránh phải chọn lại thùng)
+    // Tự động kế thừa vị trí kho và số lượng từ dòng gần nhất đã chọn
     const inheritedLocationId =
       [...lines].reverse().find((l) => Boolean(l.locationId))?.locationId || '';
+    const inheritedQuantity =
+      [...lines].reverse().find((l) => l.quantity && Number(l.quantity) > 0)?.quantity ?? 1;
     setLines([
       ...lines,
-      { itemId: '', locationId: inheritedLocationId, quantity: 1, unitCost: null, notes: '' },
+      {
+        itemId: '',
+        locationId: inheritedLocationId,
+        quantity: inheritedQuantity,
+        unitCost: null,
+        notes: '',
+      },
     ]);
   };
 
@@ -382,6 +390,20 @@ export const StockImportModal: React.FC<StockImportModalProps> = ({
     if (isConfirming) setIsConfirming(false);
     setLines((prev) => prev.map((l) => ({ ...l, locationId: targetLoc })));
     setFieldErrors({});
+  };
+
+  const handleApplyFirstQuantityToAll = () => {
+    const targetQty = lines[0]?.quantity;
+    if (!targetQty || Number(targetQty) <= 0) return;
+    if (isConfirming) setIsConfirming(false);
+    setLines((prev) => prev.map((l) => ({ ...l, quantity: targetQty })));
+    const newFieldErrors = { ...fieldErrors };
+    Object.keys(newFieldErrors).forEach((key) => {
+      if (key.endsWith('.quantity')) {
+        delete newFieldErrors[key];
+      }
+    });
+    setFieldErrors(newFieldErrors);
   };
 
   const handleAddCategoryItems = (catId: string) => {
@@ -407,12 +429,15 @@ export const StockImportModal: React.FC<StockImportModalProps> = ({
     const remainingSlots = 100 - (isSingleEmptyLine ? 0 : lines.length);
     const sliced = itemsToAdd.slice(0, remainingSlots);
 
+    const targetQty =
+      [...lines].reverse().find((l) => l.quantity && Number(l.quantity) > 0)?.quantity ?? 1;
+
     const newLines: ImportItemLine[] = sliced.map((it) => {
       const defaultCost = getDefaultItemUnitCost(it);
       return {
         itemId: it.id,
         locationId: targetLocId,
-        quantity: 1,
+        quantity: targetQty,
         unitCost: defaultCost > 0 ? defaultCost : null,
         notes: '',
       };
@@ -1014,7 +1039,22 @@ export const StockImportModal: React.FC<StockImportModalProps> = ({
                           )}
                         </div>
                       </th>
-                      <th className="py-2.5 px-3 w-28">Số lượng *</th>
+                      <th className="py-2.5 px-3 min-w-[130px]">
+                        <div className="flex items-center justify-between gap-1">
+                          <span>Số lượng *</span>
+                          {lines.length > 1 && lines[0]?.quantity && Number(lines[0].quantity) > 0 && (
+                            <button
+                              type="button"
+                              onClick={handleApplyFirstQuantityToAll}
+                              className="text-[10px] font-medium text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
+                              title={`Sao chép số lượng (${lines[0].quantity}) của dòng 1 xuống tất cả các dòng còn lại`}
+                              data-testid="btn-apply-first-qty-all"
+                            >
+                              Áp dụng dòng 1 ↓
+                            </button>
+                          )}
+                        </div>
+                      </th>
                       <th className="py-2.5 px-3 min-w-[145px]">
                         <div className="flex items-center justify-between gap-1">
                           <span>Đơn giá (VNĐ)</span>
