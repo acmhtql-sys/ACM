@@ -237,10 +237,11 @@ export class KitsService {
     }
 
     // Verify all component items exist and are active
+    const itemMap = new Map<string, { code: string; name: string }>();
     for (const kitItem of input.items) {
       const itemRecord = await prisma.item.findUnique({
         where: { id: kitItem.itemId },
-        select: { id: true, name: true, isActive: true },
+        select: { id: true, code: true, name: true, isActive: true },
       });
 
       if (!itemRecord) {
@@ -249,6 +250,7 @@ export class KitsService {
       if (!itemRecord.isActive) {
         throw new AppError(`Linh kiện '${itemRecord.name}' đã bị ngừng hoạt động`, 400);
       }
+      itemMap.set(kitItem.itemId, { code: itemRecord.code, name: itemRecord.name });
     }
 
     // Serializable atomic transaction for stock validation + kit creation + kitAllocated CAS update + audit log
@@ -263,12 +265,15 @@ export class KitsService {
                 locationId: input.locationId,
               },
             },
-            include: { item: { select: { name: true } } },
+            include: { item: { select: { code: true, name: true } } },
           });
+
+          const itmInfo = itemMap.get(kitItem.itemId);
+          const itemLabel = itmInfo ? `"${itmInfo.name}" (${itmInfo.code})` : `'${kitItem.itemId}'`;
 
           if (!bal) {
             throw new AppError(
-              `Không tìm thấy thông tin tồn kho cho linh kiện '${kitItem.itemId}' tại vị trí đã chọn`,
+              `Không tìm thấy thông tin tồn kho cho linh kiện ${itemLabel} tại vị trí đã chọn. Vui lòng nhập kho linh kiện này vào vị trí trước khi đóng hộp kit.`,
               400
             );
           }
@@ -280,8 +285,9 @@ export class KitsService {
           const available = Math.max(0, onHand - reserved - quarantined - currentKitAllocated);
 
           if (available < kitItem.quantity) {
+            const shortName = itmInfo ? itmInfo.name : (bal.item?.name || kitItem.itemId);
             throw new AppError(
-              `Không đủ tồn kho khả dụng cho linh kiện '${bal.item?.name || kitItem.itemId}' tại vị trí đã chọn (cần: ${kitItem.quantity}, khả dụng: ${available})`,
+              `Không đủ tồn kho khả dụng cho linh kiện '${shortName}' tại vị trí đã chọn (cần: ${kitItem.quantity}, khả dụng: ${available})`,
               400
             );
           }
