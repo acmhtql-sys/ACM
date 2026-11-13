@@ -636,8 +636,8 @@ describe('CameraReturnModal AI Mapping Safety Suite (GATE-3-AI-SAFETY)', () => {
     // Verify handleApply has NOT been called automatically
     expect(handleApply).not.toHaveBeenCalled();
 
-    // Only when operator clicks "Áp dụng vào phiếu hoàn trả"
-    const applyButton = screen.getByRole('button', { name: /Áp dụng vào phiếu hoàn trả/i });
+    // Only when operator clicks "Xác nhận hoàn trả"
+    const applyButton = screen.getByRole('button', { name: /Xác nhận hoàn trả/i });
     fireEvent.click(applyButton);
 
     expect(handleApply).toHaveBeenCalledTimes(1);

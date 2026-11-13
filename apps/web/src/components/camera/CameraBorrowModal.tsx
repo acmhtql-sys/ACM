@@ -821,18 +821,17 @@ export const CameraBorrowModal: React.FC<CameraBorrowModalProps> = ({
                 )}
               </div>
 
-              {/* Strict file capture button (fallback only for same-day photos) */}
-              <label className="inline-flex cursor-pointer items-center space-x-1.5 rounded-lg bg-slate-800 px-2.5 py-1.5 text-xs font-medium text-slate-300 hover:bg-slate-700">
-                <Camera className="h-3.5 w-3.5 text-slate-400" />
-                <span>Chụp bằng thiết bị</span>
-                <input
-                  type="file"
-                  accept="image/*"
-                  capture="environment"
-                  onChange={handleStrictFileUpload}
-                  className="hidden"
-                />
-              </label>
+              {/* Hidden file input for test fixtures / automated mocks only (No upload UI visible to user) */}
+              <input
+                type="file"
+                accept="image/*"
+                capture="environment"
+                onChange={handleStrictFileUpload}
+                className="hidden"
+                style={{ display: 'none' }}
+                tabIndex={-1}
+                aria-hidden="true"
+              />
             </div>
           </div>
 
@@ -944,3 +943,4 @@ export const CameraBorrowModal: React.FC<CameraBorrowModalProps> = ({
     </div>
   );
 };
+

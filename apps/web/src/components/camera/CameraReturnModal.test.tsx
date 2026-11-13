@@ -127,7 +127,8 @@ describe('CameraReturnModal Test Suite (SUP-VISION-01, 02, 04, 05, 06, 08)', () 
 
     await waitFor(() => {
       expect(screen.getByText(/Camera chưa được kích hoạt/i)).toBeTruthy();
-      expect(screen.getAllByText(/Tải ảnh linh kiện/i).length).toBeGreaterThan(0);
+      expect(screen.getByRole('button', { name: /Bật lại Camera/i })).toBeTruthy();
+      expect(screen.queryByText(/Tải ảnh linh kiện/i)).toBeNull();
     });
   });
 
@@ -262,8 +263,8 @@ describe('CameraReturnModal Test Suite (SUP-VISION-01, 02, 04, 05, 06, 08)', () 
     // Must be clamped to remaining (3)
     expect(qtyInput.value).toBe('3');
 
-    // Click Apply
-    const applyBtn = screen.getByRole('button', { name: /Áp dụng vào Phiếu Hoàn trả/i });
+    // Click Apply / Confirm Return
+    const applyBtn = screen.getByRole('button', { name: /Xác nhận hoàn trả/i });
     fireEvent.click(applyBtn);
 
     expect(handleApply).toHaveBeenCalledWith(

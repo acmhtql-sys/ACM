@@ -118,11 +118,6 @@ export const BorrowReturnPage: React.FC = () => {
   const [rejectingBorrowId, setRejectingBorrowId] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState<string>('');
 
-  const returnBackdropDismiss = useModalDismiss(
-    Boolean(returningBorrow) && !isCameraModalOpen,
-    () => setReturningBorrow(null),
-    Boolean(returningBorrow && actionLoading === returningBorrow.id)
-  );
   const rejectBackdropDismiss = useModalDismiss(
     Boolean(rejectingBorrowId),
     () => setRejectingBorrowId(null),
@@ -298,6 +293,7 @@ export const BorrowReturnPage: React.FC = () => {
       return;
     }
     setReturningBorrow(b);
+    setIsCameraModalOpen(true);
     setReturnNotes('');
     setCapturedEvidencePhoto(null);
     setRejectedReturn(null);
@@ -313,7 +309,11 @@ export const BorrowReturnPage: React.FC = () => {
     setReturnRows(rows);
   };
 
-  const handleReturnConfirm = async () => {
+  const handleReturnConfirm = async (
+    appliedRows?: Record<string, ReturnInputRow>,
+    suggestedNotes?: string,
+    evidencePhoto?: string
+  ) => {
     if (!returningBorrow || !returningBorrow.details) return;
     if (!user?.id) {
       setStatusMessage({ type: 'error', text: 'Vui lòng đăng nhập để thực hiện hoàn trả' });
@@ -332,10 +332,13 @@ export const BorrowReturnPage: React.FC = () => {
       return;
     }
 
+    const effectiveRows = appliedRows || returnRows;
+    const effectiveNotes = suggestedNotes !== undefined ? suggestedNotes : returnNotes;
+
     // Validate payload rows
     let items: ReturnPayloadItem[];
     try {
-      items = buildReturnItems(returningBorrow.details, returnRows, returnNotes);
+      items = buildReturnItems(returningBorrow.details, effectiveRows, effectiveNotes);
     } catch (err: any) {
       setStatusMessage({
         type: 'error',
@@ -357,7 +360,7 @@ export const BorrowReturnPage: React.FC = () => {
 
     const payload = {
       items,
-      notes: returnNotes.trim() || 'Hoàn trả linh kiện tại phòng Lab',
+      notes: effectiveNotes.trim() || 'Hoàn trả linh kiện tại phòng Lab',
     };
     const record: PendingBorrowReturn = {
       version: 1,
@@ -412,9 +415,11 @@ export const BorrowReturnPage: React.FC = () => {
       if (isReceiptValid) {
         clearPendingBorrowReturn(user.id, returningBorrow.id, key);
         syncStorageIntents();
+        setIsCameraModalOpen(false);
         setReturningBorrow(null);
         setReturnRows({});
         setReturnNotes('');
+        setCapturedEvidencePhoto(null);
         setStatusMessage({
           type: 'success',
           text: `Đã hoàn trả thành công! Mã phiếu trả: ${receiptReturnNumber}`,
@@ -896,225 +901,30 @@ export const BorrowReturnPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Return Modal Dialog */}
-      {returningBorrow && (
-        <div
-          {...returnBackdropDismiss}
-          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm"
-        >
-          <div className="w-full max-w-lg rounded-xl bg-white p-5 shadow-xl border border-slate-200 max-h-[90vh] overflow-y-auto">
-            <h3 className="text-sm font-bold text-slate-900 flex items-center space-x-2">
-              <CornerDownLeft className="h-4 w-4 text-emerald-600" />
-              <span>Xác nhận hoàn trả linh kiện ({returningBorrow.requestNumber})</span>
-            </h3>
-            <div className="flex items-center justify-between mt-1 mb-2">
-              <p className="text-xs text-slate-500">
-                Người mượn: <span className="font-semibold text-slate-700">{returningBorrow.borrowerName}</span>
-              </p>
-              {isCameraReturnEnabled() && (
-                <button
-                  type="button"
-                  onClick={() => setIsCameraModalOpen(true)}
-                  className="inline-flex items-center space-x-1.5 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 shadow-sm transition cursor-pointer"
-                  title="Nhận diện linh kiện hoàn trả qua Camera thời gian thực"
-                >
-                  <Camera className="h-3.5 w-3.5" />
-                  <span>Quét Camera AI</span>
-                </button>
-              )}
-            </div>
-
-            {/* If there is an unresolved rejected return for this borrow */}
-            {rejectedReturn && rejectedReturn.borrowId === returningBorrow.id && (
-              <div className="mt-3 p-3 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-800 space-y-2">
-                <div className="font-semibold flex items-center space-x-1.5 text-amber-900">
-                  <AlertCircle className="h-4 w-4 text-amber-600" />
-                  <span>Yêu cầu trước bị máy chủ từ chối:</span>
-                </div>
-                <p>{rejectedReturn.message}</p>
-                <button
-                  type="button"
-                  onClick={() => handleClearRejected(rejectedReturn.borrowId, rejectedReturn.key)}
-                  className="rounded bg-amber-700 text-white px-2.5 py-1 text-[11px] font-semibold hover:bg-amber-800"
-                >
-                  Xác nhận gỡ bỏ yêu cầu bị từ chối để nhập lại
-                </button>
-              </div>
-            )}
-
-            <div className="mt-4 space-y-4">
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Danh sách linh kiện và số lượng hoàn trả:
-                </label>
-                <p className="text-[11px] text-slate-500 mb-2">
-                  Nhập số lượng thực tế nhận lại (tối đa bằng số lượng còn lại). Chỉ dòng có số lượng &gt; 0 mới được ghi nhận.
-                </p>
-
-                <div className="space-y-2.5 max-h-56 overflow-y-auto pr-1">
-                  {returningBorrow.details
-                    ?.filter((d) => d.quantity > (d.returnedQuantity || 0))
-                    .map((d) => {
-                      const remaining = d.quantity - (d.returnedQuantity || 0);
-                      const itemLabel = d.item?.code || d.itemId;
-                      const selection = returnRows[d.id] || { quantity: '0', condition: 'GOOD' };
-
-                      return (
-                        <div
-                          key={d.id}
-                          className="rounded-lg border border-slate-200 bg-slate-50 p-2.5 text-xs space-y-2"
-                        >
-                          <div className="flex items-center justify-between font-semibold text-slate-900">
-                            <span>{d.item?.name || itemLabel} ({itemLabel})</span>
-                            <span className="text-[11px] text-slate-500">
-                              Còn lại: <strong>{remaining}</strong> {d.item?.unit || 'cái'}
-                            </span>
-                          </div>
-
-                          <div className="grid grid-cols-2 gap-2">
-                            <div>
-                              <label
-                                htmlFor={`return-qty-${d.id}`}
-                                className="block text-[11px] text-slate-600 mb-0.5"
-                              >
-                                Số lượng trả:
-                              </label>
-                              <input
-                                id={`return-qty-${d.id}`}
-                                aria-label={`Số lượng trả ${itemLabel}`}
-                                type="number"
-                                min={0}
-                                max={remaining}
-                                value={selection.quantity}
-                                onChange={(e) => {
-                                  const val = e.target.value;
-                                  setReturnRows((prev) => ({
-                                    ...prev,
-                                    [d.id]: {
-                                      quantity: val,
-                                      condition: prev[d.id]?.condition || 'GOOD',
-                                    },
-                                  }));
-                                }}
-                                className="w-full rounded border border-slate-300 bg-white px-2 py-1 text-xs focus:border-blue-500 focus:outline-none"
-                              />
-                            </div>
-
-                            <div>
-                              <label
-                                htmlFor={`return-cond-${d.id}`}
-                                className="block text-[11px] text-slate-600 mb-0.5"
-                              >
-                                Tình trạng kiểm tra:
-                              </label>
-                              <select
-                                id={`return-cond-${d.id}`}
-                                aria-label={`Tình trạng trả ${itemLabel}`}
-                                value={selection.condition}
-                                onChange={(e) => {
-                                  const cond = e.target.value as ReturnCondition;
-                                  setReturnRows((prev) => ({
-                                    ...prev,
-                                    [d.id]: {
-                                      quantity: prev[d.id]?.quantity || '0',
-                                      condition: cond,
-                                    },
-                                  }));
-                                }}
-                                className="w-full rounded border border-slate-300 bg-white px-2 py-1 text-xs focus:border-blue-500 focus:outline-none"
-                              >
-                                <option value="GOOD">Tốt (Nhập kho khả dụng)</option>
-                                <option value="DAMAGED">Hỏng (Cách ly kiểm tra)</option>
-                                <option value="LOST">Báo mất (Giảm tài sản)</option>
-                              </select>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Ghi chú kiểm tra (Notes):
-                </label>
-                <textarea
-                  rows={2}
-                  value={returnNotes}
-                  onChange={(e) => setReturnNotes(e.target.value)}
-                  placeholder="Ghi chú thêm về linh kiện hoặc tình trạng bàn giao tại phòng Lab..."
-                  className="w-full rounded-lg border border-slate-200 p-2 text-xs text-slate-900 focus:border-blue-500 focus:outline-none"
-                />
-              </div>
-
-              {/* Live Captured Photo Evidence */}
-              {capturedEvidencePhoto && (
-                <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 p-3 space-y-2">
-                  <div className="flex items-center justify-between text-xs font-semibold text-emerald-800">
-                    <span className="flex items-center space-x-1.5">
-                      <CheckCircle className="h-4 w-4 text-emerald-600" />
-                      <span>Bằng chứng ảnh chụp thực tế (Live Camera)</span>
-                    </span>
-                    <span className="text-[10px] font-mono bg-emerald-200 text-emerald-900 px-2 py-0.5 rounded">
-                      Đã xác thực thời gian thực
-                    </span>
-                  </div>
-                  <div className="relative rounded-lg overflow-hidden border border-emerald-300 max-h-40 flex items-center justify-center bg-black/5">
-                    <img
-                      src={capturedEvidencePhoto}
-                      alt="Bằng chứng hoàn trả"
-                      className="max-h-40 object-contain rounded"
-                    />
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <div className="mt-5 flex justify-end space-x-2 border-t border-slate-100 pt-3">
-              <button
-                type="button"
-                onClick={() => {
-                  setReturningBorrow(null);
-                  setCapturedEvidencePhoto(null);
-                }}
-                className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
-              >
-                Hủy bỏ
-              </button>
-              <button
-                type="button"
-                onClick={handleReturnConfirm}
-                disabled={
-                  actionLoading === returningBorrow.id ||
-                  Boolean(rejectedReturn && rejectedReturn.borrowId === returningBorrow.id)
-                }
-                className="rounded-lg bg-emerald-600 px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-emerald-700 disabled:opacity-50"
-              >
-                {actionLoading === returningBorrow.id ? 'Đang xử lý...' : 'Xác nhận hoàn trả'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* AI Camera Return Modal */}
+      {/* AI Camera Return Modal - Direct and Primary Return Interface */}
       {isCameraModalOpen && returningBorrow && (
         <CameraReturnModal
           isOpen={isCameraModalOpen}
-          onClose={() => setIsCameraModalOpen(false)}
+          onClose={() => {
+            setIsCameraModalOpen(false);
+            setReturningBorrow(null);
+            setCapturedEvidencePhoto(null);
+          }}
           borrowRecord={returningBorrow}
-          onApplyReturnRows={(appliedRows, suggestedNotes, evidencePhoto) => {
-            setReturnRows((prev) => ({
-              ...prev,
-              ...appliedRows,
-            }));
+          autoPopulateBorrowItems={true}
+          initialItems={returnRows}
+          actionLoading={actionLoading === returningBorrow.id}
+          rejectedReturn={
+            rejectedReturn && rejectedReturn.borrowId === returningBorrow.id
+              ? rejectedReturn
+              : null
+          }
+          onClearRejected={handleClearRejected}
+          onApplyReturnRows={async (appliedRows, suggestedNotes, evidencePhoto) => {
             if (evidencePhoto) {
               setCapturedEvidencePhoto(evidencePhoto);
             }
-            if (suggestedNotes) {
-              setReturnNotes((prev) => (prev ? `${prev}\n${suggestedNotes}` : suggestedNotes));
-            }
+            await handleReturnConfirm(appliedRows, suggestedNotes, evidencePhoto);
           }}
         />
       )}

@@ -19,6 +19,7 @@ import {
   Check,
   ChevronDown,
   ChevronUp,
+  CornerDownLeft,
 } from 'lucide-react';
 import {
   detectFrameBase64,
@@ -64,6 +65,11 @@ export interface CameraReturnModalProps {
     evidencePhoto?: string
   ) => void;
   catalogItems?: CatalogItem[];
+  actionLoading?: boolean;
+  rejectedReturn?: { borrowId: string; key: string; message: string } | null;
+  onClearRejected?: (borrowId: string, key: string) => void;
+  autoPopulateBorrowItems?: boolean;
+  initialItems?: Record<string, ReturnInputRow>;
 }
 
 export interface StagedReturnItem {
@@ -152,6 +158,11 @@ export const CameraReturnModal: React.FC<CameraReturnModalProps> = ({
   borrowRecord,
   onApplyReturnRows,
   catalogItems,
+  actionLoading = false,
+  rejectedReturn = null,
+  onClearRejected,
+  autoPopulateBorrowItems = false,
+  initialItems,
 }) => {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const imageRef = useRef<HTMLImageElement | null>(null);
@@ -265,7 +276,43 @@ export const CameraReturnModal: React.FC<CameraReturnModalProps> = ({
   const [rawDetections, setRawDetections] = useState<VisionDetection[]>([]);
   const [analyzedDetections, setAnalyzedDetections] = useState<AnalyzedDetection[]>([]);
   const [inferenceTime, setInferenceTime] = useState<number | null>(null);
-  const [stagedItems, setStagedItems] = useState<Record<string, StagedReturnItem>>({});
+
+  const getInitialStagedItems = useCallback((): Record<string, StagedReturnItem> => {
+    if (!autoPopulateBorrowItems && !initialItems) return {};
+
+    const initial: Record<string, StagedReturnItem> = {};
+    const details = borrowRecord.details || [];
+    for (const d of details) {
+      const remaining = d.quantity - (d.returnedQuantity || 0);
+      if (remaining > 0) {
+        const itemCode = d.item?.code || d.itemId;
+        const initialRow = initialItems?.[d.id];
+        const initialQty = initialRow ? parseInt(initialRow.quantity, 10) || 0 : 0;
+        initial[d.id] = {
+          detailId: d.id,
+          itemCode,
+          itemName: d.item?.name || 'Linh kiện',
+          unit: d.item?.unit || 'cái',
+          remaining,
+          quantity: Math.min(Math.max(initialQty, 0), remaining),
+          condition: initialRow?.condition || 'GOOD',
+        };
+      }
+    }
+    return initial;
+  }, [autoPopulateBorrowItems, initialItems, borrowRecord.details]);
+
+  const [stagedItems, setStagedItems] = useState<Record<string, StagedReturnItem>>(
+    getInitialStagedItems
+  );
+
+  useEffect(() => {
+    if (isOpen) {
+      setStagedItems(getInitialStagedItems());
+    }
+  }, [isOpen, getInitialStagedItems]);
+
+  const [customNotes, setCustomNotes] = useState<string>('');
   const [statusNotice, setStatusNotice] = useState<{
     type: 'info' | 'success' | 'warning' | 'error';
     text: string;
@@ -986,7 +1033,8 @@ export const CameraReturnModal: React.FC<CameraReturnModalProps> = ({
     setStagedItems((prev) => {
       const item = prev[detailId];
       if (!item) return prev;
-      const clamped = Math.max(1, Math.min(val, item.remaining));
+      const minVal = autoPopulateBorrowItems ? 0 : 1;
+      const clamped = Math.max(minVal, Math.min(val, item.remaining));
       return {
         ...prev,
         [detailId]: { ...item, quantity: clamped },
@@ -1006,13 +1054,15 @@ export const CameraReturnModal: React.FC<CameraReturnModalProps> = ({
     });
   };
 
-  // Apply staged items to the main return modal
+  // Confirm staged return items and trigger return operation
   const handleConfirmStaged = () => {
     const itemsList = Object.values(stagedItems);
-    if (itemsList.length === 0) {
+    const validItems = itemsList.filter((item) => item.quantity > 0);
+
+    if (validItems.length === 0) {
       setStatusNotice({
         type: 'warning',
-        text: 'Vui lòng chọn ít nhất 1 linh kiện cần hoàn trả.',
+        text: 'Vui lòng chọn ít nhất 1 linh kiện có số lượng trả lớn hơn 0.',
       });
       return;
     }
@@ -1020,7 +1070,7 @@ export const CameraReturnModal: React.FC<CameraReturnModalProps> = ({
     const rows: Record<string, ReturnInputRow> = {};
     const notesArr: string[] = [];
 
-    for (const item of itemsList) {
+    for (const item of validItems) {
       rows[item.detailId] = {
         quantity: String(item.quantity),
         condition: item.condition,
@@ -1032,20 +1082,26 @@ export const CameraReturnModal: React.FC<CameraReturnModalProps> = ({
       }
     }
 
+    if (customNotes.trim()) {
+      notesArr.push(customNotes.trim());
+    }
+
     if (capturedLivePhoto) {
       notesArr.push(`[Ảnh chụp thực tế lúc ${capturedLivePhoto.timestamp} - Live Camera Verified]`);
     }
 
-    const suggestedNotes =
-      notesArr.length > 0 ? `Nhận diện qua Camera: ${notesArr.join(', ')}` : undefined;
+    const combinedNotes = notesArr.length > 0 ? notesArr.join(' | ') : undefined;
 
     stopCameraStream();
     if (capturedLivePhoto?.dataUrl) {
-      onApplyReturnRows(rows, suggestedNotes, capturedLivePhoto.dataUrl);
+      onApplyReturnRows(rows, combinedNotes, capturedLivePhoto.dataUrl);
     } else {
-      onApplyReturnRows(rows, suggestedNotes);
+      onApplyReturnRows(rows, combinedNotes);
     }
-    onClose();
+
+    if (!autoPopulateBorrowItems) {
+      onClose();
+    }
   };
 
   const handleModalClose = () => {
@@ -1419,17 +1475,16 @@ export const CameraReturnModal: React.FC<CameraReturnModalProps> = ({
                   )}
                 </div>
 
-                {/* Upload fallback button */}
-                <label className="inline-flex cursor-pointer items-center space-x-1.5 rounded-md bg-slate-700 px-2.5 py-1.5 text-xs font-medium text-slate-200 hover:bg-slate-600">
-                  <Upload className="h-3.5 w-3.5 text-slate-300" />
-                  <span>Tải ảnh linh kiện</span>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={handleFileUpload}
-                    className="hidden"
-                  />
-                </label>
+                {/* Hidden input for test fixtures / automated mocks only (No upload UI visible to user) */}
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleFileUpload}
+                  className="hidden"
+                  style={{ display: 'none' }}
+                  tabIndex={-1}
+                  aria-hidden="true"
+                />
               </div>
 
               <div className="flex items-center space-x-1.5 text-[10px] text-slate-400 pt-1 border-t border-slate-700/60">
@@ -1441,6 +1496,26 @@ export const CameraReturnModal: React.FC<CameraReturnModalProps> = ({
 
           {/* Right Column: Tabbed Interface (Staged Return Items & AI Detections Breakdown) */}
           <div className="flex flex-col md:col-span-5 bg-white border-l border-slate-200 p-4 overflow-hidden">
+            {/* If there is an unresolved rejected return for this borrow */}
+            {rejectedReturn && (
+              <div className="mb-3 p-3 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-800 space-y-2">
+                <div className="font-semibold flex items-center space-x-1.5 text-amber-900">
+                  <AlertCircle className="h-4 w-4 text-amber-600 shrink-0" />
+                  <span>Yêu cầu trước bị máy chủ từ chối:</span>
+                </div>
+                <p>{rejectedReturn.message}</p>
+                {onClearRejected && (
+                  <button
+                    type="button"
+                    onClick={() => onClearRejected(rejectedReturn.borrowId, rejectedReturn.key)}
+                    className="rounded bg-amber-700 text-white px-2.5 py-1 text-[11px] font-semibold hover:bg-amber-800 cursor-pointer"
+                  >
+                    Xác nhận gỡ bỏ yêu cầu bị từ chối để nhập lại
+                  </button>
+                )}
+              </div>
+            )}
+
             {/* AI Summary Banner */}
             {stats.total > 0 && (
               <div className="mb-3 rounded-lg border border-slate-200 bg-slate-50 p-2.5 text-xs">
@@ -1528,14 +1603,21 @@ export const CameraReturnModal: React.FC<CameraReturnModalProps> = ({
                             <div className="font-semibold text-slate-900">{item.itemName}</div>
                             <div className="text-[11px] text-slate-500">Mã: {item.itemCode}</div>
                           </div>
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveStaged(item.detailId)}
-                            className="rounded p-1 text-slate-400 hover:text-rose-600"
-                            title="Bỏ chọn"
-                          >
-                            <X className="h-3.5 w-3.5" />
-                          </button>
+                          <div className="flex items-center space-x-2">
+                            <span className="text-[11px] text-slate-500">
+                              Còn lại: <strong>{item.remaining}</strong> {item.unit}
+                            </span>
+                            {!autoPopulateBorrowItems && (
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveStaged(item.detailId)}
+                                className="rounded p-1 text-slate-400 hover:text-rose-600"
+                                title="Bỏ chọn"
+                              >
+                                <X className="h-3.5 w-3.5" />
+                              </button>
+                            )}
+                          </div>
                         </div>
 
                         {item.matchedFromAi && (
@@ -1557,19 +1639,24 @@ export const CameraReturnModal: React.FC<CameraReturnModalProps> = ({
 
                         <div className="grid grid-cols-2 gap-2 pt-1 border-t border-slate-200/60">
                           <div>
-                            <label className="block text-[10px] font-medium text-slate-600 mb-0.5">
+                            <label
+                              htmlFor={`return-qty-${item.detailId}`}
+                              className="block text-[10px] font-medium text-slate-600 mb-0.5"
+                            >
                               Số lượng trả (tối đa {item.remaining}):
                             </label>
                             <div className="flex items-center space-x-1">
                               <input
+                                id={`return-qty-${item.detailId}`}
+                                aria-label={`Số lượng trả ${item.itemCode}`}
                                 type="number"
-                                min={1}
+                                min={autoPopulateBorrowItems ? 0 : 1}
                                 max={item.remaining}
                                 value={item.quantity}
                                 onChange={(e) =>
                                   handleUpdateQuantity(
                                     item.detailId,
-                                    parseInt(e.target.value) || 1
+                                    parseInt(e.target.value, 10) || 0
                                   )
                                 }
                                 className="w-full rounded border border-slate-300 bg-white px-2 py-1 text-xs font-semibold text-slate-800 focus:border-blue-500 focus:outline-none"
@@ -1579,10 +1666,15 @@ export const CameraReturnModal: React.FC<CameraReturnModalProps> = ({
                           </div>
 
                           <div>
-                            <label className="block text-[10px] font-medium text-slate-600 mb-0.5">
+                            <label
+                              htmlFor={`return-cond-${item.detailId}`}
+                              className="block text-[10px] font-medium text-slate-600 mb-0.5"
+                            >
                               Tình trạng kiểm tra:
                             </label>
                             <select
+                              id={`return-cond-${item.detailId}`}
+                              aria-label={`Tình trạng trả ${item.itemCode}`}
                               value={item.condition}
                               onChange={(e) =>
                                 handleUpdateCondition(
@@ -1592,9 +1684,9 @@ export const CameraReturnModal: React.FC<CameraReturnModalProps> = ({
                               }
                               className="w-full rounded border border-slate-300 bg-white px-2 py-1 text-xs text-slate-800 focus:border-blue-500 focus:outline-none"
                             >
-                              <option value="GOOD">Tốt (Khả dụng)</option>
-                              <option value="DAMAGED">Hỏng (Cách ly)</option>
-                              <option value="LOST">Báo mất</option>
+                              <option value="GOOD">Tốt (Nhập kho khả dụng)</option>
+                              <option value="DAMAGED">Hỏng (Cách ly kiểm tra)</option>
+                              <option value="LOST">Báo mất (Giảm tài sản)</option>
                             </select>
                           </div>
                         </div>
@@ -1602,6 +1694,46 @@ export const CameraReturnModal: React.FC<CameraReturnModalProps> = ({
                     ))
                   )}
                 </div>
+
+                {/* Notes Input */}
+                <div className="mt-2.5">
+                  <label
+                    htmlFor="return-custom-notes"
+                    className="block text-[11px] font-semibold text-slate-700 mb-1"
+                  >
+                    Ghi chú kiểm tra (Notes):
+                  </label>
+                  <textarea
+                    id="return-custom-notes"
+                    rows={2}
+                    value={customNotes}
+                    onChange={(e) => setCustomNotes(e.target.value)}
+                    placeholder="Ghi chú thêm về linh kiện hoặc tình trạng bàn giao tại phòng Lab..."
+                    className="w-full rounded-lg border border-slate-200 p-2 text-xs text-slate-900 focus:border-blue-500 focus:outline-none"
+                  />
+                </div>
+
+                {/* Live Captured Photo Evidence */}
+                {capturedLivePhoto && (
+                  <div className="mt-2.5 rounded-xl border border-emerald-200 bg-emerald-50/70 p-2.5 space-y-1.5">
+                    <div className="flex items-center justify-between text-xs font-semibold text-emerald-800">
+                      <span className="flex items-center space-x-1.5">
+                        <CheckCircle className="h-3.5 w-3.5 text-emerald-600" />
+                        <span>Bằng chứng ảnh chụp thực tế (Live Camera)</span>
+                      </span>
+                      <span className="text-[10px] font-mono bg-emerald-200 text-emerald-900 px-2 py-0.5 rounded">
+                        Đã xác thực thời gian thực
+                      </span>
+                    </div>
+                    <div className="relative rounded-lg overflow-hidden border border-emerald-300 max-h-32 flex items-center justify-center bg-black/5">
+                      <img
+                        src={capturedLivePhoto.dataUrl}
+                        alt="Bằng chứng hoàn trả"
+                        className="max-h-32 object-contain rounded"
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
@@ -1776,43 +1908,45 @@ export const CameraReturnModal: React.FC<CameraReturnModalProps> = ({
             )}
 
             {/* Manual fallback: add from un-staged borrow details */}
-            <div className="mt-2 pt-2 border-t border-slate-200">
-              <label className="block text-[11px] font-semibold text-slate-700 mb-1">
-                Thêm linh kiện từ phiếu mượn (Manual Fallback):
-              </label>
-              <div className="flex space-x-1.5">
-                <select
-                  id="manual-item-select"
-                  className="flex-1 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-800 focus:border-blue-500 focus:outline-none"
-                  defaultValue=""
-                  onChange={(e) => {
-                    if (e.target.value) {
-                      handleAddManualItem(e.target.value);
-                      e.target.value = '';
-                    }
-                  }}
-                >
-                  <option value="" disabled>
-                    -- Chọn linh kiện mượn cần trả --
-                  </option>
-                  {outstandingDetails
-                    .filter((d) => !stagedItems[d.id])
-                    .map((d) => (
-                      <option key={d.id} value={d.id}>
-                        {d.item?.name || d.itemId} (Còn lại:{' '}
-                        {d.quantity - (d.returnedQuantity || 0)})
-                      </option>
-                    ))}
-                </select>
+            {!autoPopulateBorrowItems && (
+              <div className="mt-2 pt-2 border-t border-slate-200">
+                <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                  Thêm linh kiện từ phiếu mượn (Manual Fallback):
+                </label>
+                <div className="flex space-x-1.5">
+                  <select
+                    id="manual-item-select"
+                    className="flex-1 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-800 focus:border-blue-500 focus:outline-none"
+                    defaultValue=""
+                    onChange={(e) => {
+                      if (e.target.value) {
+                        handleAddManualItem(e.target.value);
+                        e.target.value = '';
+                      }
+                    }}
+                  >
+                    <option value="" disabled>
+                      -- Chọn linh kiện mượn cần trả --
+                    </option>
+                    {outstandingDetails
+                      .filter((d) => !stagedItems[d.id])
+                      .map((d) => (
+                        <option key={d.id} value={d.id}>
+                          {d.item?.name || d.itemId} (Còn lại:{' '}
+                          {d.quantity - (d.returnedQuantity || 0)})
+                        </option>
+                      ))}
+                  </select>
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Footer Buttons */}
             <div className="mt-3 flex items-center justify-between border-t border-slate-200 pt-2.5">
               <button
                 type="button"
                 onClick={handleModalClose}
-                className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 cursor-pointer"
               >
                 Hủy bỏ
               </button>
@@ -1820,11 +1954,15 @@ export const CameraReturnModal: React.FC<CameraReturnModalProps> = ({
               <button
                 type="button"
                 onClick={handleConfirmStaged}
-                disabled={Object.keys(stagedItems).length === 0}
-                className="inline-flex items-center space-x-1.5 rounded-lg bg-emerald-600 px-4 py-2 text-xs font-bold text-white shadow hover:bg-emerald-500 disabled:opacity-50"
+                disabled={
+                  actionLoading ||
+                  Boolean(rejectedReturn && rejectedReturn.borrowId === borrowRecord.id) ||
+                  !Object.values(stagedItems).some((item) => item.quantity > 0)
+                }
+                className="inline-flex items-center space-x-1.5 rounded-lg bg-emerald-600 px-4 py-2 text-xs font-bold text-white shadow hover:bg-emerald-500 disabled:opacity-50 cursor-pointer"
               >
-                <span>Áp dụng vào Phiếu Hoàn trả</span>
-                <ArrowRight className="h-3.5 w-3.5" />
+                <span>{actionLoading ? 'Đang xử lý...' : 'Xác nhận hoàn trả'}</span>
+                <CornerDownLeft className="h-3.5 w-3.5" />
               </button>
             </div>
           </div>
