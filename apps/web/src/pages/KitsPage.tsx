@@ -55,6 +55,44 @@ interface LocationOption {
   name: string;
 }
 
+export function removeVietnameseTones(str: string): string {
+  return str
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/đ/g, 'd')
+    .replace(/Đ/g, 'D');
+}
+
+export function generateKitCode(name: string): string {
+  if (!name || !name.trim()) return '';
+
+  const cleanStr = removeVietnameseTones(name.trim());
+  const sanitized = cleanStr.replace(/[^a-zA-Z0-9\-_]/g, ' ');
+
+  const words = sanitized
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((w) => w.toUpperCase());
+
+  if (words.length === 0) return '';
+
+  while (
+    words.length > 1 &&
+    (words[0] === 'KIT' || words[0] === 'HOP' || words[0] === 'BO')
+  ) {
+    words.shift();
+  }
+
+  if (words.length === 1 && (words[0] === 'KIT' || words[0] === 'HOP' || words[0] === 'BO')) {
+    return 'KIT';
+  }
+
+  const coreCode = words.join('-');
+  const fullCode = coreCode.startsWith('KIT-') ? coreCode : `KIT-${coreCode}`;
+
+  return fullCode.slice(0, 50).replace(/-+$/, '');
+}
+
 export const KitsPage: React.FC = () => {
   const { user } = useAuth();
   const isOperator = user?.role === 'ADMIN' || user?.role === 'LAB_MANAGER' || user?.role === 'TECHNICIAN';
@@ -72,9 +110,28 @@ export const KitsPage: React.FC = () => {
 
   // Create Modal state
   const [isCreateModalOpen, setIsCreateModalOpen] = useState<boolean>(false);
+  const [isCodeManuallyEdited, setIsCodeManuallyEdited] = useState<boolean>(false);
+
+  const handleOpenCreateModal = () => {
+    setIsCodeManuallyEdited(false);
+    setCreateFormData({
+      code: '',
+      name: '',
+      description: '',
+      locationId: '',
+      items: [{ itemId: '', quantity: 1, notes: '' }],
+    });
+    setIsCreateModalOpen(true);
+  };
+
+  const handleCloseCreateModal = () => {
+    setIsCreateModalOpen(false);
+    setIsCodeManuallyEdited(false);
+  };
+
   const createBackdropDismiss = useModalDismiss(
     isCreateModalOpen,
-    () => setIsCreateModalOpen(false)
+    handleCloseCreateModal
   );
   const [createFormData, setCreateFormData] = useState<{
     code: string;
@@ -240,14 +297,7 @@ export const KitsPage: React.FC = () => {
       const res = await apiClient.post('/kits', payload);
       if (res.data?.success) {
         setStatusMessage({ type: 'success', text: 'Tạo hộp kit thực hành thành công' });
-        setIsCreateModalOpen(false);
-        setCreateFormData({
-          code: '',
-          name: '',
-          description: '',
-          locationId: '',
-          items: [{ itemId: '', quantity: 1, notes: '' }],
-        });
+        handleCloseCreateModal();
         fetchKits();
       }
     } catch (err: any) {
@@ -317,7 +367,7 @@ export const KitsPage: React.FC = () => {
 
           {isOperator && (
             <button
-              onClick={() => setIsCreateModalOpen(true)}
+              onClick={handleOpenCreateModal}
               className="inline-flex items-center space-x-1.5 rounded-xl bg-brand-600 px-4 py-2.5 text-xs font-semibold text-white shadow-soft hover:bg-brand-700 active:scale-[0.99] focus:outline-none focus:ring-2 focus:ring-brand-500/20 transition-all cursor-pointer"
             >
               <Plus className="h-4 w-4" />
@@ -617,8 +667,8 @@ export const KitsPage: React.FC = () => {
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <h3 className="text-sm font-bold text-slate-900">Tạo hộp kit thực hành mới</h3>
               <button
-                onClick={() => setIsCreateModalOpen(false)}
-                className="rounded p-1 text-slate-400 hover:text-slate-600"
+                onClick={handleCloseCreateModal}
+                className="rounded p-1 text-slate-400 hover:text-slate-600 cursor-pointer"
               >
                 <X className="h-4 w-4" />
               </button>
@@ -627,15 +677,41 @@ export const KitsPage: React.FC = () => {
             <form onSubmit={handleCreateSubmit} className="mt-4 space-y-3">
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-[11px] font-semibold text-slate-700">Mã hộp Kit *</label>
+                  <div className="flex items-center justify-between">
+                    <label className="block text-[11px] font-semibold text-slate-700">Mã hộp Kit *</label>
+                    {createFormData.name && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const autoCode = generateKitCode(createFormData.name);
+                          setCreateFormData((prev) => ({ ...prev, code: autoCode }));
+                          setIsCodeManuallyEdited(false);
+                        }}
+                        className="text-[10px] text-blue-600 hover:text-blue-800 underline cursor-pointer"
+                        title="Tạo lại mã tự động theo tên hộp kit"
+                      >
+                        Tạo lại theo tên
+                      </button>
+                    )}
+                  </div>
                   <input
                     type="text"
                     required
                     placeholder="VD: KIT-IOT-001"
                     value={createFormData.code}
-                    onChange={(e) => setCreateFormData({ ...createFormData, code: e.target.value })}
-                    className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-1.5 text-xs focus:border-blue-500 focus:outline-none"
+                    onChange={(e) => {
+                      const val = e.target.value.toUpperCase();
+                      if (val.trim() === '') {
+                        setIsCodeManuallyEdited(false);
+                      } else {
+                        setIsCodeManuallyEdited(true);
+                      }
+                      setCreateFormData({ ...createFormData, code: val });
+                    }}
+                    className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-mono font-medium focus:border-blue-500 focus:outline-none"
+                    data-testid="kit-code-input"
                   />
+                  <p className="mt-0.5 text-[10px] text-slate-400">Tự động sinh từ tên kit</p>
                 </div>
                 <div>
                   <label className="block text-[11px] font-semibold text-slate-700">Tên hộp Kit *</label>
@@ -644,8 +720,24 @@ export const KitsPage: React.FC = () => {
                     required
                     placeholder="VD: Kit vi điều khiển IoT"
                     value={createFormData.name}
-                    onChange={(e) => setCreateFormData({ ...createFormData, name: e.target.value })}
+                    onChange={(e) => {
+                      const newName = e.target.value;
+                      if (!isCodeManuallyEdited || !createFormData.code) {
+                        const autoCode = generateKitCode(newName);
+                        setCreateFormData((prev) => ({
+                          ...prev,
+                          name: newName,
+                          code: autoCode,
+                        }));
+                      } else {
+                        setCreateFormData((prev) => ({
+                          ...prev,
+                          name: newName,
+                        }));
+                      }
+                    }}
                     className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-1.5 text-xs focus:border-blue-500 focus:outline-none"
+                    data-testid="kit-name-input"
                   />
                 </div>
               </div>
@@ -734,8 +826,8 @@ export const KitsPage: React.FC = () => {
               <div className="flex justify-end space-x-2 border-t border-slate-100 pt-3">
                 <button
                   type="button"
-                  onClick={() => setIsCreateModalOpen(false)}
-                  className="rounded-lg border border-slate-200 px-3.5 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+                  onClick={handleCloseCreateModal}
+                  className="rounded-lg border border-slate-200 px-3.5 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 cursor-pointer"
                 >
                   Hủy
                 </button>

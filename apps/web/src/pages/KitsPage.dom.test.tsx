@@ -3,7 +3,7 @@ import React from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor, cleanup, fireEvent, within } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
-import { KitsPage } from './KitsPage';
+import { KitsPage, generateKitCode, removeVietnameseTones } from './KitsPage';
 import { apiClient } from '../services/api';
 import * as authHooks from '../hooks/useAuth';
 
@@ -279,6 +279,62 @@ describe('KitsPage DOM Test Suite', () => {
 
     await waitFor(() => {
       expect(screen.getByText('Không tìm thấy hộp kit thực hành nào')).toBeDefined();
+    });
+  });
+
+  describe('generateKitCode & Auto-generation Suite', () => {
+    it('generates standard uppercase kit codes from Vietnamese names', () => {
+      expect(generateKitCode('Kit vi điều khiển IoT')).toBe('KIT-VI-DIEU-KHIEN-IOT');
+      expect(generateKitCode('Bộ Kit Arduino Uno R3')).toBe('KIT-ARDUINO-UNO-R3');
+      expect(generateKitCode('Hộp kit cảm biến môi trường')).toBe('KIT-CAM-BIEN-MOI-TRUONG');
+      expect(generateKitCode('Cánh tay robot 6 trục')).toBe('KIT-CANH-TAY-ROBOT-6-TRUC');
+      expect(generateKitCode('Bộ thực hành IoT 01')).toBe('KIT-THUC-HANH-IOT-01');
+      expect(generateKitCode('')).toBe('');
+      expect(generateKitCode('   ')).toBe('');
+    });
+
+    it('automatically generates kit code when user types kit name in Create Kit modal', async () => {
+      vi.mocked(authHooks.useAuth).mockReturnValue({
+        user: mockTechUser as any,
+        token: 'tech-token',
+        isAuthenticated: true,
+        login: vi.fn(),
+        logout: vi.fn(),
+      });
+
+      render(
+        <BrowserRouter>
+          <KitsPage />
+        </BrowserRouter>
+      );
+
+      await waitFor(() => {
+        expect(screen.getByText('Tạo hộp kit mới')).toBeDefined();
+      });
+
+      fireEvent.click(screen.getByText('Tạo hộp kit mới'));
+
+      const nameInput = screen.getByTestId('kit-name-input');
+      const codeInput = screen.getByTestId('kit-code-input') as HTMLInputElement;
+
+      expect(codeInput.value).toBe('');
+
+      // Type name
+      fireEvent.change(nameInput, { target: { value: 'Kit vi điều khiển IoT' } });
+      expect(codeInput.value).toBe('KIT-VI-DIEU-KHIEN-IOT');
+
+      // Manual edit of code
+      fireEvent.change(codeInput, { target: { value: 'CUSTOM-KIT-99' } });
+      expect(codeInput.value).toBe('CUSTOM-KIT-99');
+
+      // Changing name further does not overwrite manual edit
+      fireEvent.change(nameInput, { target: { value: 'Kit vi điều khiển IoT ESP32' } });
+      expect(codeInput.value).toBe('CUSTOM-KIT-99');
+
+      // Clicking "Tạo lại theo tên" re-syncs
+      const resyncBtn = screen.getByTitle('Tạo lại mã tự động theo tên hộp kit');
+      fireEvent.click(resyncBtn);
+      expect(codeInput.value).toBe('KIT-VI-DIEU-KHIEN-IOT-ESP32');
     });
   });
 });
