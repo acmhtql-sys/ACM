@@ -40,6 +40,19 @@
     backdrop-filter: blur(8px);
     border: 1px solid rgba(226, 232, 240, 0.8);
   }
+
+  /* Hide number input spin buttons */
+  input.no-spinner::-webkit-outer-spin-button,
+  input.no-spinner::-webkit-inner-spin-button,
+  .no-spinner input::-webkit-outer-spin-button,
+  .no-spinner input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+  input.no-spinner,
+  .no-spinner input {
+    -moz-appearance: textfield;
+  }
 }
 
 /* Keep fullscreen fixed overlays pinned to viewport edges even when mounted inside space-y-* containers */

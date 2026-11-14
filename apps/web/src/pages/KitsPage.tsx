@@ -1506,7 +1506,7 @@ export const KitsPage: React.FC = () => {
                                       parseInt(e.target.value, 10) || 1
                                     )
                                   }
-                                  className="w-10 text-center text-xs font-bold text-slate-800 focus:outline-none"
+                                  className="w-10 text-center text-xs font-bold text-slate-800 focus:outline-none no-spinner [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                 />
                                 <button
                                   type="button"
