@@ -373,7 +373,7 @@ describe('KitsPage DOM Test Suite', () => {
       expect(codeInput.value).toBe('KIT-VDKIE-01');
     });
 
-    it('adds new component rows via Thêm dòng button and bottom action', async () => {
+    it('adds new component rows via Thêm dòng linh kiện mới button', async () => {
       vi.mocked(authHooks.useAuth).mockReturnValue({
         user: mockTechUser as any,
         token: 'tech-token',
@@ -397,13 +397,10 @@ describe('KitsPage DOM Test Suite', () => {
       // Initially 1 row exists
       expect(screen.getAllByRole('combobox').length).toBeGreaterThanOrEqual(2); // location select + item select
 
-      // Click "Thêm dòng" button
+      // Click "Thêm dòng linh kiện mới" button twice
       const addLineBtn = screen.getByTestId('btn-add-item-row');
       fireEvent.click(addLineBtn);
-
-      // Click bottom "Thêm dòng linh kiện mới" button
-      const bottomAddBtn = screen.getByText('Thêm dòng linh kiện mới');
-      fireEvent.click(bottomAddBtn);
+      fireEvent.click(addLineBtn);
 
       // Now we have 3 rows with delete buttons
       expect(screen.getAllByTitle('Xóa linh kiện này').length).toBe(3);

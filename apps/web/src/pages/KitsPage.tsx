@@ -1018,17 +1018,6 @@ export const KitsPage: React.FC = () => {
                         ))}
                       </select>
                     )}
-
-                    {/* Add Single Line */}
-                    <button
-                      type="button"
-                      onClick={addItemRow}
-                      className="inline-flex items-center space-x-1.5 rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-100 hover:border-blue-300 active:scale-[0.99] transition cursor-pointer shadow-xs"
-                      data-testid="btn-add-item-row"
-                    >
-                      <Plus className="h-3.5 w-3.5" />
-                      <span>Thêm dòng</span>
-                    </button>
                   </div>
                 </div>
 
@@ -1190,7 +1179,8 @@ export const KitsPage: React.FC = () => {
                   <button
                     type="button"
                     onClick={addItemRow}
-                    className="w-full py-2 border border-dashed border-slate-300 rounded-xl text-xs font-semibold text-slate-600 hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50/50 flex items-center justify-center space-x-1.5 transition cursor-pointer"
+                    className="w-full py-2.5 border-2 border-dashed border-slate-300 rounded-xl text-xs font-semibold text-slate-600 hover:border-blue-500 hover:text-blue-600 hover:bg-blue-50/50 flex items-center justify-center space-x-1.5 transition cursor-pointer"
+                    data-testid="btn-add-item-row"
                   >
                     <Plus className="h-4 w-4" />
                     <span>Thêm dòng linh kiện mới</span>
