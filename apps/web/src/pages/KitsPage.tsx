@@ -12,16 +12,12 @@ import {
   ChevronDown,
   ChevronUp,
   Minus,
-  Layers,
-  Zap,
-  Check,
 } from 'lucide-react';
 import { StatusBadge } from '../components/StatusBadge';
 import { useAuth } from '../hooks/useAuth';
 import { useModalDismiss } from '../hooks/useModalDismiss';
 import { apiClient } from '../services/api';
 import { KitStatus } from '@acm/shared';
-import { KitItemPickerModal, KitPickerItemOption, ItemStockBalance } from '../components/kits/KitItemPickerModal';
 
 interface KitItemComponent {
   id: string;
@@ -47,7 +43,14 @@ interface KitRecord {
   updatedAt: string;
 }
 
-export interface ItemOption extends KitPickerItemOption {
+export interface ItemStockBalance {
+  locationId: string;
+  available: number;
+  onHand: number;
+  location?: { id: string; code: string; name: string };
+}
+
+export interface ItemOption {
   id: string;
   code: string;
   name: string;
@@ -59,61 +62,6 @@ export interface ItemOption extends KitPickerItemOption {
   available?: number;
   stockBalances?: ItemStockBalance[];
 }
-
-export interface KitTemplate {
-  id: string;
-  name: string;
-  description: string;
-  items: Array<{
-    codeMatch: string;
-    keywords?: string[];
-    defaultQuantity: number;
-    notes?: string;
-  }>;
-}
-
-export const KIT_TEMPLATES: KitTemplate[] = [
-  {
-    id: 'ai-fantasy-zoo',
-    name: 'AI FANTASY ZOO - Chủ đề 1',
-    description: 'Bộ kit robot AI Fantasy Zoo tiêu chuẩn gồm bo mạch chủ, công tắc, cảm biến siêu âm, cảm biến hồng ngoại, 2 động cơ servo, loa, đèn LED và cáp nối.',
-    items: [
-      { codeMatch: 'MAIN-02', keywords: ['main', 'bo mach'], defaultQuantity: 1, notes: 'Bo mạch điều khiển chính' },
-      { codeMatch: 'SW-MAIN-02', keywords: ['switch', 'cong tac'], defaultQuantity: 1, notes: 'Công tắc nguồn' },
-      { codeMatch: 'SEN-IR', keywords: ['ir', 'hong ngoai'], defaultQuantity: 1, notes: 'Cảm biến hồng ngoại' },
-      { codeMatch: 'SEN-US-01', keywords: ['sieu am', 'ultrasonic', 'sr04'], defaultQuantity: 1, notes: 'Cảm biến siêu âm' },
-      { codeMatch: 'MOT-SERVO-01', keywords: ['servo', 'dong co'], defaultQuantity: 2, notes: 'Động cơ Servo khớp nối' },
-      { codeMatch: 'ACT-SPK-01', keywords: ['speaker', 'loa'], defaultQuantity: 1, notes: 'Loa âm thanh' },
-      { codeMatch: 'ACT-LED-01', keywords: ['led'], defaultQuantity: 1, notes: 'Đèn LED hiển thị' },
-      { codeMatch: 'WHL-OMNI-01', keywords: ['omni', 'banh xe'], defaultQuantity: 2, notes: 'Bánh xe đa hướng' },
-      { codeMatch: 'CAB-RJ11-01', keywords: ['rj11', 'cap'], defaultQuantity: 3, notes: 'Cáp kết nối cảm biến' },
-    ],
-  },
-  {
-    id: 'smart-car',
-    name: 'Bộ Kit Xe Robot Thông Minh (Smart Car)',
-    description: 'Kit thực hành xe robot tự hành dò đường (line tracking) và tránh chướng ngại vật siêu âm.',
-    items: [
-      { codeMatch: 'ESP32', keywords: ['esp32', 'arduino', 'uno'], defaultQuantity: 1, notes: 'Bo mạch điều khiển' },
-      { codeMatch: 'SEN-US', keywords: ['sieu am', 'sr04', 'ultrasonic'], defaultQuantity: 1, notes: 'Cảm biến siêu âm tránh vật cản' },
-      { codeMatch: 'SEN-IR', keywords: ['ir', 'line', 'hong ngoai'], defaultQuantity: 2, notes: 'Cảm biến hồng ngoại dò line' },
-      { codeMatch: 'MOT-SERVO', keywords: ['servo', 'dong co'], defaultQuantity: 2, notes: 'Động cơ dẫn động' },
-      { codeMatch: 'WHL-', keywords: ['banh xe', 'wheel'], defaultQuantity: 2, notes: 'Bánh xe robot' },
-    ],
-  },
-  {
-    id: 'iot-starter',
-    name: 'Bộ Kit Vi Điều Khiển & Cảm Biến IoT',
-    description: 'Bộ linh kiện thực hành môn Internet of Things và Hệ thống nhúng với vi điều khiển và cảm biến môi trường.',
-    items: [
-      { codeMatch: 'ESP32', keywords: ['esp32', 'arduino', 'uno'], defaultQuantity: 1, notes: 'Board vi điều khiển IoT' },
-      { codeMatch: 'DHT', keywords: ['dht', 'nhiet do', 'do am'], defaultQuantity: 1, notes: 'Cảm biến nhiệt ẩm DHT' },
-      { codeMatch: 'SR04', keywords: ['sieu am', 'khoang cach'], defaultQuantity: 1, notes: 'Cảm biến khoảng cách' },
-      { codeMatch: 'LED', keywords: ['led'], defaultQuantity: 2, notes: 'Đèn LED tín hiệu' },
-      { codeMatch: 'RES', keywords: ['dien tro', 'resistor'], defaultQuantity: 5, notes: 'Điện trở phân dòng' },
-    ],
-  },
-];
 
 interface LocationOption {
   id: string;
@@ -275,7 +223,6 @@ export const KitsPage: React.FC = () => {
   const handleCloseCreateModal = () => {
     setIsCreateModalOpen(false);
     setIsCodeManuallyEdited(false);
-    setIsPickerModalOpen(false);
   };
 
   const createBackdropDismiss = useModalDismiss(
@@ -296,9 +243,6 @@ export const KitsPage: React.FC = () => {
     items: [{ itemId: '', quantity: 1, notes: '' }],
   });
 
-  // Multi-item picker modal state
-  const [isPickerModalOpen, setIsPickerModalOpen] = useState<boolean>(false);
-
   // Group available categories from itemsList
   const availableCategories = useMemo(() => {
     const map = new Map<string, { id: string; name: string; count: number }>();
@@ -313,6 +257,22 @@ export const KitsPage: React.FC = () => {
       }
     }
     return Array.from(map.values()).sort((a, b) => b.count - a.count);
+  }, [itemsList]);
+
+  // Group items by category for <optgroup> dropdown in each row
+  const groupedItemsByCategory = useMemo(() => {
+    const map = new Map<string, { categoryName: string; items: ItemOption[] }>();
+    for (const item of itemsList) {
+      const catName = item.category?.name || item.categoryName || 'Linh kiện khác';
+      const existing = map.get(catName);
+      if (existing) {
+        existing.items.push(item);
+      } else {
+        map.set(catName, { categoryName: catName, items: [item] });
+      }
+    }
+    // Sort categories alphabetically
+    return Array.from(map.values()).sort((a, b) => a.categoryName.localeCompare(b.categoryName, 'vi'));
   }, [itemsList]);
 
   // Stock availability helper at selected location
@@ -332,60 +292,6 @@ export const KitsPage: React.FC = () => {
       return avail < row.quantity;
     }).length;
   }, [createFormData.items, createFormData.locationId, itemsList]);
-
-  // Set of already selected item IDs in current form
-  const alreadySelectedItemIds = useMemo(() => {
-    return new Set(createFormData.items.map((i) => i.itemId).filter(Boolean));
-  }, [createFormData.items]);
-
-  // Handler: Apply pre-configured Kit Template
-  const handleApplyTemplate = (templateId: string) => {
-    const tmpl = KIT_TEMPLATES.find((t) => t.id === templateId);
-    if (!tmpl) return;
-
-    const autoCode = generateKitCode(tmpl.name, existingCodes);
-    const matchedItems: Array<{ itemId: string; quantity: number; notes: string }> = [];
-    const usedItemIds = new Set<string>();
-
-    for (const tItem of tmpl.items) {
-      // 1. Exact match code
-      let found = itemsList.find(
-        (it) => it.code.toUpperCase() === tItem.codeMatch.toUpperCase() && !usedItemIds.has(it.id)
-      );
-      // 2. Prefix match code
-      if (!found) {
-        found = itemsList.find(
-          (it) => it.code.toUpperCase().startsWith(tItem.codeMatch.toUpperCase()) && !usedItemIds.has(it.id)
-        );
-      }
-      // 3. Keyword match in name
-      if (!found && tItem.keywords) {
-        found = itemsList.find(
-          (it) =>
-            tItem.keywords!.some((kw) =>
-              removeVietnameseTones(it.name.toLowerCase()).includes(removeVietnameseTones(kw))
-            ) && !usedItemIds.has(it.id)
-        );
-      }
-
-      if (found) {
-        usedItemIds.add(found.id);
-        matchedItems.push({
-          itemId: found.id,
-          quantity: tItem.defaultQuantity,
-          notes: tItem.notes || '',
-        });
-      }
-    }
-
-    setCreateFormData((prev) => ({
-      ...prev,
-      name: prev.name.trim() ? prev.name : tmpl.name,
-      code: prev.code.trim() && isCodeManuallyEdited ? prev.code : autoCode,
-      description: prev.description.trim() ? prev.description : tmpl.description,
-      items: matchedItems.length > 0 ? matchedItems : prev.items,
-    }));
-  };
 
   // Handler: Batch add all items in a category
   const handleAddCategoryItems = (catId: string) => {
@@ -410,46 +316,6 @@ export const KitsPage: React.FC = () => {
       return {
         ...prev,
         items: [...cleaned, ...newLines],
-      };
-    });
-  };
-
-  // Handler: Add items chosen via Multi-Item Picker Modal
-  const handlePickerAddItems = (
-    newItems: Array<{ itemId: string; quantity: number; notes?: string }>
-  ) => {
-    setCreateFormData((prev) => {
-      const currentMap = new Map<string, { quantity: number; notes: string }>();
-      for (const row of prev.items) {
-        if (row.itemId) {
-          currentMap.set(row.itemId, { quantity: row.quantity, notes: row.notes });
-        }
-      }
-
-      for (const n of newItems) {
-        if (currentMap.has(n.itemId)) {
-          const cur = currentMap.get(n.itemId)!;
-          currentMap.set(n.itemId, {
-            quantity: cur.quantity + n.quantity,
-            notes: n.notes || cur.notes,
-          });
-        } else {
-          currentMap.set(n.itemId, {
-            quantity: n.quantity,
-            notes: n.notes || '',
-          });
-        }
-      }
-
-      const mergedRows = Array.from(currentMap.entries()).map(([itemId, val]) => ({
-        itemId,
-        quantity: val.quantity,
-        notes: val.notes,
-      }));
-
-      return {
-        ...prev,
-        items: mergedRows.length > 0 ? mergedRows : [{ itemId: '', quantity: 1, notes: '' }],
       };
     });
   };
@@ -1129,28 +995,8 @@ export const KitsPage: React.FC = () => {
                     </p>
                   </div>
 
-                  {/* Quick Action Toolbar */}
-                  <div className="flex flex-wrap items-center gap-2">
-                    {/* Preset Template Dropdown */}
-                    <select
-                      defaultValue=""
-                      onChange={(e) => {
-                        if (e.target.value) {
-                          handleApplyTemplate(e.target.value);
-                          e.target.value = '';
-                        }
-                      }}
-                      className="rounded-lg border border-indigo-200 bg-indigo-50/80 px-2.5 py-1.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-100 transition cursor-pointer"
-                      title="Nạp nhanh các linh kiện theo mẫu kit chuẩn"
-                    >
-                      <option value="" disabled>⚡ Nạp mẫu kit Robot có sẵn...</option>
-                      {KIT_TEMPLATES.map((tmpl) => (
-                        <option key={tmpl.id} value={tmpl.id}>
-                          🤖 {tmpl.name}
-                        </option>
-                      ))}
-                    </select>
-
+                  {/* Clean Action Toolbar */}
+                  <div className="flex items-center space-x-2">
                     {/* Batch Add by Category */}
                     {availableCategories.length > 0 && (
                       <select
@@ -1161,7 +1007,7 @@ export const KitsPage: React.FC = () => {
                             e.target.value = '';
                           }
                         }}
-                        className="rounded-lg border border-amber-200 bg-amber-50/80 px-2.5 py-1.5 text-xs font-semibold text-amber-800 hover:bg-amber-100 transition cursor-pointer"
+                        className="rounded-lg border border-dashed border-amber-300 bg-amber-50/80 px-2.5 py-1.5 text-xs font-semibold text-amber-800 hover:bg-amber-100 transition cursor-pointer"
                         title="Thêm toàn bộ linh kiện của một danh mục vào kit"
                       >
                         <option value="" disabled>📁 + Thêm theo danh mục...</option>
@@ -1173,24 +1019,15 @@ export const KitsPage: React.FC = () => {
                       </select>
                     )}
 
-                    {/* Multi-item Search Picker */}
-                    <button
-                      type="button"
-                      onClick={() => setIsPickerModalOpen(true)}
-                      className="inline-flex items-center space-x-1.5 rounded-lg border border-blue-200 bg-blue-50 px-2.5 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-100 transition cursor-pointer"
-                    >
-                      <Search className="h-3.5 w-3.5" />
-                      <span>🔍 Tìm & Chọn linh kiện</span>
-                    </button>
-
                     {/* Add Single Line */}
                     <button
                       type="button"
                       onClick={addItemRow}
-                      className="inline-flex items-center space-x-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition cursor-pointer"
+                      className="inline-flex items-center space-x-1.5 rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-100 hover:border-blue-300 active:scale-[0.99] transition cursor-pointer shadow-xs"
+                      data-testid="btn-add-item-row"
                     >
                       <Plus className="h-3.5 w-3.5" />
-                      <span>+ Thêm dòng</span>
+                      <span>Thêm dòng</span>
                     </button>
                   </div>
                 </div>
@@ -1218,7 +1055,7 @@ export const KitsPage: React.FC = () => {
 
                         return (
                           <tr key={idx} className="hover:bg-slate-50/60 transition-colors">
-                            {/* Component Selector */}
+                            {/* Component Selector with Categories */}
                             <td className="px-3 py-2">
                               <select
                                 required
@@ -1227,10 +1064,14 @@ export const KitsPage: React.FC = () => {
                                 className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-800 focus:border-blue-500 focus:outline-none"
                               >
                                 <option value="">-- Chọn linh kiện --</option>
-                                {itemsList.map((itm) => (
-                                  <option key={itm.id} value={itm.id}>
-                                    {itm.code} - {itm.name} ({itm.unit || 'cái'})
-                                  </option>
+                                {groupedItemsByCategory.map((grp) => (
+                                  <optgroup key={grp.categoryName} label={`📁 ${grp.categoryName}`}>
+                                    {grp.items.map((itm) => (
+                                      <option key={itm.id} value={itm.id}>
+                                        {itm.code} - {itm.name} ({itm.unit || 'cái'})
+                                      </option>
+                                    ))}
+                                  </optgroup>
                                 ))}
                               </select>
                             </td>
@@ -1344,6 +1185,18 @@ export const KitsPage: React.FC = () => {
                   </table>
                 </div>
 
+                {/* Bottom Add Line Button */}
+                <div className="pt-1">
+                  <button
+                    type="button"
+                    onClick={addItemRow}
+                    className="w-full py-2 border border-dashed border-slate-300 rounded-xl text-xs font-semibold text-slate-600 hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50/50 flex items-center justify-center space-x-1.5 transition cursor-pointer"
+                  >
+                    <Plus className="h-4 w-4" />
+                    <span>Thêm dòng linh kiện mới</span>
+                  </button>
+                </div>
+
                 {/* Table Summary & Warning */}
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between text-xs text-slate-600 gap-2 pt-1">
                   <div className="flex items-center space-x-3">
@@ -1429,19 +1282,6 @@ export const KitsPage: React.FC = () => {
           </div>
         </div>
       )}
-
-      {/* Multi-Item Search Picker Modal */}
-      <KitItemPickerModal
-        isOpen={isPickerModalOpen}
-        onClose={() => setIsPickerModalOpen(false)}
-        items={itemsList}
-        selectedLocationId={createFormData.locationId}
-        selectedLocationName={
-          locationsList.find((l) => l.id === createFormData.locationId)?.name
-        }
-        alreadySelectedIds={alreadySelectedItemIds}
-        onAddItems={handlePickerAddItems}
-      />
     </div>
   );
 };

@@ -373,7 +373,7 @@ describe('KitsPage DOM Test Suite', () => {
       expect(codeInput.value).toBe('KIT-VDKIE-01');
     });
 
-    it('applies kit template to populate kit name, auto-generated code, and matched components', async () => {
+    it('adds new component rows via Thêm dòng button and bottom action', async () => {
       vi.mocked(authHooks.useAuth).mockReturnValue({
         user: mockTechUser as any,
         token: 'tech-token',
@@ -394,19 +394,19 @@ describe('KitsPage DOM Test Suite', () => {
 
       fireEvent.click(screen.getByText('Tạo hộp kit mới'));
 
-      // Find template dropdown
-      const templateSelect = screen.getByTitle('Nạp nhanh các linh kiện theo mẫu kit chuẩn');
-      fireEvent.change(templateSelect, { target: { value: 'ai-fantasy-zoo' } });
+      // Initially 1 row exists
+      expect(screen.getAllByRole('combobox').length).toBeGreaterThanOrEqual(2); // location select + item select
 
-      const nameInput = screen.getByTestId('kit-name-input') as HTMLInputElement;
-      const codeInput = screen.getByTestId('kit-code-input') as HTMLInputElement;
+      // Click "Thêm dòng" button
+      const addLineBtn = screen.getByTestId('btn-add-item-row');
+      fireEvent.click(addLineBtn);
 
-      expect(nameInput.value).toBe('AI FANTASY ZOO - Chủ đề 1');
-      expect(codeInput.value).toBe('KIT-AFZ-01');
+      // Click bottom "Thêm dòng linh kiện mới" button
+      const bottomAddBtn = screen.getByText('Thêm dòng linh kiện mới');
+      fireEvent.click(bottomAddBtn);
 
-      // The table should contain matched components like MAIN-02 and SEN-IR
-      expect(screen.getAllByText(/Main Board 2/).length).toBeGreaterThan(0);
-      expect(screen.getAllByText(/Cảm biến hồng ngoại/).length).toBeGreaterThan(0);
+      // Now we have 3 rows with delete buttons
+      expect(screen.getAllByTitle('Xóa linh kiện này').length).toBe(3);
     });
 
     it('batch adds components by category', async () => {
@@ -436,46 +436,6 @@ describe('KitsPage DOM Test Suite', () => {
 
       // Cảm biến hồng ngoại should now be present in the kit table
       expect(screen.getAllByText(/Cảm biến hồng ngoại/).length).toBeGreaterThan(0);
-    });
-
-    it('opens multi-item search picker and adds selected items to kit', async () => {
-      vi.mocked(authHooks.useAuth).mockReturnValue({
-        user: mockTechUser as any,
-        token: 'tech-token',
-        isAuthenticated: true,
-        login: vi.fn(),
-        logout: vi.fn(),
-      });
-
-      render(
-        <BrowserRouter>
-          <KitsPage />
-        </BrowserRouter>
-      );
-
-      await waitFor(() => {
-        expect(screen.getByText('Tạo hộp kit mới')).toBeDefined();
-      });
-
-      fireEvent.click(screen.getByText('Tạo hộp kit mới'));
-
-      // Click "🔍 Tìm & Chọn linh kiện"
-      const pickerBtn = screen.getByText('🔍 Tìm & Chọn linh kiện');
-      fireEvent.click(pickerBtn);
-
-      // Picker modal opens
-      expect(screen.getByText('Tìm & Chọn linh kiện thêm vào Kit thực hành')).toBeDefined();
-
-      // Click to check an item
-      const itemRow = screen.getByText('ESP32 DevKit');
-      fireEvent.click(itemRow);
-
-      // Click "Thêm 1 linh kiện vào Kit"
-      const addBtn = screen.getByText(/Thêm 1 linh kiện vào Kit/);
-      fireEvent.click(addBtn);
-
-      // Verify item appears in kit table with value
-      expect(screen.getByDisplayValue(/ESP32 - ESP32 DevKit/)).toBeDefined();
     });
   });
 });
