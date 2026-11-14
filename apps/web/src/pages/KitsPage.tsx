@@ -210,6 +210,7 @@ export const KitsPage: React.FC = () => {
 
   const handleOpenCreateModal = () => {
     setIsCodeManuallyEdited(false);
+    fetchOptions();
     setCreateFormData({
       code: '',
       name: '',
@@ -242,6 +243,16 @@ export const KitsPage: React.FC = () => {
     locationId: '',
     items: [{ itemId: '', quantity: 1, notes: '' }],
   });
+
+  // Auto-select first location when locationsList becomes available while modal is open
+  useEffect(() => {
+    if (isCreateModalOpen && locationsList.length > 0 && !createFormData.locationId) {
+      setCreateFormData((prev) => ({
+        ...prev,
+        locationId: locationsList[0].id,
+      }));
+    }
+  }, [isCreateModalOpen, locationsList]);
 
   // Group available categories from itemsList
   const availableCategories = useMemo(() => {
@@ -356,21 +367,25 @@ export const KitsPage: React.FC = () => {
 
   const fetchOptions = async () => {
     try {
-      const [itemsRes, locsRes] = await Promise.all([
-        apiClient.get('/items', { params: { limit: 200 } }),
+      const [itemsRes, locsRes] = await Promise.allSettled([
+        apiClient.get('/items', { params: { limit: 100 } }),
         apiClient.get('/locations', { params: { limit: 100 } }),
       ]);
-      if (itemsRes.data?.success) {
-        const items = Array.isArray(itemsRes.data.data)
-          ? itemsRes.data.data
-          : itemsRes.data.data?.items || [];
+
+      if (itemsRes.status === 'fulfilled' && itemsRes.value.data?.success) {
+        const raw = itemsRes.value.data.data;
+        const items = Array.isArray(raw) ? raw : raw?.items || [];
         setItemsList(items);
+      } else if (itemsRes.status === 'rejected') {
+        console.error('Lỗi khi nạp danh sách linh kiện:', itemsRes.reason);
       }
-      if (locsRes.data?.success) {
-        const locs = Array.isArray(locsRes.data.data)
-          ? locsRes.data.data
-          : locsRes.data.data?.items || [];
+
+      if (locsRes.status === 'fulfilled' && locsRes.value.data?.success) {
+        const raw = locsRes.value.data.data;
+        const locs = Array.isArray(raw) ? raw : raw?.locations || raw?.items || [];
         setLocationsList(locs);
+      } else if (locsRes.status === 'rejected') {
+        console.error('Lỗi khi nạp danh sách vị trí kho:', locsRes.reason);
       }
     } catch (err) {
       console.warn('Không thể nạp danh mục phụ trợ cho modal Kit', err);
@@ -960,7 +975,11 @@ export const KitsPage: React.FC = () => {
                       onChange={(e) => setCreateFormData({ ...createFormData, locationId: e.target.value })}
                       className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-800 focus:border-blue-500 focus:outline-none"
                     >
-                      <option value="">-- Chọn vị trí kho lưu trữ (Bắt buộc) --</option>
+                      <option value="">
+                        {locationsList.length === 0
+                          ? '-- Đang tải vị trí kho hoặc chưa có kho --'
+                          : '-- Chọn vị trí kho lưu trữ (Bắt buộc) --'}
+                      </option>
                       {locationsList.map((loc) => (
                         <option key={loc.id} value={loc.id}>
                           {loc.name} ({loc.code})
