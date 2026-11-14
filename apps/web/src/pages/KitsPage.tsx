@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   Boxes,
   Plus,
@@ -12,6 +12,7 @@ import {
   ChevronDown,
   ChevronUp,
   Minus,
+  Check,
 } from 'lucide-react';
 import { StatusBadge } from '../components/StatusBadge';
 import { useAuth } from '../hooks/useAuth';
@@ -186,6 +187,219 @@ export function generateKitCode(
 
   return candidate;
 }
+
+interface KitItemComboboxProps {
+  value: string;
+  onChange: (itemId: string) => void;
+  itemsList: ItemOption[];
+  groupedItems: { categoryName: string; items: ItemOption[] }[];
+}
+
+const KitItemCombobox: React.FC<KitItemComboboxProps> = ({
+  value,
+  onChange,
+  itemsList,
+  groupedItems,
+}) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const containerRef = useRef<HTMLDivElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  const selectedItem = useMemo(() => itemsList.find((it) => it.id === value), [itemsList, value]);
+
+  // Click outside listener
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isOpen]);
+
+  // Auto-focus search input when opened
+  useEffect(() => {
+    if (isOpen) {
+      setTimeout(() => searchInputRef.current?.focus(), 50);
+    }
+  }, [isOpen]);
+
+  // Filter items and categories based on search
+  const filteredGroups = useMemo(() => {
+    const q = searchTerm.trim().toLowerCase();
+    if (!q) return groupedItems;
+
+    const result: { categoryName: string; items: ItemOption[] }[] = [];
+    for (const grp of groupedItems) {
+      const matchedItems = grp.items.filter(
+        (it) =>
+          it.code.toLowerCase().includes(q) ||
+          it.name.toLowerCase().includes(q) ||
+          (it.categoryName || '').toLowerCase().includes(q) ||
+          (it.category?.name || '').toLowerCase().includes(q)
+      );
+      if (matchedItems.length > 0) {
+        result.push({
+          categoryName: grp.categoryName,
+          items: matchedItems,
+        });
+      }
+    }
+    return result;
+  }, [groupedItems, searchTerm]);
+
+  return (
+    <div ref={containerRef} className="relative w-full">
+      {/* Trigger Button */}
+      {selectedItem ? (
+        <button
+          type="button"
+          onClick={() => setIsOpen(!isOpen)}
+          className="w-full flex items-center justify-between rounded-lg border border-blue-200 bg-blue-50/40 hover:bg-blue-50/70 px-2.5 py-1.5 text-xs text-left transition shadow-2xs group cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+        >
+          <div className="flex items-center space-x-2 min-w-0 flex-1 mr-1.5">
+            <span className="shrink-0 px-1.5 py-0.5 rounded bg-blue-100 font-mono text-[10px] font-bold text-blue-800 border border-blue-200/60">
+              {selectedItem.code}
+            </span>
+            <span className="truncate font-semibold text-slate-800 text-xs" title={selectedItem.name}>
+              {selectedItem.name}
+            </span>
+          </div>
+          <div className="flex items-center space-x-1 shrink-0 text-[10px] font-medium text-slate-400 group-hover:text-blue-600 transition">
+            <span>Đổi</span>
+            <ChevronDown className="h-3 w-3 text-slate-400 group-hover:text-blue-600 transition" />
+          </div>
+        </button>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setIsOpen(!isOpen)}
+          className="w-full flex items-center justify-between rounded-lg border border-slate-300 bg-white hover:border-blue-400 px-2.5 py-1.5 text-xs text-slate-500 transition shadow-2xs cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+        >
+          <div className="flex items-center space-x-1.5 text-slate-500">
+            <Search className="h-3.5 w-3.5 text-slate-400" />
+            <span>Chọn linh kiện...</span>
+          </div>
+          <ChevronDown className="h-3.5 w-3.5 text-slate-400" />
+        </button>
+      )}
+
+      {/* Selected Item Sub-badge */}
+      {selectedItem && (
+        <div className="mt-1 flex items-center space-x-1.5 text-[10px] text-slate-500 font-medium pl-0.5">
+          <span className="truncate max-w-[130px]" title={selectedItem.category?.name || selectedItem.categoryName || 'Linh kiện'}>
+            🏷️ {selectedItem.category?.name || selectedItem.categoryName || 'Linh kiện'}
+          </span>
+          <span>•</span>
+          <span>ĐVT: {selectedItem.unit || 'cái'}</span>
+        </div>
+      )}
+
+      {/* Custom Floating Popover */}
+      {isOpen && (
+        <div className="absolute z-50 left-0 top-full mt-1.5 w-[330px] sm:w-[380px] rounded-xl border border-slate-200 bg-white p-2.5 shadow-2xl animate-in fade-in slide-in-from-top-1 duration-150">
+          {/* Search Bar */}
+          <div className="relative mb-2">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+            <input
+              ref={searchInputRef}
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Gõ mã (VD: SEN, MAIN) hoặc tên..."
+              className="w-full rounded-lg border border-slate-200 bg-slate-50 pl-8 pr-7 py-1.5 text-xs text-slate-800 placeholder:text-slate-400 focus:bg-white focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
+            />
+            {searchTerm && (
+              <button
+                type="button"
+                onClick={() => setSearchTerm('')}
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 text-slate-400 hover:text-slate-600 cursor-pointer"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            )}
+          </div>
+
+          {/* Grouped Component List */}
+          <div className="max-h-56 overflow-y-auto space-y-2.5 pr-1 text-left custom-scrollbar">
+            {filteredGroups.length === 0 ? (
+              <div className="py-6 text-center text-xs text-slate-400">
+                Không tìm thấy linh kiện nào khớp với "<strong>{searchTerm}</strong>"
+              </div>
+            ) : (
+              filteredGroups.map((grp) => (
+                <div key={grp.categoryName} className="space-y-1">
+                  <div className="sticky top-0 z-10 bg-white/95 backdrop-blur-xs py-0.5 px-1 flex items-center justify-between text-[10px] font-bold text-slate-500 uppercase tracking-wider border-b border-slate-100">
+                    <span className="flex items-center space-x-1">
+                      <span>📁</span>
+                      <span>{grp.categoryName}</span>
+                    </span>
+                    <span className="text-[10px] text-slate-400 bg-slate-100 px-1.5 py-0.2 rounded-full font-semibold">
+                      {grp.items.length} món
+                    </span>
+                  </div>
+
+                  <div className="space-y-0.5">
+                    {grp.items.map((itm) => {
+                      const isSelected = itm.id === value;
+                      const totalStock =
+                        itm.totalOnHand ??
+                        itm.available ??
+                        itm.stockBalances?.reduce((sum, b) => sum + (b.available || 0), 0) ??
+                        0;
+
+                      return (
+                        <button
+                          key={itm.id}
+                          type="button"
+                          onClick={() => {
+                            onChange(itm.id);
+                            setIsOpen(false);
+                            setSearchTerm('');
+                          }}
+                          className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-left transition-colors cursor-pointer ${
+                            isSelected
+                              ? 'bg-blue-50 text-blue-900 font-semibold border border-blue-200/80'
+                              : 'hover:bg-slate-50 text-slate-800 border border-transparent'
+                          }`}
+                        >
+                          <div className="flex items-center space-x-2 min-w-0 flex-1 mr-2">
+                            <span className="shrink-0 px-1.5 py-0.5 rounded bg-slate-100 font-mono text-[10px] font-bold text-slate-700 border border-slate-200/60">
+                              {itm.code}
+                            </span>
+                            <span className="truncate text-xs">
+                              {itm.name}
+                            </span>
+                          </div>
+
+                          <div className="shrink-0 flex items-center space-x-1.5">
+                            {totalStock > 0 ? (
+                              <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                Sẵn có: {totalStock}
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-rose-50 text-rose-700 border border-rose-200">
+                                Hết hàng
+                              </span>
+                            )}
+                            {isSelected && <Check className="h-3.5 w-3.5 text-blue-600 shrink-0" />}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
 
 export const KitsPage: React.FC = () => {
   const { user } = useAuth();
@@ -1106,7 +1320,7 @@ export const KitsPage: React.FC = () => {
                 </div>
 
                 {/* Items Table */}
-                <div className="overflow-x-auto rounded-xl border border-slate-200">
+                <div className="overflow-x-auto rounded-xl border border-slate-200 min-h-[300px]">
                   <table className="w-full text-left text-xs">
                     <thead className="border-b border-slate-200 bg-slate-50 text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
                       <tr>
@@ -1134,17 +1348,24 @@ export const KitsPage: React.FC = () => {
                         return (
                           <tr key={idx} className="hover:bg-slate-50/60 transition-colors">
                             {/* Component Selector with Categories */}
-                            <td className="px-3 py-2 min-w-[220px]">
+                            <td className="px-3 py-2 min-w-[240px]">
+                              {/* Modern Interactive Combobox */}
+                              <KitItemCombobox
+                                value={row.itemId}
+                                onChange={(newId) => updateItemRow(idx, 'itemId', newId)}
+                                itemsList={itemsList}
+                                groupedItems={groupedItemsByCategory}
+                              />
+
+                              {/* Native select hidden for full DOM test compatibility and form validation */}
                               <select
                                 required
                                 value={row.itemId}
                                 onChange={(e) => updateItemRow(idx, 'itemId', e.target.value)}
                                 data-testid="item-row-select"
-                                className={`w-full rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors focus:outline-none ${
-                                  row.itemId
-                                    ? 'border-blue-300 bg-blue-50/20 text-slate-900 focus:border-blue-500 focus:bg-white'
-                                    : 'border-slate-300 bg-white text-slate-700 focus:border-blue-500'
-                                }`}
+                                className="sr-only"
+                                tabIndex={-1}
+                                aria-hidden="true"
                               >
                                 <option value="">-- Chọn linh kiện --</option>
                                 {groupedItemsByCategory.map((grp) => (
@@ -1176,20 +1397,6 @@ export const KitsPage: React.FC = () => {
                                   </optgroup>
                                 ))}
                               </select>
-
-                              {selectedItem && (
-                                <div className="mt-1 flex items-center space-x-1.5 text-[10px] text-slate-500 font-medium">
-                                  <span className="inline-flex items-center px-1.5 py-0.2 rounded bg-slate-100 text-slate-700 font-mono font-semibold">
-                                    {selectedItem.code}
-                                  </span>
-                                  <span>•</span>
-                                  <span className="truncate max-w-[130px]" title={selectedItem.category?.name || selectedItem.categoryName || 'Linh kiện'}>
-                                    {selectedItem.category?.name || selectedItem.categoryName || 'Linh kiện'}
-                                  </span>
-                                  <span>•</span>
-                                  <span>ĐVT: {selectedItem.unit || 'cái'}</span>
-                                </div>
-                              )}
                             </td>
 
                             {/* Source Bin / Location Selector */}
