@@ -509,5 +509,136 @@ describe('KitsPage DOM Test Suite', () => {
         expect(screen.getByTitle('Chọn khay/thùng nguồn chứa linh kiện này')).toBeDefined();
       });
     });
+
+    it('auto-merges quantity and notifies user when duplicate component is selected in another row', async () => {
+      vi.mocked(authHooks.useAuth).mockReturnValue({
+        user: mockTechUser as any,
+        token: 'tech-token',
+        isAuthenticated: true,
+        login: vi.fn(),
+        logout: vi.fn(),
+      });
+
+      render(
+        <BrowserRouter>
+          <KitsPage />
+        </BrowserRouter>
+      );
+
+      await waitFor(() => {
+        expect(screen.getByText('Tạo hộp kit mới')).toBeDefined();
+      });
+
+      fireEvent.click(screen.getByText('Tạo hộp kit mới'));
+
+      await waitFor(() => {
+        expect(screen.getAllByTestId('item-row-select').length).toBe(1);
+      });
+
+      // Select ESP32 in row 1
+      const selects = screen.getAllByTestId('item-row-select');
+      fireEvent.change(selects[0], { target: { value: 'item-1' } });
+
+      // Add second row
+      fireEvent.click(screen.getByTestId('btn-add-item-row'));
+
+      const selectsAfterAdd = screen.getAllByTestId('item-row-select');
+      expect(selectsAfterAdd.length).toBe(2);
+
+      // Select ESP32 in row 2 as well
+      fireEvent.change(selectsAfterAdd[1], { target: { value: 'item-1' } });
+
+      // Should automatically merge back into 1 row, incrementing quantity to 2
+      await waitFor(() => {
+        expect(screen.getAllByTestId('item-row-select').length).toBe(1);
+        expect(screen.getByText(/đã có trong danh sách. Hệ thống đã tự động gộp số lượng/)).toBeDefined();
+        expect(screen.getByDisplayValue('2')).toBeDefined(); // Quantity input has 2
+      });
+    });
+
+    it('displays in-modal feedback banner when submitting with empty required fields', async () => {
+      vi.mocked(authHooks.useAuth).mockReturnValue({
+        user: mockTechUser as any,
+        token: 'tech-token',
+        isAuthenticated: true,
+        login: vi.fn(),
+        logout: vi.fn(),
+      });
+
+      render(
+        <BrowserRouter>
+          <KitsPage />
+        </BrowserRouter>
+      );
+
+      await waitFor(() => {
+        expect(screen.getByText('Tạo hộp kit mới')).toBeDefined();
+      });
+
+      fireEvent.click(screen.getByText('Tạo hộp kit mới'));
+
+      // Submit form without entering name/code
+      const form = screen.getByTestId('kit-name-input').closest('form')!;
+      fireEvent.submit(form);
+
+      await waitFor(() => {
+        expect(screen.getByText('Mã hộp kit không được để trống')).toBeDefined();
+      });
+    });
+
+    it('successfully calls API with merged payload when creating kit', async () => {
+      vi.mocked(authHooks.useAuth).mockReturnValue({
+        user: mockTechUser as any,
+        token: 'tech-token',
+        isAuthenticated: true,
+        login: vi.fn(),
+        logout: vi.fn(),
+      });
+
+      vi.mocked(apiClient.post).mockResolvedValueOnce({
+        data: { success: true, data: { id: 'kit-new', code: 'KIT-AFZ-01' } },
+      } as any);
+
+      render(
+        <BrowserRouter>
+          <KitsPage />
+        </BrowserRouter>
+      );
+
+      await waitFor(() => {
+        expect(screen.getByText('Tạo hộp kit mới')).toBeDefined();
+      });
+
+      fireEvent.click(screen.getByText('Tạo hộp kit mới'));
+
+      // Fill name
+      fireEvent.change(screen.getByTestId('kit-name-input'), {
+        target: { value: 'AI Fantasy Zoo Kit' },
+      });
+
+      // Select item
+      const itemSelect = screen.getByTestId('item-row-select');
+      fireEvent.change(itemSelect, { target: { value: 'item-1' } });
+
+      // Submit form
+      const form = screen.getByTestId('kit-name-input').closest('form')!;
+      fireEvent.submit(form);
+
+      await waitFor(() => {
+        expect(apiClient.post).toHaveBeenCalledWith(
+          '/kits',
+          expect.objectContaining({
+            code: 'KIT-AFZ-01',
+            name: 'AI Fantasy Zoo Kit',
+            items: [
+              expect.objectContaining({
+                itemId: 'item-1',
+                quantity: 1,
+              }),
+            ],
+          })
+        );
+      });
+    });
   });
 });

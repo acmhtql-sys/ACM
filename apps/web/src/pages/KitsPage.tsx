@@ -193,6 +193,7 @@ interface KitItemComboboxProps {
   onChange: (itemId: string) => void;
   itemsList: ItemOption[];
   groupedItems: { categoryName: string; items: ItemOption[] }[];
+  selectedItemIds?: Set<string>;
 }
 
 const KitItemCombobox: React.FC<KitItemComboboxProps> = ({
@@ -200,6 +201,7 @@ const KitItemCombobox: React.FC<KitItemComboboxProps> = ({
   onChange,
   itemsList,
   groupedItems,
+  selectedItemIds,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -357,6 +359,7 @@ const KitItemCombobox: React.FC<KitItemComboboxProps> = ({
                   <div className="space-y-0.5">
                     {grp.items.map((itm) => {
                       const isSelected = itm.id === value;
+                      const isAlreadyInKit = !isSelected && Boolean(selectedItemIds?.has(itm.id));
                       const totalStock =
                         itm.totalOnHand ??
                         itm.available ??
@@ -388,6 +391,14 @@ const KitItemCombobox: React.FC<KitItemComboboxProps> = ({
                           </div>
 
                           <div className="shrink-0 flex items-center space-x-1.5">
+                            {isAlreadyInKit && (
+                              <span
+                                className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-blue-50 text-blue-700 border border-blue-200"
+                                title="Linh kiện này đã có trong kit. Nhấp để gộp số lượng."
+                              >
+                                Đã có (click gộp)
+                              </span>
+                            )}
                             {totalStock > 0 ? (
                               <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
                                 Sẵn có: {totalStock}
@@ -436,9 +447,14 @@ export const KitsPage: React.FC = () => {
   // Create Modal state
   const [isCreateModalOpen, setIsCreateModalOpen] = useState<boolean>(false);
   const [isCodeManuallyEdited, setIsCodeManuallyEdited] = useState<boolean>(false);
+  const [modalFeedbackMessage, setModalFeedbackMessage] = useState<{
+    type: 'error' | 'info' | 'success';
+    text: string;
+  } | null>(null);
 
   const handleOpenCreateModal = () => {
     setIsCodeManuallyEdited(false);
+    setModalFeedbackMessage(null);
     fetchOptions();
     setCreateFormData({
       code: '',
@@ -453,6 +469,7 @@ export const KitsPage: React.FC = () => {
   const handleCloseCreateModal = () => {
     setIsCreateModalOpen(false);
     setIsCodeManuallyEdited(false);
+    setModalFeedbackMessage(null);
   };
 
   const createBackdropDismiss = useModalDismiss(
@@ -472,6 +489,11 @@ export const KitsPage: React.FC = () => {
     locationId: '',
     items: [{ itemId: '', locationId: '', quantity: 1, notes: '' }],
   });
+
+  const selectedItemIds = useMemo(
+    () => new Set(createFormData.items.map((i) => i.itemId).filter(Boolean)),
+    [createFormData.items]
+  );
 
   // Auto-select first location when locationsList becomes available while modal is open
   useEffect(() => {
@@ -724,32 +746,50 @@ export const KitsPage: React.FC = () => {
 
   const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setModalFeedbackMessage(null);
     setStatusMessage(null);
 
-    // Frontend validation
+    // Frontend validation with in-modal feedback
     if (!createFormData.code.trim()) {
-      setStatusMessage({ type: 'error', text: 'Mã hộp kit không được để trống' });
+      setModalFeedbackMessage({ type: 'error', text: 'Mã hộp kit không được để trống' });
       return;
     }
     if (!createFormData.name.trim()) {
-      setStatusMessage({ type: 'error', text: 'Tên hộp kit không được để trống' });
+      setModalFeedbackMessage({ type: 'error', text: 'Tên hộp kit không được để trống' });
       return;
     }
     if (!createFormData.locationId) {
-      setStatusMessage({ type: 'error', text: 'Vui lòng chọn vị trí kho lưu trữ cho hộp kit' });
+      setModalFeedbackMessage({ type: 'error', text: 'Vui lòng chọn vị trí kho lưu trữ cho hộp kit' });
       return;
     }
     const validItems = createFormData.items.filter((i) => i.itemId && i.quantity > 0);
     if (validItems.length === 0) {
-      setStatusMessage({ type: 'error', text: 'Vui lòng chọn ít nhất một linh kiện hợp lệ' });
+      setModalFeedbackMessage({ type: 'error', text: 'Vui lòng chọn ít nhất một linh kiện hợp lệ' });
       return;
     }
 
-    const itemIds = validItems.map((i) => i.itemId);
-    if (new Set(itemIds).size !== itemIds.length) {
-      setStatusMessage({ type: 'error', text: 'Danh sách linh kiện trong kit không được trùng lặp' });
-      return;
+    // Auto-merge duplicate items by itemId (summing quantities and combining notes)
+    const mergedMap = new Map<string, { itemId: string; locationId?: string; quantity: number; notes: string }>();
+    for (const item of validItems) {
+      const existing = mergedMap.get(item.itemId);
+      if (existing) {
+        existing.quantity += Number(item.quantity) || 1;
+        if (item.notes?.trim()) {
+          existing.notes = existing.notes ? `${existing.notes}; ${item.notes.trim()}` : item.notes.trim();
+        }
+        if (!existing.locationId && item.locationId) {
+          existing.locationId = item.locationId;
+        }
+      } else {
+        mergedMap.set(item.itemId, {
+          itemId: item.itemId,
+          locationId: item.locationId || undefined,
+          quantity: Number(item.quantity) || 1,
+          notes: item.notes?.trim() || '',
+        });
+      }
     }
+    const finalItems = Array.from(mergedMap.values());
 
     try {
       const payload: any = {
@@ -757,7 +797,7 @@ export const KitsPage: React.FC = () => {
         name: createFormData.name.trim(),
         description: createFormData.description.trim() || undefined,
         locationId: createFormData.locationId || undefined,
-        items: validItems.map((i) => ({
+        items: finalItems.map((i) => ({
           itemId: i.itemId,
           locationId: i.locationId || undefined,
           quantity: Number(i.quantity),
@@ -772,7 +812,7 @@ export const KitsPage: React.FC = () => {
         fetchKits();
       }
     } catch (err: any) {
-      setStatusMessage({
+      setModalFeedbackMessage({
         type: 'error',
         text: err?.response?.data?.message || 'Không thể tạo hộp kit. Vui lòng kiểm tra tồn kho.',
       });
@@ -797,6 +837,38 @@ export const KitsPage: React.FC = () => {
     setCreateFormData((prev) => {
       const updated = [...prev.items];
       if (field === 'itemId') {
+        if (!value) {
+          updated[index] = { ...updated[index], itemId: '', locationId: '' };
+          return { ...prev, items: updated };
+        }
+
+        // Check if item is already chosen in another row
+        const duplicateIndex = prev.items.findIndex((row, i) => i !== index && row.itemId === value);
+        if (duplicateIndex !== -1) {
+          const existingRow = prev.items[duplicateIndex];
+          const currentRow = prev.items[index];
+          const addedQty = Number(currentRow?.quantity) || 1;
+          const itmObj = itemsList.find((it) => it.id === value);
+          const itmName = itmObj?.name || itmObj?.code || 'Linh kiện';
+
+          const newItems = prev.items.filter((_, i) => i !== index);
+          const targetIndex = duplicateIndex > index ? duplicateIndex - 1 : duplicateIndex;
+          const mergedNotes = [existingRow.notes, currentRow?.notes].filter(Boolean).join('; ');
+
+          newItems[targetIndex] = {
+            ...newItems[targetIndex],
+            quantity: (Number(newItems[targetIndex].quantity) || 1) + addedQty,
+            notes: mergedNotes,
+          };
+
+          setModalFeedbackMessage({
+            type: 'info',
+            text: `"${itmName}" đã có trong danh sách. Hệ thống đã tự động gộp số lượng (+${addedQty} ${itmObj?.unit || 'cái'}) vào dòng hiện có.`,
+          });
+
+          return { ...prev, items: newItems };
+        }
+
         const selectedItm = itemsList.find((it) => it.id === value);
         let bestLocId = '';
         if (selectedItm && selectedItm.stockBalances && selectedItm.stockBalances.length > 0) {
@@ -1367,6 +1439,7 @@ export const KitsPage: React.FC = () => {
                                 onChange={(newId) => updateItemRow(idx, 'itemId', newId)}
                                 itemsList={itemsList}
                                 groupedItems={groupedItemsByCategory}
+                                selectedItemIds={selectedItemIds}
                               />
 
                               {/* Native select hidden for full DOM test compatibility and form validation */}
@@ -1615,6 +1688,37 @@ export const KitsPage: React.FC = () => {
                     </button>
                   )}
                 </div>
+
+                {/* Modal Feedback Banner */}
+                {modalFeedbackMessage && (
+                  <div
+                    className={`flex items-center justify-between rounded-xl p-3 text-xs shadow-xs animate-in fade-in duration-150 ${
+                      modalFeedbackMessage.type === 'error'
+                        ? 'border border-rose-200 bg-rose-50 text-rose-800'
+                        : modalFeedbackMessage.type === 'success'
+                        ? 'border border-emerald-200 bg-emerald-50 text-emerald-800'
+                        : 'border border-blue-200 bg-blue-50 text-blue-800'
+                    }`}
+                  >
+                    <div className="flex items-center space-x-2 font-medium">
+                      {modalFeedbackMessage.type === 'error' ? (
+                        <AlertTriangle className="h-4 w-4 text-rose-600 shrink-0" />
+                      ) : modalFeedbackMessage.type === 'success' ? (
+                        <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
+                      ) : (
+                        <Check className="h-4 w-4 text-blue-600 shrink-0" />
+                      )}
+                      <span>{modalFeedbackMessage.text}</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setModalFeedbackMessage(null)}
+                      className="text-slate-400 hover:text-slate-600 cursor-pointer p-0.5"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                )}
 
                 {/* Insufficient Stock Warning */}
                 {insufficientStockItemsCount > 0 ? (
