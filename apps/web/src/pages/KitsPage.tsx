@@ -238,13 +238,13 @@ export const KitsPage: React.FC = () => {
     name: string;
     description: string;
     locationId: string;
-    items: { itemId: string; quantity: number; notes: string }[];
+    items: { itemId: string; locationId?: string; quantity: number; notes: string }[];
   }>({
     code: '',
     name: '',
     description: '',
     locationId: '',
-    items: [{ itemId: '', quantity: 1, notes: '' }],
+    items: [{ itemId: '', locationId: '', quantity: 1, notes: '' }],
   });
 
   // Auto-select first location when locationsList becomes available while modal is open
@@ -311,13 +311,13 @@ export const KitsPage: React.FC = () => {
     return { totalOther, details };
   };
 
-  // Count items in kit exceeding available stock at selected location
+  // Count items in kit exceeding available stock at chosen source location
   const insufficientStockItemsCount = useMemo(() => {
-    if (!createFormData.locationId) return 0;
     return createFormData.items.filter((row) => {
       if (!row.itemId) return false;
       const itm = itemsList.find((it) => it.id === row.itemId);
-      const avail = getItemStockAtLocation(itm, createFormData.locationId);
+      const effectiveLoc = row.locationId || createFormData.locationId;
+      const avail = getItemStockAtLocation(itm, effectiveLoc);
       return avail < row.quantity;
     }).length;
   }, [createFormData.items, createFormData.locationId, itemsList]);
@@ -336,11 +336,24 @@ export const KitsPage: React.FC = () => {
       if (toAdd.length === 0) return prev;
 
       const cleaned = prev.items.filter((i) => Boolean(i.itemId));
-      const newLines = toAdd.map((it) => ({
-        itemId: it.id,
-        quantity: 1,
-        notes: '',
-      }));
+      const newLines = toAdd.map((it) => {
+        let bestLocId = '';
+        if (it.stockBalances && it.stockBalances.length > 0) {
+          const kitLocBal = it.stockBalances.find((b) => b.locationId === prev.locationId && (b.available || 0) > 0);
+          if (kitLocBal) {
+            bestLocId = prev.locationId;
+          } else {
+            const firstStocked = it.stockBalances.find((b) => (b.available || 0) > 0);
+            if (firstStocked) bestLocId = firstStocked.locationId;
+          }
+        }
+        return {
+          itemId: it.id,
+          locationId: bestLocId || prev.locationId || '',
+          quantity: 1,
+          notes: '',
+        };
+      });
 
       return {
         ...prev,
@@ -506,6 +519,7 @@ export const KitsPage: React.FC = () => {
         locationId: createFormData.locationId || undefined,
         items: validItems.map((i) => ({
           itemId: i.itemId,
+          locationId: i.locationId || undefined,
           quantity: Number(i.quantity),
           notes: i.notes.trim() || undefined,
         })),
@@ -528,7 +542,7 @@ export const KitsPage: React.FC = () => {
   const addItemRow = () => {
     setCreateFormData((prev) => ({
       ...prev,
-      items: [...prev.items, { itemId: '', quantity: 1, notes: '' }],
+      items: [...prev.items, { itemId: '', locationId: prev.locationId || '', quantity: 1, notes: '' }],
     }));
   };
 
@@ -542,7 +556,26 @@ export const KitsPage: React.FC = () => {
   const updateItemRow = (index: number, field: string, value: any) => {
     setCreateFormData((prev) => {
       const updated = [...prev.items];
-      updated[index] = { ...updated[index], [field]: value };
+      if (field === 'itemId') {
+        const selectedItm = itemsList.find((it) => it.id === value);
+        let bestLocId = '';
+        if (selectedItm && selectedItm.stockBalances && selectedItm.stockBalances.length > 0) {
+          const kitLocBal = selectedItm.stockBalances.find((b) => b.locationId === prev.locationId && (b.available || 0) > 0);
+          if (kitLocBal) {
+            bestLocId = prev.locationId;
+          } else {
+            const firstStocked = selectedItm.stockBalances.find((b) => (b.available || 0) > 0);
+            if (firstStocked) bestLocId = firstStocked.locationId;
+          }
+        }
+        updated[index] = {
+          ...updated[index],
+          itemId: value,
+          locationId: bestLocId || prev.locationId || '',
+        };
+      } else {
+        updated[index] = { ...updated[index], [field]: value };
+      }
       return { ...prev, items: updated };
     });
   };
@@ -1028,7 +1061,7 @@ export const KitsPage: React.FC = () => {
                       <span>2. Danh sách linh kiện trong kit *</span>
                     </h4>
                     <p className="text-[11px] text-slate-500">
-                      Tồn kho khả dụng sẽ hiển thị trực tiếp theo vị trí kho đã chọn.
+                      Tự động kết nối với Khay/Thùng chứa linh kiện tương ứng (hoặc chọn nguồn xuất tùy ý).
                     </p>
                   </div>
 
@@ -1064,7 +1097,8 @@ export const KitsPage: React.FC = () => {
                     <thead className="border-b border-slate-200 bg-slate-50 text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
                       <tr>
                         <th className="px-3 py-2.5">Linh kiện</th>
-                        <th className="px-3 py-2.5 text-center">Tồn kho khả dụng</th>
+                        <th className="px-3 py-2.5">Khay/Thùng nguồn</th>
+                        <th className="px-3 py-2.5 text-center">Tồn khả dụng</th>
                         <th className="px-3 py-2.5 text-center">Số lượng</th>
                         <th className="px-3 py-2.5">Ghi chú</th>
                         <th className="px-2 py-2.5 text-center w-10">Xóa</th>
@@ -1073,20 +1107,20 @@ export const KitsPage: React.FC = () => {
                     <tbody className="divide-y divide-slate-100">
                       {createFormData.items.map((row, idx) => {
                         const selectedItem = itemsList.find((it) => it.id === row.itemId);
+                        const effectiveLocId = row.locationId || createFormData.locationId;
                         const availStock =
-                          selectedItem && createFormData.locationId
-                            ? getItemStockAtLocation(selectedItem, createFormData.locationId)
+                          selectedItem && effectiveLocId
+                            ? getItemStockAtLocation(selectedItem, effectiveLocId)
                             : 0;
                         const otherStockInfo =
-                          selectedItem && createFormData.locationId
-                            ? getOtherLocationsStockInfo(selectedItem, createFormData.locationId)
+                          selectedItem && effectiveLocId
+                            ? getOtherLocationsStockInfo(selectedItem, effectiveLocId)
                             : { totalOther: 0, details: [] };
-                        const hasSelectedLocation = Boolean(createFormData.locationId);
 
                         return (
                           <tr key={idx} className="hover:bg-slate-50/60 transition-colors">
                             {/* Component Selector with Categories */}
-                            <td className="px-3 py-2">
+                            <td className="px-3 py-2 min-w-[200px]">
                               <select
                                 required
                                 value={row.itemId}
@@ -1128,40 +1162,64 @@ export const KitsPage: React.FC = () => {
                               </select>
                             </td>
 
+                            {/* Source Bin / Location Selector */}
+                            <td className="px-3 py-2 min-w-[170px]">
+                              {selectedItem ? (
+                                selectedItem.stockBalances && selectedItem.stockBalances.length > 0 ? (
+                                  <select
+                                    value={row.locationId || ''}
+                                    onChange={(e) => updateItemRow(idx, 'locationId', e.target.value)}
+                                    className="w-full rounded-lg border border-slate-200 bg-slate-50/70 px-2 py-1.5 text-xs text-slate-800 focus:bg-white focus:border-blue-500 focus:outline-none"
+                                    title="Chọn khay/thùng nguồn chứa linh kiện này"
+                                  >
+                                    {selectedItem.stockBalances.map((b) => {
+                                      const locObj = locationsList.find((l) => l.id === b.locationId) || b.location;
+                                      const locName = locObj?.name || b.locationId;
+                                      const isKitLoc = b.locationId === createFormData.locationId;
+                                      return (
+                                        <option key={b.locationId} value={b.locationId}>
+                                          {b.available > 0 ? '📥 ' : '⚠️ '}
+                                          {locName} {isKitLoc ? '(Kho kit)' : ''} ({b.available} {selectedItem.unit || 'cái'})
+                                        </option>
+                                      );
+                                    })}
+                                  </select>
+                                ) : (
+                                  <span className="text-[11px] text-slate-400 italic">Mặc định kho kit</span>
+                                )
+                              ) : (
+                                <span className="text-slate-300 text-[11px]">—</span>
+                              )}
+                            </td>
+
                             {/* Stock Availability Badge */}
                             <td className="px-3 py-2 text-center whitespace-nowrap">
                               {selectedItem ? (
-                                hasSelectedLocation ? (
-                                  availStock >= row.quantity ? (
-                                    <span className="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 border border-emerald-200">
-                                      Còn {availStock} {selectedItem.unit || 'cái'} ✓
-                                    </span>
-                                  ) : availStock > 0 ? (
-                                    <span
-                                      className="inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-700 border border-amber-200"
-                                      title={`Kho chỉ còn ${availStock}, thiếu ${row.quantity - availStock}`}
-                                    >
-                                      Chỉ còn {availStock} (Thiếu {row.quantity - availStock}) ⚠️
-                                    </span>
-                                  ) : (
-                                    <div className="flex flex-col items-center">
-                                      <span className="inline-flex items-center rounded-full bg-rose-50 px-2 py-0.5 text-[11px] font-semibold text-rose-700 border border-rose-200">
-                                        Hết hàng tại vị trí này (0) ✕
-                                      </span>
-                                      {otherStockInfo.totalOther > 0 && (
-                                        <span
-                                          className="mt-1 text-[10px] text-blue-600 font-medium cursor-help"
-                                          title={`Linh kiện đang có tại:\n${otherStockInfo.details.join('\n')}`}
-                                        >
-                                          💡 Còn {otherStockInfo.totalOther} {selectedItem.unit || 'cái'} ở vị trí khác
-                                        </span>
-                                      )}
-                                    </div>
-                                  )
-                                ) : (
-                                  <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-500">
-                                    Chưa chọn kho
+                                availStock >= row.quantity ? (
+                                  <span className="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 border border-emerald-200">
+                                    Còn {availStock} {selectedItem.unit || 'cái'} ✓
                                   </span>
+                                ) : availStock > 0 ? (
+                                  <span
+                                    className="inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-700 border border-amber-200"
+                                    title={`Nguồn này chỉ còn ${availStock}, thiếu ${row.quantity - availStock}`}
+                                  >
+                                    Chỉ còn {availStock} (Thiếu {row.quantity - availStock}) ⚠️
+                                  </span>
+                                ) : (
+                                  <div className="flex flex-col items-center">
+                                    <span className="inline-flex items-center rounded-full bg-rose-50 px-2 py-0.5 text-[11px] font-semibold text-rose-700 border border-rose-200">
+                                      Hết hàng tại nguồn (0) ✕
+                                    </span>
+                                    {otherStockInfo.totalOther > 0 && (
+                                      <span
+                                        className="mt-1 text-[10px] text-blue-600 font-medium cursor-help"
+                                        title={`Các khay/thùng khác đang có:\n${otherStockInfo.details.join('\n')}`}
+                                      >
+                                        💡 Còn {otherStockInfo.totalOther} {selectedItem.unit || 'cái'} ở nguồn khác
+                                      </span>
+                                    )}
+                                  </div>
                                 )
                               ) : (
                                 <span className="text-slate-400 text-[11px]">—</span>
@@ -1295,31 +1353,27 @@ export const KitsPage: React.FC = () => {
                 </div>
 
                 {/* Insufficient Stock Warning */}
-                {insufficientStockItemsCount > 0 && createFormData.locationId && (
+                {insufficientStockItemsCount > 0 ? (
                   <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900 space-y-1.5 shadow-2xs">
                     <div className="flex items-center space-x-1.5 font-semibold text-amber-900">
                       <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0" />
                       <span>
-                        Linh kiện chưa có sẵn tại vị trí &quot;
-                        {locationsList.find((l) => l.id === createFormData.locationId)?.name || 'đã chọn'}
-                        &quot;
+                        Có {insufficientStockItemsCount} linh kiện chưa đủ tồn kho tại khay/thùng nguồn đã chọn.
                       </span>
                     </div>
                     <p className="text-[11px] text-amber-800 leading-relaxed pl-5.5">
-                      Hệ thống quản lý tồn kho chi tiết theo từng vị trí (kệ/ngăn). Linh kiện trên có thể vẫn còn hàng ở các vị trí khác trong phòng Lab nhưng chưa có tại vị trí này.
+                      Vui lòng giảm số lượng hoặc chọn khay/thùng nguồn khác còn hàng ở cột &quot;Khay/Thùng nguồn&quot;.
                     </p>
-                    <div className="text-[11px] text-amber-900 pl-5.5 space-y-0.5">
-                      <span className="font-semibold">💡 Gợi ý xử lý:</span>
-                      <ul className="list-disc pl-4 space-y-0.5 text-amber-800">
-                        <li>
-                          <strong>Cách 1:</strong> Đổi mục <strong>&quot;Vị trí lưu kho&quot;</strong> ở trên sang vị trí kho/kệ đang chứa linh kiện này (ví dụ: Kho Tổng, Kệ linh kiện...).
-                        </li>
-                        <li>
-                          <strong>Cách 2:</strong> Vào <strong>Giao dịch kho &gt; Chuyển kho</strong> để chuyển linh kiện về vị trí này trước khi đóng hộp kit.
-                        </li>
-                      </ul>
-                    </div>
                   </div>
+                ) : (
+                  createFormData.items.some((i) => Boolean(i.itemId)) && (
+                    <div className="rounded-xl border border-emerald-200/80 bg-emerald-50/70 p-2.5 text-xs text-emerald-800 flex items-center space-x-2">
+                      <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
+                      <span>
+                        Tất cả linh kiện đã được tự động kết nối với khay/thùng nguồn có sẵn hàng và sẵn sàng tạo hộp kit.
+                      </span>
+                    </div>
+                  )
                 )}
               </div>
 

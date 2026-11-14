@@ -725,6 +725,7 @@ export const kitItemInputSchema = z.object({
   itemId: z.string().uuid('ID linh kiện (itemId) không hợp lệ'),
   quantity: z.number().int('Số lượng linh kiện phải là số nguyên').positive('Số lượng linh kiện trong kit phải lớn hơn 0'),
   notes: z.string().trim().max(255, 'Ghi chú linh kiện trong kit tối đa 255 ký tự').optional().nullable(),
+  locationId: z.string().uuid('ID vị trí xuất linh kiện không hợp lệ').optional().nullable(),
 });
 
 export const createKitSchema = z

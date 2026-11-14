@@ -43,23 +43,29 @@ export function formatKitResponse(k: any): KitResponse {
           email: k.createdBy.email,
         }
       : null,
-    items: (k.items || []).map((ki: any) => ({
-      id: ki.id,
-      kitId: ki.kitId,
-      itemId: ki.itemId,
-      item: ki.item
-        ? {
-            id: ki.item.id,
-            code: ki.item.code,
-            name: ki.item.name,
-            unit: ki.item.unit,
-            type: ki.item.type,
-          }
-        : undefined,
-      quantity: ki.quantity,
-      notes: ki.notes ?? null,
-      createdAt: ki.createdAt,
-    })),
+    items: (k.items || []).map((ki: any) => {
+      const locMatch = ki.notes?.match(/\[LOC:([0-9a-fA-F-]+)\]/);
+      const sourceLocationId = locMatch ? locMatch[1] : (k.locationId ?? null);
+      const cleanNotes = ki.notes ? ki.notes.replace(/\[LOC:[0-9a-fA-F-]+\]\s*/g, '').trim() || null : null;
+      return {
+        id: ki.id,
+        kitId: ki.kitId,
+        itemId: ki.itemId,
+        sourceLocationId,
+        item: ki.item
+          ? {
+              id: ki.item.id,
+              code: ki.item.code,
+              name: ki.item.name,
+              unit: ki.item.unit,
+              type: ki.item.type,
+            }
+          : undefined,
+        quantity: ki.quantity,
+        notes: cleanNotes,
+        createdAt: ki.createdAt,
+      };
+    }),
     totalItems: (k.items || []).reduce((acc: number, cur: any) => acc + (cur.quantity || 0), 0),
     createdAt: k.createdAt,
     updatedAt: k.updatedAt,
@@ -256,24 +262,60 @@ export class KitsService {
     // Serializable atomic transaction for stock validation + kit creation + kitAllocated CAS update + audit log
     return await withSerializableRetry(async (tx) => {
       // Validate available inventory inside the serializable transaction to eliminate TOCTOU races
+      const allocatedItemsMeta: Array<{ itemId: string; locationId: string; quantity: number }> = [];
+
       if (input.locationId) {
         for (const kitItem of input.items) {
+          // Effective source location: explicitly chosen locationId, or default to input.locationId
+          let sourceLocId = kitItem.locationId || null;
+
+          // If no locationId specified on item, check if input.locationId has stock
+          if (!sourceLocId) {
+            const locBal = await tx.stockBalance.findUnique({
+              where: {
+                itemId_locationId: {
+                  itemId: kitItem.itemId,
+                  locationId: input.locationId,
+                },
+              },
+            });
+            const locAvail = locBal
+              ? Math.max(0, (locBal.onHand ?? 0) - (locBal.reserved ?? 0) - (locBal.quarantined ?? 0) - (locBal.kitAllocated ?? 0))
+              : 0;
+
+            if (locAvail >= kitItem.quantity) {
+              sourceLocId = input.locationId;
+            } else {
+              // Automatically look up active location with enough available stock
+              const allBals = await tx.stockBalance.findMany({
+                where: { itemId: kitItem.itemId },
+                include: { location: true },
+              });
+              const candidate = allBals.find((b) => {
+                const a = Math.max(0, (b.onHand ?? 0) - (b.reserved ?? 0) - (b.quarantined ?? 0) - (b.kitAllocated ?? 0));
+                return a >= kitItem.quantity;
+              });
+              sourceLocId = candidate ? candidate.locationId : input.locationId;
+            }
+          }
+
           const bal = await tx.stockBalance.findUnique({
             where: {
               itemId_locationId: {
                 itemId: kitItem.itemId,
-                locationId: input.locationId,
+                locationId: sourceLocId,
               },
             },
-            include: { item: { select: { code: true, name: true } } },
+            include: { item: { select: { code: true, name: true } }, location: { select: { code: true, name: true } } },
           });
 
           const itmInfo = itemMap.get(kitItem.itemId);
           const itemLabel = itmInfo ? `"${itmInfo.name}" (${itmInfo.code})` : `'${kitItem.itemId}'`;
+          const locLabel = bal?.location ? `"${bal.location.name}" (${bal.location.code})` : `'${sourceLocId}'`;
 
           if (!bal) {
             throw new AppError(
-              `Không tìm thấy thông tin tồn kho cho linh kiện ${itemLabel} tại vị trí đã chọn. Vui lòng nhập kho linh kiện này vào vị trí trước khi đóng hộp kit.`,
+              `Không tìm thấy thông tin tồn kho cho linh kiện ${itemLabel} tại vị trí ${locLabel}. Vui lòng nhập kho hoặc chọn khay/thùng chứa linh kiện này trước khi đóng hộp kit.`,
               400
             );
           }
@@ -287,7 +329,7 @@ export class KitsService {
           if (available < kitItem.quantity) {
             const shortName = itmInfo ? itmInfo.name : (bal.item?.name || kitItem.itemId);
             throw new AppError(
-              `Không đủ tồn kho khả dụng cho linh kiện '${shortName}' tại vị trí đã chọn (cần: ${kitItem.quantity}, khả dụng: ${available})`,
+              `Không đủ tồn kho khả dụng cho linh kiện '${shortName}' tại vị trí ${locLabel} (cần: ${kitItem.quantity}, khả dụng: ${available})`,
               400
             );
           }
@@ -296,7 +338,7 @@ export class KitsService {
           const updateResult = await tx.stockBalance.updateMany({
             where: {
               itemId: kitItem.itemId,
-              locationId: input.locationId,
+              locationId: sourceLocId,
               kitAllocated: currentKitAllocated,
             },
             data: {
@@ -310,6 +352,12 @@ export class KitsService {
               409
             );
           }
+
+          allocatedItemsMeta.push({
+            itemId: kitItem.itemId,
+            locationId: sourceLocId,
+            quantity: kitItem.quantity,
+          });
         }
       }
 
@@ -325,12 +373,19 @@ export class KitsService {
       });
 
       for (const item of input.items) {
+        const allocMeta = allocatedItemsMeta.find((m) => m.itemId === item.itemId);
+        const sourceLocId = allocMeta?.locationId || item.locationId || input.locationId;
+        const cleanNotes = item.notes?.replace(/\[LOC:[0-9a-fA-F-]+\]\s*/g, '').trim() || null;
+        const finalNotes = sourceLocId && sourceLocId !== input.locationId
+          ? `[LOC:${sourceLocId}]${cleanNotes ? ' ' + cleanNotes : ''}`
+          : cleanNotes;
+
         await tx.kitItem.create({
           data: {
             kitId: createdKit.id,
             itemId: item.itemId,
             quantity: item.quantity,
-            notes: item.notes?.trim() || null,
+            notes: finalNotes,
           },
         });
       }
@@ -628,16 +683,34 @@ export class KitsService {
       // 1. If retiring kit: release component allocations back to inventory
       if (targetStatus === KitStatus.RETIRED && kit.locationId) {
         for (const item of kit.items) {
-          const releaseResult = await tx.stockBalance.updateMany({
+          const locMatch = item.notes?.match(/\[LOC:([0-9a-fA-F-]+)\]/);
+          const sourceLocId: string | null = (locMatch ? locMatch[1] : kit.locationId) ?? null;
+
+          if (!sourceLocId) continue;
+
+          let releaseResult = await tx.stockBalance.updateMany({
             where: {
               itemId: item.itemId,
-              locationId: kit.locationId,
+              locationId: sourceLocId,
               kitAllocated: { gte: item.quantity },
             },
             data: {
               kitAllocated: { decrement: item.quantity },
             },
           });
+
+          if (releaseResult.count === 0 && sourceLocId !== kit.locationId) {
+            releaseResult = await tx.stockBalance.updateMany({
+              where: {
+                itemId: item.itemId,
+                locationId: kit.locationId,
+                kitAllocated: { gte: item.quantity },
+              },
+              data: {
+                kitAllocated: { decrement: item.quantity },
+              },
+            });
+          }
 
           if (releaseResult.count === 0) {
             throw new AppError(
@@ -768,16 +841,34 @@ export class KitsService {
       // If kit was active (AVAILABLE or MAINTENANCE), release kitAllocated back to inventory
       if (kit.status !== KitStatus.RETIRED && kit.locationId) {
         for (const item of kit.items) {
-          const releaseResult = await tx.stockBalance.updateMany({
+          const locMatch = item.notes?.match(/\[LOC:([0-9a-fA-F-]+)\]/);
+          const sourceLocId: string | null = (locMatch ? locMatch[1] : kit.locationId) ?? null;
+
+          if (!sourceLocId) continue;
+
+          let releaseResult = await tx.stockBalance.updateMany({
             where: {
               itemId: item.itemId,
-              locationId: kit.locationId,
+              locationId: sourceLocId,
               kitAllocated: { gte: item.quantity },
             },
             data: {
               kitAllocated: { decrement: item.quantity },
             },
           });
+
+          if (releaseResult.count === 0 && sourceLocId !== kit.locationId) {
+            releaseResult = await tx.stockBalance.updateMany({
+              where: {
+                itemId: item.itemId,
+                locationId: kit.locationId,
+                kitAllocated: { gte: item.quantity },
+              },
+              data: {
+                kitAllocated: { decrement: item.quantity },
+              },
+            });
+          }
 
           if (releaseResult.count === 0) {
             throw new AppError(

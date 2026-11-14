@@ -504,10 +504,9 @@ describe('KitsPage DOM Test Suite', () => {
       fireEvent.change(itemSelect, { target: { value: 'item-2' } });
 
       await waitFor(() => {
-        // Out of stock badge at selected location loc-2
-        expect(screen.getByText(/Hết hàng tại vị trí này \(0\)/)).toBeDefined();
-        // Hint about 5 items available in other locations
-        expect(screen.getByText(/Còn 5 cái ở vị trí khác/)).toBeDefined();
+        // Automatically connects to loc-1 where 5 items are in stock, displaying green stock badge
+        expect(screen.getByText(/Còn 5 cái/)).toBeDefined();
+        expect(screen.getByTitle('Chọn khay/thùng nguồn chứa linh kiện này')).toBeDefined();
       });
     });
   });
