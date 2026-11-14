@@ -1097,11 +1097,32 @@ export const KitsPage: React.FC = () => {
                                 <option value="">-- Chọn linh kiện --</option>
                                 {groupedItemsByCategory.map((grp) => (
                                   <optgroup key={grp.categoryName} label={`📁 ${grp.categoryName}`}>
-                                    {grp.items.map((itm) => (
-                                      <option key={itm.id} value={itm.id}>
-                                        {itm.code} - {itm.name} ({itm.unit || 'cái'})
-                                      </option>
-                                    ))}
+                                    {grp.items.map((itm) => {
+                                      const stockAtLoc = getItemStockAtLocation(itm, createFormData.locationId);
+                                      const totalStock =
+                                        itm.totalOnHand ??
+                                        itm.available ??
+                                        itm.stockBalances?.reduce((sum, b) => sum + (b.available || 0), 0) ??
+                                        0;
+                                      let statusTag = '';
+                                      if (createFormData.locationId) {
+                                        if (stockAtLoc > 0) {
+                                          statusTag = ` (Khả dụng: ${stockAtLoc} ${itm.unit || 'cái'})`;
+                                        } else if (totalStock > 0) {
+                                          statusTag = ` (Kho này: 0 | Tổng Lab: ${totalStock})`;
+                                        } else {
+                                          statusTag = ` - HẾT HÀNG`;
+                                        }
+                                      } else {
+                                        statusTag = ` (Tổng Lab: ${totalStock} ${itm.unit || 'cái'})`;
+                                      }
+
+                                      return (
+                                        <option key={itm.id} value={itm.id}>
+                                          [{itm.code}] {itm.name}{statusTag}
+                                        </option>
+                                      );
+                                    })}
                                   </optgroup>
                                 ))}
                               </select>
