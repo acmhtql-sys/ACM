@@ -277,7 +277,7 @@ export const KitsPage: React.FC = () => {
   const groupedItemsByCategory = useMemo(() => {
     const map = new Map<string, { categoryName: string; items: ItemOption[] }>();
     for (const item of itemsList) {
-      const catName = item.category?.name || item.categoryName || 'Linh kiện khác';
+      const catName = (item.category?.name || item.categoryName || '').trim() || 'Linh kiện khác';
       const existing = map.get(catName);
       if (existing) {
         existing.items.push(item);
@@ -285,8 +285,22 @@ export const KitsPage: React.FC = () => {
         map.set(catName, { categoryName: catName, items: [item] });
       }
     }
-    // Sort categories alphabetically
-    return Array.from(map.values()).sort((a, b) => a.categoryName.localeCompare(b.categoryName, 'vi'));
+    // Sort categories: standard categories alphabetically, 'Linh kiện khác' at the end
+    const sortedCategories = Array.from(map.values()).sort((a, b) => {
+      if (a.categoryName === 'Linh kiện khác') return 1;
+      if (b.categoryName === 'Linh kiện khác') return -1;
+      return a.categoryName.localeCompare(b.categoryName, 'vi');
+    });
+
+    // Within each category, sort items by code then name
+    for (const grp of sortedCategories) {
+      grp.items.sort((a, b) =>
+        (a.code || '').localeCompare(b.code || '', 'vi') ||
+        (a.name || '').localeCompare(b.name || '', 'vi')
+      );
+    }
+
+    return sortedCategories;
   }, [itemsList]);
 
   // Stock availability helper at selected location
@@ -1120,13 +1134,17 @@ export const KitsPage: React.FC = () => {
                         return (
                           <tr key={idx} className="hover:bg-slate-50/60 transition-colors">
                             {/* Component Selector with Categories */}
-                            <td className="px-3 py-2 min-w-[200px]">
+                            <td className="px-3 py-2 min-w-[220px]">
                               <select
                                 required
                                 value={row.itemId}
                                 onChange={(e) => updateItemRow(idx, 'itemId', e.target.value)}
                                 data-testid="item-row-select"
-                                className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-800 focus:border-blue-500 focus:outline-none"
+                                className={`w-full rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors focus:outline-none ${
+                                  row.itemId
+                                    ? 'border-blue-300 bg-blue-50/20 text-slate-900 focus:border-blue-500 focus:bg-white'
+                                    : 'border-slate-300 bg-white text-slate-700 focus:border-blue-500'
+                                }`}
                               >
                                 <option value="">-- Chọn linh kiện --</option>
                                 {groupedItemsByCategory.map((grp) => (
@@ -1139,16 +1157,14 @@ export const KitsPage: React.FC = () => {
                                         itm.stockBalances?.reduce((sum, b) => sum + (b.available || 0), 0) ??
                                         0;
                                       let statusTag = '';
-                                      if (createFormData.locationId) {
-                                        if (stockAtLoc > 0) {
-                                          statusTag = ` (Khả dụng: ${stockAtLoc} ${itm.unit || 'cái'})`;
-                                        } else if (totalStock > 0) {
-                                          statusTag = ` (Kho này: 0 | Tổng Lab: ${totalStock})`;
+                                      if (totalStock > 0) {
+                                        if (stockAtLoc > 0 && stockAtLoc < totalStock) {
+                                          statusTag = ` (Sẵn có: ${totalStock} ${itm.unit || 'cái'} • Tại kho kit: ${stockAtLoc})`;
                                         } else {
-                                          statusTag = ` - HẾT HÀNG`;
+                                          statusTag = ` (Sẵn có: ${totalStock} ${itm.unit || 'cái'})`;
                                         }
                                       } else {
-                                        statusTag = ` (Tổng Lab: ${totalStock} ${itm.unit || 'cái'})`;
+                                        statusTag = ` — [HẾT HÀNG]`;
                                       }
 
                                       return (
@@ -1160,6 +1176,20 @@ export const KitsPage: React.FC = () => {
                                   </optgroup>
                                 ))}
                               </select>
+
+                              {selectedItem && (
+                                <div className="mt-1 flex items-center space-x-1.5 text-[10px] text-slate-500 font-medium">
+                                  <span className="inline-flex items-center px-1.5 py-0.2 rounded bg-slate-100 text-slate-700 font-mono font-semibold">
+                                    {selectedItem.code}
+                                  </span>
+                                  <span>•</span>
+                                  <span className="truncate max-w-[130px]" title={selectedItem.category?.name || selectedItem.categoryName || 'Linh kiện'}>
+                                    {selectedItem.category?.name || selectedItem.categoryName || 'Linh kiện'}
+                                  </span>
+                                  <span>•</span>
+                                  <span>ĐVT: {selectedItem.unit || 'cái'}</span>
+                                </div>
+                              )}
                             </td>
 
                             {/* Source Bin / Location Selector */}
