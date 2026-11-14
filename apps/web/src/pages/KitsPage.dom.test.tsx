@@ -434,5 +434,81 @@ describe('KitsPage DOM Test Suite', () => {
       // Cảm biến hồng ngoại should now be present in the kit table
       expect(screen.getAllByText(/Cảm biến hồng ngoại/).length).toBeGreaterThan(0);
     });
+
+    it('shows hint about stock in other locations when item is out of stock at selected location', async () => {
+      vi.mocked(authHooks.useAuth).mockReturnValue({
+        user: mockTechUser as any,
+        token: 'tech-token',
+        isAuthenticated: true,
+        login: vi.fn(),
+        logout: vi.fn(),
+      });
+
+      // Provide two locations: loc-1 (Kho Tổng) and loc-2 (AI Fantasy Zoo 1)
+      vi.mocked(apiClient.get).mockImplementation((url: string) => {
+        if (url === '/kits') {
+          return Promise.resolve({ data: { success: true, data: [] } } as any);
+        }
+        if (url === '/items') {
+          return Promise.resolve({
+            data: {
+              success: true,
+              data: [
+                {
+                  id: 'item-2',
+                  code: 'MAIN-02',
+                  name: 'Main Board 2',
+                  unit: 'cái',
+                  categoryId: 'cat-mcu',
+                  categoryName: 'Vi điều khiển',
+                  stockBalances: [
+                    { locationId: 'loc-1', available: 5, onHand: 5, location: { code: 'WH-MAIN', name: 'Kho Tổng' } },
+                  ],
+                },
+              ],
+            },
+          } as any);
+        }
+        if (url === '/locations') {
+          return Promise.resolve({
+            data: {
+              success: true,
+              data: [
+                { id: 'loc-2', code: 'FZ-1', name: 'AI Fantasy Zoo 1' },
+                { id: 'loc-1', code: 'WH-MAIN', name: 'Kho Tổng' },
+              ],
+            },
+          } as any);
+        }
+        return Promise.resolve({ data: { success: true, data: [] } } as any);
+      });
+
+      render(
+        <BrowserRouter>
+          <KitsPage />
+        </BrowserRouter>
+      );
+
+      await waitFor(() => {
+        expect(screen.getByText('Tạo hộp kit mới')).toBeDefined();
+      });
+
+      fireEvent.click(screen.getByText('Tạo hộp kit mới'));
+
+      await waitFor(() => {
+        expect(screen.getByTestId('item-row-select')).toBeDefined();
+      });
+
+      // Select item MAIN-02
+      const itemSelect = screen.getByTestId('item-row-select');
+      fireEvent.change(itemSelect, { target: { value: 'item-2' } });
+
+      await waitFor(() => {
+        // Out of stock badge at selected location loc-2
+        expect(screen.getByText(/Hết hàng tại vị trí này \(0\)/)).toBeDefined();
+        // Hint about 5 items available in other locations
+        expect(screen.getByText(/Còn 5 cái ở vị trí khác/)).toBeDefined();
+      });
+    });
   });
 });
