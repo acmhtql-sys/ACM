@@ -129,10 +129,9 @@ npm run test
 
 ---
 
-## 6. Legacy Module Requirements Index (Bảo toàn tài liệu hiện có)
-- [Authentication & Authorization](./Authentication_&_Authorization)
-- [User Management](./User_Management)
-- [Category & Item Management](./Category_&_Item_Management)
-- [Inventory & Location Management](./Inventory_&_Location_Management)
-- [Import, Export & Stock Transactions](./Import,_Export_&_Stock_Transactions)
-- [Borrow & Return Management](./Borrow_&_Return_Management)
+## 6. Tài liệu Kỹ thuật & Bàn giao (Documentation)
+
+- [Tài liệu Bàn giao Hệ thống (Word)](./TAI_LIEU_BAN_GIAO_HE_THONG_ACM_QLLK.docx)
+- [Thuyết minh Đề tài (Word)](./%C4%90%E1%BB%80%20T%C3%80I_%20AIR%20COMPONENTS%20MANAGER.docx)
+- [Tài liệu Kiến trúc & Vận hành](./docs/)
+- [Tài liệu Triển khai & Bảo mật Staging](./docs/deployment/)
