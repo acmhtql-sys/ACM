@@ -84,43 +84,29 @@ Hệ thống cung cấp giao diện Dashboard SaaS hiện đại, khả năng qu
 
 ## 3. Kiến trúc Monorepo Chuẩn (Workspace Structure)
 
-Dự án được cấu trúc theo tiêu chuẩn **npm Workspaces Monorepo**, phân tách rõ ràng giữa ứng dụng, thư viện dùng chung và tài liệu:
+Dự án được tổ chức theo mô hình **Monorepo** với 3 tầng chức năng độc lập, phân tách rõ ràng trách nhiệm:
+
+| Tầng kiến trúc | Thư mục | Vai trò & Trách nhiệm chính |
+| :--- | :--- | :--- |
+| 🌐 **Frontend Application** | `apps/web/` | Giao diện SaaS Dashboard (React 18, Vite, Tailwind CSS, TanStack Query) |
+| 🚀 **Backend Service** | `apps/api/` | Dịch vụ RESTful API lõi (Express, TypeScript, Prisma ORM, JWT, RBAC Guard) |
+| 📦 **Shared Library** | `packages/shared/` | Thư viện dùng chung (@acm/shared: Types, DTOs, Enums, Zod Schemas, Công thức tồn kho) |
+| 🗄️ **Database & Infra** | `database/`, `infra/` | Script khởi tạo DB PostgreSQL (`init.sql`), Supabase RLS Policies, Docker Compose |
+| 📚 **Docs & Scripts** | `docs/`, `scripts/` | Tài liệu kiến trúc, runbook vận hành, scripts seed dữ liệu và kiểm thử hệ thống |
 
 ```text
 ACM/
-├── apps/
-│   ├── web/                     # Frontend App: React 18 + Vite + Tailwind CSS
-│   │   ├── src/
-│   │   │   ├── app/             # Router & App Root
-│   │   │   ├── pages/           # SaaS Dashboard Pages (Items, Kits, Borrow, Inventory,...)
-│   │   │   ├── layouts/         # Sidebar, Header, Mobile Nav
-│   │   │   ├── components/      # UI components, Modals, Camera QR Scanner
-│   │   │   └── services/        # Axios API Client & State management
-│   │   └── package.json
-│   └── api/                     # Backend API: Node.js + Express + TypeScript + Prisma
-│       ├── src/
-│       │   ├── config/          # Database connection, Environment, Security
-│       │   ├── modules/         # Modular APIs (auth, items, kits, borrow, inventory, audit)
-│       │   ├── middleware/      # Error handler, RBAC, Idempotency, Rate Limiter
-│       │   └── server.ts        # Express HTTP Bootstrap
-│       ├── prisma/              # schema.prisma & Migration scripts
-│       └── package.json
-├── packages/
-│   └── shared/                  # Thư viện dùng chung (@acm/shared)
-│       └── src/                 # Shared Types, DTOs, Enums, Zod schemas, Invariant formulas
-├── database/                    # Script khởi tạo cơ sở dữ liệu (init.sql cho Docker)
-├── docs/                        # Toàn bộ tài liệu kỹ thuật, kiến trúc & deployment
-│   ├── deployment/              # Checklist triển khai Cloud, báo cáo kiểm định bảo mật
-│   └── runbooks/                # Hướng dẫn quy trình vận hành và khôi phục sự cố
-├── infra/                       # Cấu hình Supabase SQL, RLS Policies, Dockerfile
-├── scripts/                     # Script seed dữ liệu mẫu, migration, kiểm tra bảo mật
-├── tests/                       # Bộ kiểm thử tích hợp chéo monorepo (Integration Tests)
-├── .github/workflows/           # GitHub Actions CI/CD Pipeline tự động
-├── docker-compose.yml           # Khởi chạy PostgreSQL 17 & Redis cục bộ
-├── render.yaml                  # Cấu hình tự động triển khai Backend trên Render
-├── vercel.json                  # Cấu hình định tuyến & triển khai Frontend trên Vercel
-├── package.json                 # Cấu hình gốc Monorepo npm workspaces
-└── README.md                    # Tài liệu hướng dẫn chính của dự án
+├── 🌐 apps/
+│   ├── web/                    # Giao diện người dùng Web (React 18 + Vite + Tailwind CSS)
+│   └── api/                    # Dịch vụ Backend API (Node.js + Express + Prisma ORM)
+├── 📦 packages/
+│   └── shared/                 # Định nghĩa dùng chung (@acm/shared: Types, DTOs, Enums, Math)
+├── 🗄️ database/                 # Script khởi tạo cơ sở dữ liệu PostgreSQL cục bộ (init.sql)
+├── 📚 docs/                     # Toàn bộ tài liệu kiến trúc, deployment staging & runbooks
+├── ☁️ infra/                    # Cấu hình hạ tầng Supabase, RLS Policies, Dockerfile
+├── ⚙️ scripts/                  # Scripts seed dữ liệu, migration và kiểm thử hệ thống
+├── 🧪 tests/                    # Kiểm thử tích hợp chéo monorepo (Monorepo Integration Tests)
+└── 🤖 .github/workflows/        # CI/CD Workflows tự động kiểm tra mã nguồn (GitHub Actions)
 ```
 
 ---
@@ -157,74 +143,58 @@ $$\text{Available} = \text{OnHand} - \text{Reserved} - \text{Quarantined} - \tex
 
 ## 6. Hướng dẫn Cài đặt & Khởi chạy (Quick Start)
 
-### 6.1. Yêu cầu Tiên quyết
-- Node.js version `>= 20.x` (khuyến nghị v22 LTS)
-- npm version `>= 10.x`
-- Docker & Docker Compose (nếu chạy Database PostgreSQL cục bộ)
+> **Yêu cầu môi trường:** Node.js `>= 20.x` (khuyến nghị v22 LTS) & npm `>= 10.x`. Tùy chọn Docker Compose nếu chạy Database cục bộ.
 
-### 6.2. Cài đặt Dependencies
+### 6.1. Khởi chạy Nhanh (5 Bước Tinh gọn)
+
 ```bash
-# Clone repository
+# 1. Clone repository & cài đặt dependencies cho toàn bộ monorepo
 git clone https://github.com/acmhtql-sys/ACM.git
 cd ACM
-
-# Cài đặt tất cả dependencies cho các workspaces
 npm install
-```
 
-### 6.3. Cấu hình Biến môi trường
-```bash
+# 2. Cấu hình biến môi trường
 cp .env.example .env
-```
-*Chỉnh sửa file `.env` với chuỗi kết nối Database và JWT Secret phù hợp.*
 
-### 6.4. Sinh mã Prisma & Khởi tạo Database
-```bash
-# Sinh Prisma Client
+# 3. Khởi tạo Prisma Client & kiểm tra Schema cơ sở dữ liệu
 npm run prisma:generate
-
-# Kiểm tra tính hợp lệ của Schema
 npm run prisma:validate
-```
 
-### 6.5. Build Dự án
-```bash
-# Build gói dùng chung (@acm/shared)
+# 4. Biên dịch các gói dùng chung & ứng dụng
 npm run build:shared
-
-# Build toàn bộ Backend và Frontend
 npm run build
+
+# 5. Khởi chạy môi trường phát triển (Chạy song song Backend & Frontend)
+npm run dev:api    # 🚀 Backend API:  http://localhost:5000
+npm run dev:web    # 🌐 Frontend Web:  http://localhost:5173
 ```
 
-### 6.6. Khởi động Chế độ Phát triển (Development)
-```bash
-# Khởi động Backend API (Port 5000)
-npm run dev:api
+### 6.2. Bảng Tra cứu Các Lệnh Hỗ trợ Thường Dùng (Commands Reference)
 
-# Khởi động Frontend Web (Port 5173)
-npm run dev:web
-```
-*Truy cập ứng dụng tại:* `http://localhost:5173`
-
-### 6.7. Chạy Kiểm thử (Testing)
-```bash
-# Chạy toàn bộ Unit Tests
-npm run test:unit
-
-# Chạy Integration Tests
-npm run test:integration
-```
+| Tác vụ | Lệnh thực thi | Mô tả chi tiết |
+| :--- | :--- | :--- |
+| **Kiểm thử Unit** | `npm run test:unit` | Chạy toàn bộ unit test của `packages/shared`, `apps/api`, `apps/web` |
+| **Kiểm thử Tích hợp** | `npm run test:integration` | Kiểm thử tích hợp monorepo chéo các gói và cơ sở dữ liệu |
+| **Kiểm tra TypeScript** | `npm run typecheck` | Quét kiểm tra type safety toàn bộ workspace mà không sinh file |
+| **Khởi chạy Docker DB** | `docker compose up -d` | Khởi tạo PostgreSQL 17 và Redis cục bộ trong container |
+| **Seed dữ liệu mẫu** | `npm run prisma:seed:test` | Nạp dữ liệu mẫu ban đầu (phòng kho, danh mục, linh kiện, tài khoản) |
 
 ---
 
 ## 7. Tài khoản Thử nghiệm (Demo Credentials)
 
-| Vai trò (Role) | Email đăng nhập | Mật khẩu mặc định | Quyền hạn chính |
-| :--- | :--- | :--- | :--- |
-| **System Admin** | `admin@acm.local` | `ACM@dev2026!` | Toàn quyền quản trị hệ thống, quản lý người dùng |
-| **Lab Manager** | `manager@acm.local` | `ACM@dev2026!` | Quản lý kho, duyệt phiếu mượn, tạo hộp kit, báo cáo |
-| **Technician** | `tech@acm.local` | `ACM@dev2026!` | Bàn giao mượn/trả, kiểm kê kho, thao tác kỹ thuật |
-| **Student** | `student@acm.local` | `ACM@dev2026!` | Tra cứu linh kiện, gửi yêu cầu mượn kit |
+Hệ thống được thiết kế theo mô hình phân quyền dựa trên vai trò (**Role-Based Access Control - RBAC**) với 4 tài khoản thử nghiệm tiêu chuẩn:
+
+| Vai trò (Role) | Email đăng nhập | Phạm vi Quyền hạn & Trách nhiệm chính |
+| :--- | :--- | :--- |
+| 👑 **System Admin** | `admin@acm.local` | Quản trị toàn quyền, cấu hình hệ thống, quản lý tài khoản người dùng, xem toàn bộ nhật ký kiểm toán (Audit Logs) |
+| 👔 **Lab Manager** | `manager@acm.local` | Quản lý kho, duyệt phiếu mượn/trả, quản lý và đóng gói hộp kit thực hành, xem báo cáo thống kê KPI |
+| 🔧 **Technician** | `tech@acm.local` | Bàn giao thiết bị cho sinh viên, nhận hoàn trả, kiểm kê tồn kho định kỳ, kiểm tra chất lượng linh kiện |
+| 🎓 **Student** | `student@acm.local` | Tra cứu linh kiện trong kho, lập phiếu yêu cầu mượn linh kiện/hộp kit, theo dõi lịch sử mượn cá nhân |
+
+> 🔒 **Lưu ý bảo mật (Security Policy):**  
+> Vì lý do an toàn thông tin, **mật khẩu đăng nhập không được công khai trên kho lưu trữ mã nguồn**.  
+> Mật khẩu cho các tài khoản thử nghiệm được cấu hình an toàn thông qua biến môi trường nội bộ trong tệp `.env` hoặc được tạo tự động khi chạy lệnh seed cơ sở dữ liệu (`npm run prisma:seed:test`). Vui lòng liên hệ quản trị viên dự án để nhận thông tin xác thực an toàn.
 
 ---
 
