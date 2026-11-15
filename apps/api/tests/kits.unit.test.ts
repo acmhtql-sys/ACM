@@ -18,6 +18,7 @@ vi.mock('../src/config/database', () => {
     },
     stockBalance: {
       findUnique: vi.fn(),
+      findMany: vi.fn(),
       update: vi.fn(),
       updateMany: vi.fn(),
     },
@@ -384,13 +385,25 @@ describe('Phase 5 – Kit Management & Inventory Synchronization Unit Tests (TC-
       } as any);
 
       // Inside transaction: onHand = 5, reserved = 3, kitAllocated = 1 -> available = 1
-      mockTx.stockBalance.findUnique.mockResolvedValueOnce({
+      mockTx.stockBalance.findUnique.mockResolvedValue({
         onHand: 5,
         reserved: 3,
         quarantined: 0,
         kitAllocated: 1,
+        locationId: validLocationId,
         item: { name: 'ESP32 DevKit V1' },
+        location: { name: 'Kho Tổng Phòng Lab', code: 'WH-MAIN' },
       });
+      mockTx.stockBalance.findMany.mockResolvedValueOnce([
+        {
+          onHand: 5,
+          reserved: 3,
+          quarantined: 0,
+          kitAllocated: 1,
+          locationId: validLocationId,
+          location: { name: 'Kho Tổng Phòng Lab', code: 'WH-MAIN' },
+        },
+      ]);
 
       // Request quantity: 2, but available is only 1!
       await expect(
@@ -421,12 +434,14 @@ describe('Phase 5 – Kit Management & Inventory Synchronization Unit Tests (TC-
       } as any);
 
       // StockBalance inside transaction: onHand = 10, available = 10, kitAllocated = 0
-      mockTx.stockBalance.findUnique.mockResolvedValueOnce({
+      mockTx.stockBalance.findUnique.mockResolvedValue({
         onHand: 10,
         reserved: 0,
         quarantined: 0,
         kitAllocated: 0,
+        locationId: validLocationId,
         item: { name: 'ESP32 DevKit V1' },
+        location: { name: 'Kho Tổng Phòng Lab', code: 'WH-MAIN' },
       });
 
       mockTx.stockBalance.updateMany.mockResolvedValueOnce({ count: 1 });
