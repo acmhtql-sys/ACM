@@ -113,31 +113,51 @@ ACM/
 
 ## 4. Công nghệ Sử dụng (Technology Stack)
 
-| Lĩnh vực | Công nghệ | Chi tiết sử dụng |
+| Phân hệ / Lĩnh vực | Công nghệ Chủ đạo | Chi tiết & Mục đích Sử dụng |
 | :--- | :--- | :--- |
-| **Frontend** | React 18, TypeScript, Vite | Xây dựng Single Page Application hiệu năng cao |
-| **Giao diện & UI** | Tailwind CSS, Lucide React, Recharts | Thiết kế phong cách SaaS hiện đại, responsive hoàn toàn |
-| **Backend** | Node.js (v20+ / v22), Express, TypeScript | RESTful API mô-đun hóa, bảo vệ CSRF, CORS, Helmet |
-| **Cơ sở dữ liệu** | PostgreSQL 17, Supabase | Cơ sở dữ liệu quan hệ, Row-Level Security, Realtime storage |
-| **ORM & Migration** | Prisma ORM | Quản lý schema, type-safe query, migration tự động |
-| **Kiểm thử (Testing)** | Vitest, Testing Library, Supertest | Unit test, DOM test, Integration test và API test |
-| **Hạ tầng & Cloud** | Vercel (Web), Render (API), Docker Compose | CI/CD tự động qua GitHub Actions, multi-cloud ready |
+| 🌐 **Frontend App** | ![React](https://img.shields.io/badge/React_18-61DAFB?style=flat-square&logo=react&logoColor=black) ![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=flat-square&logo=typescript&logoColor=white) ![Vite](https://img.shields.io/badge/Vite-646CFF?style=flat-square&logo=vite&logoColor=white) | Xây dựng Single Page Application hiệu năng cao, type-safe toàn diện |
+| 🎨 **Giao diện & UI** | ![TailwindCSS](https://img.shields.io/badge/Tailwind_CSS-06B6D4?style=flat-square&logo=tailwindcss&logoColor=white) ![Lucide](https://img.shields.io/badge/Lucide_Icons-F56565?style=flat-square) ![Recharts](https://img.shields.io/badge/Recharts-22C55E?style=flat-square) | Phong cách SaaS Dashboard hiện đại, responsive đa thiết bị, biểu đồ động |
+| 🚀 **Backend Service** | ![Node.js](https://img.shields.io/badge/Node.js_22-339933?style=flat-square&logo=nodedotjs&logoColor=white) ![Express](https://img.shields.io/badge/Express-000000?style=flat-square&logo=express&logoColor=white) | RESTful API mô-đun hóa, bảo vệ CSRF, CORS, Helmet, Rate Limiter |
+| 🗄️ **Cơ sở Dữ liệu** | ![PostgreSQL](https://img.shields.io/badge/PostgreSQL_17-4169E1?style=flat-square&logo=postgresql&logoColor=white) ![Supabase](https://img.shields.io/badge/Supabase-3ECF8E?style=flat-square&logo=supabase&logoColor=white) | Cơ sở dữ liệu quan hệ ACID, Row-Level Security (RLS), Cloud Storage |
+| 🔄 **ORM & Validation** | ![Prisma](https://img.shields.io/badge/Prisma_ORM-2D3748?style=flat-square&logo=prisma&logoColor=white) ![Zod](https://img.shields.io/badge/Zod-3E67B1?style=flat-square&logo=zod&logoColor=white) | Type-safe query builder, migration tự động, kiểm thực dữ liệu 2 chiều |
+| 🧪 **Kiểm thử (Test)** | ![Vitest](https://img.shields.io/badge/Vitest-FCC72B?style=flat-square&logo=vitest&logoColor=black) ![Testing_Library](https://img.shields.io/badge/Testing_Library-E33332?style=flat-square&logo=testinglibrary&logoColor=white) | Unit test (438+ tests), DOM test component, API integration test |
+| ☁️ **Hạ tầng & Cloud** | ![Vercel](https://img.shields.io/badge/Vercel-000000?style=flat-square&logo=vercel&logoColor=white) ![Render](https://img.shields.io/badge/Render-46E3B7?style=flat-square&logo=render&logoColor=black) ![Docker](https://img.shields.io/badge/Docker-2496ED?style=flat-square&logo=docker&logoColor=white) | Triển khai Multi-Cloud, CI/CD tự động hóa qua GitHub Actions |
 
 ---
 
 ## 5. Quy tắc Bất biến Quản lý Tồn kho (Inventory Invariant Rules)
 
-Hệ thống áp dụng công thức bảo toàn tồn kho nghiêm ngặt để đảm bảo dữ liệu luôn chính xác tuyệt đối:
+Hệ thống áp dụng mô hình toán học bảo toàn tồn kho nghiêm ngặt để đảm bảo số liệu vật lý tại kho và số liệu trên phần mềm luôn chính xác tuyệt đối theo thời gian thực:
 
-$$\text{Available} = \text{OnHand} - \text{Reserved} - \text{Quarantined} - \text{KitAllocated}$$
+<div align="center">
 
-### Ý nghĩa các đại lượng:
-- **`OnHand` (Tồn thực tế):** Số lượng vật lý đang có mặt trong kho của phòng Lab.
-- **`Reserved` (Đã giữ chỗ):** Số lượng nằm trong các phiếu mượn đã được duyệt (`APPROVED`), chờ sinh viên tới quầy nhận.
-- **`Quarantined` (Cách ly):** Số lượng linh kiện bị hỏng hóc, lỗi kỹ thuật đang chờ xử lý hoặc thanh lý.
-- **`KitAllocated` (Cấp phát Kit):** Số lượng linh kiện đã được đóng gói cố định vào các Hộp Kit thực hành.
-- **`Borrowed` (Đang mượn bên ngoài):** Số lượng linh kiện đã được bàn giao (`HANDED_OVER`) ra khỏi phạm vi phòng Lab.
-  > ⚠️ **Lưu ý bảo toàn:** Khi bàn giao, `OnHand` giảm tương ứng với số linh kiện mang ra ngoài, đồng thời `Borrowed` tăng lên. Do đó `Borrowed` **không được phép trừ lặp lần 2** khỏi `OnHand`.
+```
+┌────────────────────────────────────────────────────────────────────────────────────────┐
+│   TỒN KHẢ DỤNG (Available) = OnHand − Reserved − Quarantined − KitAllocated            │
+└────────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+$$\mathbf{Available} = \mathbf{OnHand} - \mathbf{Reserved} - \mathbf{Quarantined} - \mathbf{KitAllocated}$$
+
+</div>
+
+### Bảng Định nghĩa & Trạng thái Vật lý
+
+| Chỉ số Tồn kho | Ký hiệu | Ý nghĩa trong Phòng Lab Robotics & AI | Trạng thái Vật lý |
+| :--- | :---: | :--- | :--- |
+| **Tồn thực tế** | `OnHand` | Tổng số lượng linh kiện đang có mặt thực tế trong các kệ, tủ, khay của phòng Lab | 🏢 Nằm tại phòng kho |
+| **Đã giữ chỗ** | `Reserved` | Số lượng linh kiện nằm trong các phiếu mượn đã được duyệt (`APPROVED`), đang chờ người mượn tới quầy nhận | ⏳ Chờ bàn giao |
+| **Hàng cách ly** | `Quarantined` | Số lượng linh kiện bị hỏng hóc, cháy nổ, gãy chân cắm... đang cách ly chờ sửa chữa hoặc thanh lý | ⚠️ Ngăn cách ly |
+| **Cấp phát Kit** | `KitAllocated` | Số lượng linh kiện đã được đóng gói cố định vào các **Hộp Kit thực hành** theo chủ đề bài học | 🧰 Nằm trong hộp Kit |
+| **Tồn khả dụng** | `Available` | Số lượng thực sự còn tự do để cho mượn lẻ hoặc lấy ra đóng thêm các bộ Kit mới | ✅ Sẵn sàng xuất mượn |
+| **Đang mượn ngoài** | `Borrowed` | Số lượng linh kiện **đã bàn giao** (`HANDED_OVER`) ra khỏi phạm vi phòng Lab | 🏃 Sinh viên đang giữ |
+
+> ### 💡 Nguyên lý Bảo toàn Bất biến (Zero Double-Deduction Principle)
+> - **Khi bàn giao linh kiện (`HANDED_OVER`):**  
+>   Linh kiện rời khỏi phòng Lab ➔ $\text{OnHand}$ giảm đúng bằng số lượng bàn giao, đồng thời $\text{Borrowed}$ tăng lên tương ứng.
+> - **Quy tắc tuyệt đối:** Vì $\text{OnHand}$ đã giảm khi mang ra ngoài, nên $\text{Borrowed}$ **KHÔNG ĐƯỢC PHÉP TRỪ LẶP LẦN 2** vào công thức $\text{Available}$.
+> - **Khi hoàn trả (`RETURNED`):**  
+>   Linh kiện nhập lại kho ➔ $\text{Borrowed}$ giảm và $\text{OnHand}$ tăng lại (hoặc chuyển vào $\text{Quarantined}$ nếu bị hỏng trong quá trình thực hành).
 
 ---
 
