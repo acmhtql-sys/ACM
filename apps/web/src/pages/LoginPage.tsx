@@ -53,7 +53,7 @@ export const LoginPage: React.FC = () => {
           </div>
           <div>
             <div className="text-base font-bold tracking-tight">ACM SYSTEM</div>
-            <div className="text-xs text-slate-400">Components & Equipment Management</div>
+            <div className="text-xs text-slate-400 font-medium">Components & Equipment Management System</div>
           </div>
         </div>
 
@@ -90,8 +90,15 @@ export const LoginPage: React.FC = () => {
           </div>
         </div>
 
-        <div className="text-[11px] text-slate-500 relative z-10">
-          © 2026 ACM Engineering Team. Enterprise Lab Edition.
+        <div className="text-[11px] text-slate-400/90 leading-relaxed relative z-10 space-y-0.5 border-t border-slate-800/60 pt-4">
+          <div className="font-medium text-slate-300">
+            © 2026 ACM – Components & Equipment Management System.
+          </div>
+          <div className="text-slate-400">
+            Bản quyền thuộc về <span className="text-slate-200 font-medium">acmhtql-sys</span>,{' '}
+            <span className="text-slate-200 font-medium">Phuong05122005</span> và{' '}
+            <span className="text-slate-200 font-medium">minhanhhhhhhh</span>.
+          </div>
         </div>
       </div>
 
@@ -103,7 +110,10 @@ export const LoginPage: React.FC = () => {
               <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand-600 font-extrabold text-white text-xs">
                 ACM
               </div>
-              <span className="text-sm font-bold text-slate-900">ACM SYSTEM</span>
+              <div>
+                <span className="text-sm font-bold text-slate-900 block leading-tight">ACM SYSTEM</span>
+                <span className="text-[10px] text-slate-500">Components & Equipment Management System</span>
+              </div>
             </div>
             <h2 className="text-2xl font-bold tracking-tight text-slate-900">Đăng nhập ACM</h2>
             <p className="mt-1 text-xs text-slate-500">
@@ -161,6 +171,11 @@ export const LoginPage: React.FC = () => {
               <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
               <span>Máy chủ Cloud sẵn sàng</span>
             </span>
+          </div>
+
+          <div className="lg:hidden text-center text-[10.5px] text-slate-400 pt-1 space-y-0.5 border-t border-slate-100/80">
+            <div className="font-medium text-slate-600">© 2026 ACM – Components & Equipment Management System</div>
+            <div>Bản quyền: acmhtql-sys, Phuong05122005 và minhanhhhhhhh</div>
           </div>
         </div>
       </div>

@@ -316,8 +316,8 @@ export const SettingsPage: React.FC = () => {
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-slate-600">
           <div>
             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Nền tảng</span>
-            <span className="font-semibold text-slate-800 block mt-0.5">AIR Components Manager (ACM)</span>
-            <span className="text-[11px] text-slate-500 block">Hệ thống Quản lý Kho & Thiết bị Lab</span>
+            <span className="font-semibold text-slate-800 block mt-0.5">ACM – Components & Equipment Management System</span>
+            <span className="text-[11px] text-slate-500 block">Air Components Manager (Phòng Lab & AI Robotic)</span>
           </div>
           <div>
             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Công nghệ</span>
@@ -325,9 +325,9 @@ export const SettingsPage: React.FC = () => {
             <span className="text-[11px] text-slate-500 block">React 18, TypeScript, Tailwind, Node.js, Prisma</span>
           </div>
           <div>
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Bản quyền & Sử dụng</span>
-            <span className="font-semibold text-slate-800 block mt-0.5">Lab & Education License</span>
-            <span className="text-[11px] text-slate-500 block">Dành riêng cho Trung tâm Đào tạo & Nghiên cứu</span>
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Bản quyền & Tác giả</span>
+            <span className="font-semibold text-slate-800 block mt-0.5">© 2026 acmhtql-sys</span>
+            <span className="text-[11px] text-slate-500 block">Tác giả: Phuong05122005 & minhanhhhhhhh</span>
           </div>
         </div>
       </div>
