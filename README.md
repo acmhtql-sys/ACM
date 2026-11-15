@@ -189,15 +189,16 @@ npm run dev:api    # 🚀 Backend API:  http://localhost:5000
 npm run dev:web    # 🌐 Frontend Web:  http://localhost:5173
 ```
 
-### 6.2. Bảng Tra cứu Các Lệnh Hỗ trợ Thường Dùng (Commands Reference)
+### 6.2. Bảng Tra cứu Lệnh Thực thi (CLI Reference Cheat Sheet)
 
-| Tác vụ | Lệnh thực thi | Mô tả chi tiết |
+| Tác vụ & Phân hệ | Lệnh thực thi (CLI Command) | Mô tả chi tiết & Phạm vi áp dụng |
 | :--- | :--- | :--- |
-| **Kiểm thử Unit** | `npm run test:unit` | Chạy toàn bộ unit test của `packages/shared`, `apps/api`, `apps/web` |
-| **Kiểm thử Tích hợp** | `npm run test:integration` | Kiểm thử tích hợp monorepo chéo các gói và cơ sở dữ liệu |
-| **Kiểm tra TypeScript** | `npm run typecheck` | Quét kiểm tra type safety toàn bộ workspace mà không sinh file |
-| **Khởi chạy Docker DB** | `docker compose up -d` | Khởi tạo PostgreSQL 17 và Redis cục bộ trong container |
-| **Seed dữ liệu mẫu** | `npm run prisma:seed:test` | Nạp dữ liệu mẫu ban đầu (phòng kho, danh mục, linh kiện, tài khoản) |
+| 🧪 **Kiểm thử Unit** | <nobr><code>npm run test:unit</code></nobr> | Chạy toàn bộ 438+ unit tests cho `@acm/shared`, `@acm/api` và `@acm/web` |
+| 🔗 **Kiểm thử Tích hợp** | <nobr><code>npm run test:integration</code></nobr> | Kiểm thử tích hợp nghiệp vụ chéo monorepo và cơ sở dữ liệu |
+| 🛡️ **Kiểm tra Type Safety** | <nobr><code>npm run typecheck</code></nobr> | Quét lỗi kiểu dữ liệu TypeScript toàn bộ workspace mà không sinh file |
+| 🐳 **Khởi chạy Docker DB** | <nobr><code>docker compose up -d</code></nobr> | Khởi tạo PostgreSQL 17 và Redis chạy ngầm trong container cục bộ |
+| 🌱 **Seed Dữ liệu mẫu** | <nobr><code>npm run prisma:seed:test</code></nobr> | Nạp dữ liệu mẫu ban đầu: kho hàng, danh mục, linh kiện và tài khoản |
+| 🧹 **Kiểm tra Code Style** | <nobr><code>npm run lint</code></nobr> | Quét và phát hiện lỗi định dạng mã nguồn theo tiêu chuẩn ESLint |
 
 ---
 
