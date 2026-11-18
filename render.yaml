@@ -7,7 +7,7 @@ services:
     plan: free
     region: singapore
     branch: main
-    autoDeployTrigger: off
+    autoDeploy: true
     buildCommand: npm ci --include=dev && npm run prisma:generate && npm run build:shared && npm run build:api
     startCommand: npm run start --workspace=@acm/api
     healthCheckPath: /api/v1/health/readiness
