@@ -24,6 +24,7 @@ import {
   type VisionDetection,
   type VisionDetectResponse,
 } from '../../services/vision.service';
+import { YOLO11_85_CLASSES } from '../../services/vision-classes';
 import { useModalDismiss } from '../../hooks/useModalDismiss';
 
 export interface BorrowCatalogItem {
@@ -56,35 +57,10 @@ export interface StagedBorrowItem {
   confidence?: number;
 }
 
-export const UBTECH_FRIENDLY_NAMES: Record<string, string> = {
-  Servo: 'Động cơ RC Servo (SG90)',
-  Ultrasonic_sensor: 'Cảm biến siêu âm (HC-SR04)',
-  Temp_hum_sensor: 'Cảm biến nhiệt ẩm (DHT22)',
-  LED_lamp: 'Đèn LED RGB',
-  Main_1: 'Bo mạch điều khiển Main 1',
-  Main_2: 'Bo mạch điều khiển Main 2',
-  Switch_main_1: 'Công tắc nguồn Main 1',
-  Switch_main_2: 'Công tắc nguồn Main 2',
-  Switch_wire_main_1: 'Cáp nối công tắc Main 1',
-  Switch_wire_main_2: 'Cáp nối công tắc Main 2',
-  IR_sensor: 'Cảm biến hồng ngoại (IR)',
-  Light_sensor: 'Cảm biến ánh sáng',
-  Sound_sensor: 'Cảm biến âm thanh',
-  Touch_sensor: 'Cảm biến chạm',
-  Motor: 'Động cơ DC Motor',
-  Bluetooth_speaker: 'Loa Bluetooth',
-  'Servo_wire -Blue-': 'Dây servo (Xanh dương)',
-  Servo_wire_Gray: 'Dây servo (Xám)',
-  'Servo_wire_-Short-': 'Dây servo (Ngắn)',
-  Baseboard: 'Tấm đế lắp ráp (Baseboard)',
-  Base_brick: 'Khối đế lắp ráp (Base brick)',
-  Red_plug: 'Chốt cắm đỏ',
-  Blue_short_plug: 'Chốt cắm ngắn xanh',
-  Yellow_long_plug: 'Chốt cắm dài vàng',
-  Wheel_hub_Tire: 'Bánh xe kèm lốp cao su',
-  Poly_directional_wheel: 'Bánh xe đa hướng',
-  'Poly-directinal_wheel': 'Bánh xe đa hướng',
-};
+export const UBTECH_FRIENDLY_NAMES: Record<string, string> = {};
+YOLO11_85_CLASSES.forEach((c) => {
+  UBTECH_FRIENDLY_NAMES[c.className] = c.friendlyNameVi;
+});
 
 // Known code aliases for matching classes to catalog
 export const UBTECH_CODE_ALIASES: Record<string, string[]> = {
@@ -408,7 +384,8 @@ export const CameraBorrowModal: React.FC<CameraBorrowModalProps> = ({
 
     isInFlightRef.current = true;
     try {
-      const res: VisionDetectResponse = await detectFrameBase64(b64);
+      const contextItems = catalogItems.map((c) => ({ code: c.code, name: c.name }));
+      const res: VisionDetectResponse = await detectFrameBase64(b64, contextItems);
       if (res.success && res.detections) {
         setInferenceTime(res.inferenceTimeMs || null);
         processDetections(res.detections);
@@ -559,7 +536,8 @@ export const CameraBorrowModal: React.FC<CameraBorrowModalProps> = ({
       setStatusNotice({ type: 'info', text: 'Đang phân tích ảnh linh kiện mới chụp...' });
 
       try {
-        const res = await detectFrameFile(file);
+        const contextItems = catalogItems.map((c) => ({ code: c.code, name: c.name }));
+        const res = await detectFrameFile(file, contextItems);
         if (res.success && res.detections) {
           setInferenceTime(res.inferenceTimeMs || null);
           processDetections(res.detections);

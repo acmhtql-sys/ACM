@@ -29,6 +29,7 @@ import {
   type VisionDetection,
   type VisionDetectResponse,
 } from '../../services/vision.service';
+import { findMatchingTrainedClass } from '../../services/vision-classes';
 import type { KitRecordForBorrow } from './StudentBorrowKitModal';
 
 export type ComponentCondition = 'GOOD' | 'DAMAGED' | 'LOST';
@@ -279,12 +280,14 @@ export const KitReturnInspectionModal: React.FC<KitReturnInspectionModalProps> =
       const x2 = Math.min(600, x1 + boxW - 20);
       const y2 = Math.min(440, y1 + boxH - 20);
 
+      const matchedClass = findMatchingTrainedClass(ki.item?.code || ki.item?.name || '');
+
       detections.push({
-        classId: idx + 1,
-        className: ki.item?.name || 'Linh kiện',
+        classId: matchedClass?.classId ?? idx + 1,
+        className: matchedClass?.className || ki.item?.name || 'Linh kiện',
         confidence: 0.94 + (idx % 5) * 0.01,
         boundingBox: { x1, y1, x2, y2 },
-        suggestedItemCode: ki.item?.code || null,
+        suggestedItemCode: matchedClass?.defaultItemCode || ki.item?.code || null,
       });
     });
 
@@ -311,10 +314,16 @@ export const KitReturnInspectionModal: React.FC<KitReturnInspectionModalProps> =
         }
       }
 
+      const contextItems = kit?.items?.map((ki) => ({
+        code: ki.item?.code,
+        name: ki.item?.name,
+        quantity: ki.quantity,
+      }));
+
       let detections: VisionDetection[] = [];
       if (b64) {
         try {
-          const res = await detectFrameBase64(b64);
+          const res = await detectFrameBase64(b64, contextItems);
           if (res.success && res.detections && res.detections.length > 0) {
             detections = res.detections;
           } else {
@@ -334,8 +343,11 @@ export const KitReturnInspectionModal: React.FC<KitReturnInspectionModalProps> =
       // Build recognized items summary
       if (kit?.items) {
         const summary: RecognizedItemSummary[] = kit.items.map((ki) => {
+          const matchedClass = findMatchingTrainedClass(ki.item?.code || ki.item?.name || '');
           const matchedDets = detections.filter(
             (d) =>
+              (matchedClass && d.classId === matchedClass.classId) ||
+              (matchedClass && d.className.toLowerCase() === matchedClass.className.toLowerCase()) ||
               d.suggestedItemCode?.toUpperCase() === ki.item?.code?.toUpperCase() ||
               d.className.toLowerCase().includes((ki.item?.name || '').toLowerCase()) ||
               (ki.item?.name || '').toLowerCase().includes(d.className.toLowerCase())

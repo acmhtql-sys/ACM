@@ -43,6 +43,13 @@ storageState*.json
 *.trace
 *.webm
 
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+
 # Prisma
 # Keep schema and migrations, ignore generated client if copied
 
