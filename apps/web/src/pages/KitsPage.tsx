@@ -13,12 +13,18 @@ import {
   ChevronUp,
   Minus,
   Check,
+  BookOpen,
+  ClipboardCheck,
+  Send,
 } from 'lucide-react';
 import { StatusBadge } from '../components/StatusBadge';
 import { useAuth } from '../hooks/useAuth';
 import { useModalDismiss } from '../hooks/useModalDismiss';
 import { apiClient } from '../services/api';
 import { KitStatus } from '@acm/shared';
+import { StudentBorrowKitModal } from '../components/kits/StudentBorrowKitModal';
+import { KitHandoverModal } from '../components/kits/KitHandoverModal';
+import { KitReturnInspectionModal } from '../components/kits/KitReturnInspectionModal';
 
 interface KitItemComponent {
   id: string;
@@ -451,6 +457,15 @@ export const KitsPage: React.FC = () => {
     type: 'error' | 'info' | 'success';
     text: string;
   } | null>(null);
+
+  // Student Borrow Modal state
+  const [borrowModalKit, setBorrowModalKit] = useState<KitRecord | null>(null);
+
+  // Operator Handover Modal state
+  const [handoverModalKit, setHandoverModalKit] = useState<KitRecord | null>(null);
+
+  // Operator Return Inspection Modal state
+  const [inspectionModalKit, setInspectionModalKit] = useState<KitRecord | null>(null);
 
   const handleOpenCreateModal = () => {
     setIsCodeManuallyEdited(false);
@@ -1069,6 +1084,33 @@ export const KitsPage: React.FC = () => {
                         </td>
                         <td className="px-4 py-3 text-right">
                           <div className="flex items-center justify-end space-x-1.5">
+                            {/* Student Action: Register to Borrow Kit */}
+                            {!isOperator && k.status === 'AVAILABLE' && (
+                              <button
+                                onClick={() => setBorrowModalKit(k)}
+                                className="inline-flex items-center space-x-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white shadow-2xs hover:bg-blue-700 active:scale-[0.99] transition cursor-pointer"
+                                title="Đăng ký mượn hộp kit này về thực hành"
+                              >
+                                <BookOpen className="h-3.5 w-3.5" />
+                                <span>Đăng ký mượn</span>
+                              </button>
+                            )}
+                            {!isOperator && k.status === 'ALLOCATED' && (
+                              <span className="text-[11px] font-medium text-slate-400 italic">
+                                Đang được mượn
+                              </span>
+                            )}
+                            {!isOperator && k.status === 'MAINTENANCE' && (
+                              <span className="text-[11px] font-medium text-amber-600 italic">
+                                Đang bảo trì
+                              </span>
+                            )}
+                            {!isOperator && k.status === 'RETIRED' && (
+                              <span className="text-[11px] font-medium text-slate-400 italic">
+                                Đã thanh lý
+                              </span>
+                            )}
+
                             {/* Operator Status Transition Controls */}
                             {isOperator && (
                               <>
@@ -1077,10 +1119,11 @@ export const KitsPage: React.FC = () => {
                                     <button
                                       disabled={actionLoading === k.id}
                                       onClick={() => handleStatusChange(k.id, KitStatus.ALLOCATED)}
-                                      className="rounded-lg bg-indigo-50 border border-indigo-200/60 px-2.5 py-1 text-[11px] font-semibold text-indigo-700 hover:bg-indigo-100 transition-colors cursor-pointer"
+                                      className="inline-flex items-center space-x-1 rounded-lg bg-indigo-50 border border-indigo-200/60 px-2.5 py-1 text-[11px] font-semibold text-indigo-700 hover:bg-indigo-100 transition-colors cursor-pointer"
                                       title="Bàn giao sử dụng"
                                     >
-                                      Bàn giao
+                                      <Send className="h-3 w-3" />
+                                      <span>Bàn giao</span>
                                     </button>
                                     <button
                                       disabled={actionLoading === k.id}
@@ -1105,11 +1148,12 @@ export const KitsPage: React.FC = () => {
                                   <>
                                     <button
                                       disabled={actionLoading === k.id}
-                                      onClick={() => handleStatusChange(k.id, KitStatus.AVAILABLE)}
-                                      className="rounded-lg bg-emerald-50 border border-emerald-200/60 px-2.5 py-1 text-[11px] font-semibold text-emerald-700 hover:bg-emerald-100 transition-colors cursor-pointer"
-                                      title="Thu hồi về sẵn sàng"
+                                      onClick={() => setInspectionModalKit(k)}
+                                      className="inline-flex items-center space-x-1.5 rounded-lg bg-emerald-50 border border-emerald-200/80 px-2.5 py-1 text-[11px] font-semibold text-emerald-700 hover:bg-emerald-100 transition-colors shadow-2xs cursor-pointer"
+                                      title="Kiểm đếm linh kiện và nghiệm thu thu hồi hộp kit"
                                     >
-                                      Thu hồi
+                                      <ClipboardCheck className="h-3.5 w-3.5 text-emerald-600" />
+                                      <span>Nghiệm thu & Trả kit</span>
                                     </button>
                                     <button
                                       disabled={actionLoading === k.id}
@@ -1782,6 +1826,39 @@ export const KitsPage: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Student Borrow Kit Modal */}
+      <StudentBorrowKitModal
+        isOpen={Boolean(borrowModalKit)}
+        kit={borrowModalKit}
+        onClose={() => setBorrowModalKit(null)}
+        onSuccess={(msg) => {
+          setStatusMessage({ type: 'success', text: msg });
+          fetchKits();
+        }}
+      />
+
+      {/* Operator Kit Handover Modal */}
+      <KitHandoverModal
+        isOpen={Boolean(handoverModalKit)}
+        kit={handoverModalKit}
+        onClose={() => setHandoverModalKit(null)}
+        onSuccess={(msg) => {
+          setStatusMessage({ type: 'success', text: msg });
+          fetchKits();
+        }}
+      />
+
+      {/* Operator Kit Return & Inspection Checklist Modal */}
+      <KitReturnInspectionModal
+        isOpen={Boolean(inspectionModalKit)}
+        kit={inspectionModalKit}
+        onClose={() => setInspectionModalKit(null)}
+        onSuccess={(msg) => {
+          setStatusMessage({ type: 'success', text: msg });
+          fetchKits();
+        }}
+      />
     </div>
   );
 };
