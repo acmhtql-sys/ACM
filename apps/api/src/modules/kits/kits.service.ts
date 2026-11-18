@@ -638,10 +638,6 @@ export class KitsService {
     currentUser: AuthenticatedUser,
     meta?: RequestMetadata
   ): Promise<KitResponse> {
-    if (currentUser.role === UserRole.STUDENT) {
-      throw new AppError('Sinh viên không có quyền cập nhật trạng thái hộp kit', 403);
-    }
-
     const kit = await prisma.kit.findUnique({
       where: { id },
       include: { items: true },
@@ -653,6 +649,16 @@ export class KitsService {
 
     const currentStatus = kit.status;
     const targetStatus = input.status;
+
+    // RBAC: STUDENT is only allowed to register/borrow kit (AVAILABLE -> ALLOCATED)
+    if (currentUser.role === UserRole.STUDENT) {
+      if (currentStatus !== KitStatus.AVAILABLE || targetStatus !== KitStatus.ALLOCATED) {
+        throw new AppError(
+          'Sinh viên chỉ có quyền đăng ký mượn hộp kit đang ở trạng thái Sẵn sàng (AVAILABLE ➔ ALLOCATED)',
+          403
+        );
+      }
+    }
 
     // Idempotent: If target status matches current status, return without re-allocating or re-releasing
     if (currentStatus === targetStatus) {

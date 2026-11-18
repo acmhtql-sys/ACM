@@ -115,12 +115,12 @@ kitsRouter.put(
 /**
  * PATCH /api/v1/kits/:id/status
  * Updates kit status (AVAILABLE, ALLOCATED, MAINTENANCE, RETIRED) with inventory release/re-allocation.
- * RBAC: ADMIN, LAB_MANAGER, TECHNICIAN
+ * RBAC: ADMIN, LAB_MANAGER, TECHNICIAN, STUDENT (STUDENT only allowed to register/borrow: AVAILABLE -> ALLOCATED)
  */
 kitsRouter.patch(
   '/:id/status',
   authenticate,
-  authorizeRoles(UserRole.ADMIN, UserRole.LAB_MANAGER, UserRole.TECHNICIAN),
+  authorizeRoles(UserRole.ADMIN, UserRole.LAB_MANAGER, UserRole.TECHNICIAN, UserRole.STUDENT),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { id } = req.params;

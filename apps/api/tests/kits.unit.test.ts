@@ -654,6 +654,55 @@ describe('Phase 5 – Kit Management & Inventory Synchronization Unit Tests (TC-
       );
     });
 
+    it('allows STUDENT to transition kit from AVAILABLE -> ALLOCATED (borrow registration)', async () => {
+      const record = createMockKitRecord({ status: KitStatus.AVAILABLE });
+      vi.mocked(prisma.kit.findUnique).mockResolvedValueOnce(record as any);
+
+      mockTx.kit.findUnique.mockResolvedValueOnce({
+        ...record,
+        status: KitStatus.ALLOCATED,
+      });
+
+      const result = await kitsService.updateKitStatus(
+        record.id,
+        { status: KitStatus.ALLOCATED, notes: '[ĐĂNG KÝ MƯỢN KIT] SV Nguyen Van A' },
+        studentUser as any
+      );
+
+      expect(result.status).toBe(KitStatus.ALLOCATED);
+      expect(mockTx.kit.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: { status: KitStatus.ALLOCATED },
+        })
+      );
+    });
+
+    it('rejects STUDENT from transitioning kit from ALLOCATED -> AVAILABLE with 403', async () => {
+      const record = createMockKitRecord({ status: KitStatus.ALLOCATED });
+      vi.mocked(prisma.kit.findUnique).mockResolvedValueOnce(record as any);
+
+      await expect(
+        kitsService.updateKitStatus(
+          record.id,
+          { status: KitStatus.AVAILABLE },
+          studentUser as any
+        )
+      ).rejects.toThrow('Sinh viên chỉ có quyền đăng ký mượn hộp kit đang ở trạng thái Sẵn sàng');
+    });
+
+    it('rejects STUDENT from transitioning kit to MAINTENANCE or RETIRED with 403', async () => {
+      const record = createMockKitRecord({ status: KitStatus.AVAILABLE });
+      vi.mocked(prisma.kit.findUnique).mockResolvedValueOnce(record as any);
+
+      await expect(
+        kitsService.updateKitStatus(
+          record.id,
+          { status: KitStatus.MAINTENANCE },
+          studentUser as any
+        )
+      ).rejects.toThrow('Sinh viên chỉ có quyền đăng ký mượn hộp kit đang ở trạng thái Sẵn sàng');
+    });
+
     it('allows valid transition ALLOCATED -> AVAILABLE', async () => {
       const record = createMockKitRecord({ status: KitStatus.ALLOCATED });
       vi.mocked(prisma.kit.findUnique).mockResolvedValueOnce(record as any);
