@@ -417,7 +417,7 @@ export const CameraReturnModal: React.FC<CameraReturnModalProps> = ({
     checkVisionHealth()
       .then((res) => {
         if (isMounted) {
-          setIsServiceOnline(res.status === 'ok');
+          setIsServiceOnline(res?.status === 'ok');
         }
       })
       .catch(() => {

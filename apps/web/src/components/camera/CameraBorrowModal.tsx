@@ -234,7 +234,7 @@ export const CameraBorrowModal: React.FC<CameraBorrowModalProps> = ({
     let isMounted = true;
     checkVisionHealth()
       .then((res) => {
-        if (isMounted) setIsServiceOnline(res.status === 'ok');
+        if (isMounted) setIsServiceOnline(res?.status === 'ok');
       })
       .catch(() => {
         if (isMounted) {

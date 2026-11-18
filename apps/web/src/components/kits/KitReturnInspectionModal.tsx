@@ -26,6 +26,7 @@ import { apiClient } from '../../services/api';
 import {
   detectFrameBase64,
   detectFrameFile,
+  checkVisionHealth,
   type VisionDetection,
   type VisionDetectResponse,
 } from '../../services/vision.service';
@@ -81,6 +82,8 @@ export const KitReturnInspectionModal: React.FC<KitReturnInspectionModalProps> =
   const [isCameraActive, setIsCameraActive] = useState<boolean>(false);
   const [isAiScanning, setIsAiScanning] = useState<boolean>(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
+  const [visionError, setVisionError] = useState<string | null>(null);
+  const [isVisionOnline, setIsVisionOnline] = useState<boolean | null>(null);
   const [qcPhotoUrl, setQcPhotoUrl] = useState<string | null>(null);
   const [qcTimestamp, setQcTimestamp] = useState<string | null>(null);
   const [rawDetections, setRawDetections] = useState<VisionDetection[]>([]);
@@ -104,10 +107,19 @@ export const KitReturnInspectionModal: React.FC<KitReturnInspectionModalProps> =
     setQcTimestamp(null);
     setIsCameraActive(false);
     setIsAiScanning(false);
+    setVisionError(null);
     setRawDetections([]);
     setRecognizedSummary([]);
     setAiApplied(false);
     setUploadedPreview(null);
+
+    checkVisionHealth()
+      .then((health) => {
+        setIsVisionOnline(!!health);
+      })
+      .catch(() => {
+        setIsVisionOnline(false);
+      });
 
     const rows: ComponentInspectionRow[] = (kit.items || []).map((ki) => ({
       itemId: ki.itemId,
@@ -260,40 +272,6 @@ export const KitReturnInspectionModal: React.FC<KitReturnInspectionModalProps> =
     }
   }, [uploadedPreview, kit]);
 
-  // Generate Smart Fallback Detections if local Python service is offline (e.g. running on cloud/Vercel)
-  const generateFallbackDetections = useCallback((): VisionDetection[] => {
-    if (!kit || !kit.items || kit.items.length === 0) return [];
-    const detections: VisionDetection[] = [];
-
-    // Layout simulated detections nicely across the 640x480 frame
-    const totalItems = kit.items.length;
-    const cols = totalItems > 6 ? 4 : 3;
-    const rows = Math.ceil(totalItems / cols);
-    const boxW = Math.floor(560 / cols);
-    const boxH = Math.floor(400 / rows);
-
-    kit.items.forEach((ki, idx) => {
-      const col = idx % cols;
-      const row = Math.floor(idx / cols);
-      const x1 = 40 + col * boxW + Math.floor(Math.random() * 15);
-      const y1 = 40 + row * boxH + Math.floor(Math.random() * 15);
-      const x2 = Math.min(600, x1 + boxW - 20);
-      const y2 = Math.min(440, y1 + boxH - 20);
-
-      const matchedClass = findMatchingTrainedClass(ki.item?.code || ki.item?.name || '');
-
-      detections.push({
-        classId: matchedClass?.classId ?? idx + 1,
-        className: matchedClass?.className || ki.item?.name || 'Linh kiện',
-        confidence: 0.94 + (idx % 5) * 0.01,
-        boundingBox: { x1, y1, x2, y2 },
-        suggestedItemCode: matchedClass?.defaultItemCode || ki.item?.code || null,
-      });
-    });
-
-    return detections;
-  }, [kit]);
-
   // Execute AI detection frame processing
   const runAiDetection = useCallback(async () => {
     if (isInFlightRef.current) return;
@@ -314,33 +292,30 @@ export const KitReturnInspectionModal: React.FC<KitReturnInspectionModalProps> =
         }
       }
 
-      const contextItems = kit?.items?.map((ki) => ({
-        code: ki.item?.code,
-        name: ki.item?.name,
-        quantity: ki.quantity,
-      }));
-
       let detections: VisionDetection[] = [];
       if (b64) {
         try {
-          const res = await detectFrameBase64(b64, contextItems);
-          if (res.success && res.detections && res.detections.length > 0) {
-            detections = res.detections;
+          const res = await detectFrameBase64(b64);
+          if (res.success) {
+            setVisionError(null);
+            setIsVisionOnline(true);
+            detections = res.detections || [];
           } else {
-            detections = generateFallbackDetections();
+            setVisionError(res.error || 'Dịch vụ Vision AI chưa phản hồi');
+            setIsVisionOnline(false);
+            detections = [];
           }
-        } catch {
-          // Vision service unreachable or offline on cloud: use intelligent fallback matching
-          detections = generateFallbackDetections();
+        } catch (err: any) {
+          setVisionError(err?.message || 'Chưa kết nối được dịch vụ Vision AI');
+          setIsVisionOnline(false);
+          detections = [];
         }
-      } else {
-        detections = generateFallbackDetections();
       }
 
       setRawDetections(detections);
       drawBoundingBoxes(detections);
 
-      // Build recognized items summary
+      // Build recognized items summary strictly based on real detections
       if (kit?.items) {
         const summary: RecognizedItemSummary[] = kit.items.map((ki) => {
           const matchedClass = findMatchingTrainedClass(ki.item?.code || ki.item?.name || '');
@@ -357,9 +332,9 @@ export const KitReturnInspectionModal: React.FC<KitReturnInspectionModalProps> =
             itemName: ki.item?.name || 'Linh kiện',
             unit: ki.item?.unit || 'cái',
             expectedQty: ki.quantity,
-            detectedQty: matchedDets.length > 0 ? ki.quantity : 0,
+            detectedQty: matchedDets.length,
             isMatched: matchedDets.length > 0,
-            confidence: matchedDets.length > 0 ? Math.round((matchedDets[0].confidence || 0.95) * 100) : 0,
+            confidence: matchedDets.length > 0 ? Math.round((matchedDets[0].confidence || 0.9) * 100) : 0,
           };
         });
         setRecognizedSummary(summary);
@@ -367,7 +342,7 @@ export const KitReturnInspectionModal: React.FC<KitReturnInspectionModalProps> =
     } finally {
       isInFlightRef.current = false;
     }
-  }, [uploadedPreview, generateFallbackDetections, drawBoundingBoxes, kit]);
+  }, [uploadedPreview, drawBoundingBoxes, kit]);
 
   // Toggle Continuous AI Scan
   const handleToggleAiScan = useCallback(() => {
@@ -670,9 +645,23 @@ export const KitReturnInspectionModal: React.FC<KitReturnInspectionModalProps> =
                   <Camera className="h-4 w-4 text-blue-600" />
                   <span>Quét Camera AI Nhận diện linh kiện (Component Vision Scanner)</span>
                 </h4>
-                <p className="text-[11px] text-slate-500">
-                  Đưa hộp kit hoặc các linh kiện vào khung hình để AI tự động nhận dạng và đếm số lượng
-                </p>
+                <div className="flex items-center space-x-2 mt-0.5">
+                  <p className="text-[11px] text-slate-500">
+                    Đưa hộp kit hoặc các linh kiện vào khung hình để AI tự động nhận dạng và đếm số lượng
+                  </p>
+                  {isVisionOnline === true && (
+                    <span className="inline-flex items-center space-x-1 rounded-full bg-emerald-100/80 px-2 py-0.5 text-[10px] font-bold text-emerald-800">
+                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                      <span>YOLO11: Sẵn sàng</span>
+                    </span>
+                  )}
+                  {isVisionOnline === false && (
+                    <span className="inline-flex items-center space-x-1 rounded-full bg-amber-100/80 px-2 py-0.5 text-[10px] font-bold text-amber-800">
+                      <AlertTriangle className="h-2.5 w-2.5 text-amber-600" />
+                      <span>Vision: Offline</span>
+                    </span>
+                  )}
+                </div>
               </div>
 
               {/* Controls */}
@@ -813,6 +802,42 @@ export const KitReturnInspectionModal: React.FC<KitReturnInspectionModalProps> =
                 </div>
               </div>
             </div>
+
+            {/* VISION SERVICE OFFLINE NOTICE */}
+            {visionError && (
+              <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900 shadow-2xs flex items-start space-x-2">
+                <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
+                <div className="space-y-1">
+                  <p className="font-bold">Dịch vụ nhận diện AI chưa kết nối (Vision Service Offline)</p>
+                  <p className="text-[11px] text-amber-800">
+                    Vui lòng chạy lệnh: <code className="bg-amber-100 px-1.5 py-0.5 rounded font-mono font-bold text-amber-900">npm run vision</code> trên terminal máy tính để kích hoạt mô hình YOLO11 (85 lớp trên port 5055). Khi dùng trên Vercel, bạn cũng có thể mở web tại <code className="bg-amber-100 px-1 py-0.5 rounded font-mono font-semibold">http://localhost:5173</code> để tránh trình duyệt chặn HTTPS mixed content.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* EMPTY DETECTIONS STATUS (REAL SCAN WITH 0 OBJECTS) */}
+            {(isCameraActive || uploadedPreview) && rawDetections.length === 0 && !visionError && (
+              <div className="rounded-xl border border-slate-200 bg-white p-3 flex items-center justify-between text-xs text-slate-600 shadow-2xs">
+                <div className="flex items-center space-x-2.5">
+                  <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-slate-100 text-slate-500">
+                    <Eye className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <p className="font-bold text-slate-800">
+                      Chưa phát hiện linh kiện nào trong khung hình (0 linh kiện)
+                    </p>
+                    <p className="text-[11px] text-slate-500">
+                      Đặt linh kiện hoặc toàn bộ hộp kit vào trước camera để hệ thống nhận diện thật bằng AI.
+                    </p>
+                  </div>
+                </div>
+                <span className="inline-flex items-center space-x-1 rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-medium text-slate-600">
+                  <span className="h-1.5 w-1.5 rounded-full bg-blue-500 animate-pulse" />
+                  <span>Đang quét thực tế</span>
+                </span>
+              </div>
+            )}
 
             {/* AI DETECTION RESULTS & AUTO-APPLY BAR */}
             {rawDetections.length > 0 && (

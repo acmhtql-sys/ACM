@@ -27,6 +27,7 @@ os.environ["YOLO_VERBOSE"] = "False"
 from PIL import Image
 from starlette.applications import Starlette
 from starlette.middleware import Middleware
+from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.middleware.cors import CORSMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse
@@ -37,7 +38,7 @@ from ultralytics import YOLO
 PORT = int(os.environ.get("VISION_SERVICE_PORT", "5055"))
 HOST = os.environ.get("VISION_SERVICE_HOST", "0.0.0.0")
 MAX_PAYLOAD_BYTES = 5 * 1024 * 1024  # 5MB
-CONFIDENCE_THRESHOLD = 0.25
+CONFIDENCE_THRESHOLD = 0.45
 INFERENCE_TIMEOUT_SEC = 5.0
 
 # Model Path Resolution
@@ -351,13 +352,28 @@ routes = [
     Route("/api/v1/vision/detect", detect_endpoint, methods=["POST"]),
 ]
 
+class PrivateNetworkAccessMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        if request.method == "OPTIONS":
+            response = await call_next(request)
+            response.headers["Access-Control-Allow-Private-Network"] = "true"
+            response.headers["Access-Control-Allow-Origin"] = "*"
+            response.headers["Access-Control-Allow-Headers"] = "*"
+            response.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
+            return response
+        response = await call_next(request)
+        response.headers["Access-Control-Allow-Private-Network"] = "true"
+        return response
+
+
 middleware = [
+    Middleware(PrivateNetworkAccessMiddleware),
     Middleware(
         CORSMiddleware,
         allow_origins=["*"],
         allow_methods=["GET", "POST", "OPTIONS"],
         allow_headers=["*"],
-    )
+    ),
 ]
 
 app = Starlette(debug=False, routes=routes, middleware=middleware)

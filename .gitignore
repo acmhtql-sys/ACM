@@ -49,6 +49,8 @@ __pycache__/
 *$py.class
 .venv/
 venv/
+*.pt
+*.onnx
 
 # Prisma
 # Keep schema and migrations, ignore generated client if copied
