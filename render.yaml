@@ -6,7 +6,7 @@ services:
     runtime: node
     plan: free
     region: singapore
-    branch: codex/cloud-staging-p2e-readonly-deploy-20261107
+    branch: main
     autoDeployTrigger: off
     buildCommand: npm ci --include=dev && npm run prisma:generate && npm run build:shared && npm run build:api
     startCommand: npm run start --workspace=@acm/api

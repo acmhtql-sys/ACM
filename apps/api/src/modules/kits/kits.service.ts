@@ -269,34 +269,34 @@ export class KitsService {
           // Effective source location: explicitly chosen locationId, or default to input.locationId
           let sourceLocId = kitItem.locationId || null;
 
-          // If no locationId specified on item, check if input.locationId has stock
-          if (!sourceLocId) {
-            const locBal = await tx.stockBalance.findUnique({
-              where: {
-                itemId_locationId: {
-                  itemId: kitItem.itemId,
-                  locationId: input.locationId,
-                },
+          // Check if sourceLocId (or input.locationId) has sufficient available stock
+          const checkLocId = sourceLocId || input.locationId;
+          const locBal = await tx.stockBalance.findUnique({
+            where: {
+              itemId_locationId: {
+                itemId: kitItem.itemId,
+                locationId: checkLocId,
               },
-            });
-            const locAvail = locBal
-              ? Math.max(0, (locBal.onHand ?? 0) - (locBal.reserved ?? 0) - (locBal.quarantined ?? 0) - (locBal.kitAllocated ?? 0))
-              : 0;
+            },
+            include: { location: true },
+          });
+          const locAvail = locBal
+            ? Math.max(0, (locBal.onHand ?? 0) - (locBal.reserved ?? 0) - (locBal.quarantined ?? 0) - (locBal.kitAllocated ?? 0))
+            : 0;
 
-            if (locAvail >= kitItem.quantity) {
-              sourceLocId = input.locationId;
-            } else {
-              // Automatically look up active location with enough available stock
-              const allBals = await tx.stockBalance.findMany({
-                where: { itemId: kitItem.itemId },
-                include: { location: true },
-              });
-              const candidate = allBals.find((b) => {
-                const a = Math.max(0, (b.onHand ?? 0) - (b.reserved ?? 0) - (b.quarantined ?? 0) - (b.kitAllocated ?? 0));
-                return a >= kitItem.quantity;
-              });
-              sourceLocId = candidate ? candidate.locationId : input.locationId;
-            }
+          if (locBal && locAvail >= kitItem.quantity) {
+            sourceLocId = checkLocId;
+          } else {
+            // Automatically look up active location with enough available stock across inventory
+            const allBals = await tx.stockBalance.findMany({
+              where: { itemId: kitItem.itemId },
+              include: { location: true },
+            });
+            const candidate = allBals.find((b) => {
+              const a = Math.max(0, (b.onHand ?? 0) - (b.reserved ?? 0) - (b.quarantined ?? 0) - (b.kitAllocated ?? 0));
+              return a >= kitItem.quantity;
+            });
+            sourceLocId = candidate ? candidate.locationId : checkLocId;
           }
 
           const bal = await tx.stockBalance.findUnique({
