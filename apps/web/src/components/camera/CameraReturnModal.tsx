@@ -1123,11 +1123,11 @@ export const CameraReturnModal: React.FC<CameraReturnModalProps> = ({
   return (
     <div
       {...backdropDismiss}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-2.5 sm:p-4 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-0 sm:p-3 md:p-4 backdrop-blur-sm"
     >
-      <div className="flex h-[94vh] w-full max-w-5xl flex-col rounded-2xl bg-white shadow-2xl border border-slate-200 overflow-hidden">
+      <div className="flex h-[100dvh] sm:h-[94vh] w-full max-w-5xl flex-col sm:rounded-2xl bg-white shadow-2xl border-0 sm:border border-slate-200 overflow-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3 sm:px-5 sm:py-3.5 bg-slate-50">
+        <div className="flex items-center justify-between border-b border-slate-200 px-3.5 py-2.5 sm:px-5 sm:py-3.5 bg-slate-50 shrink-0">
           <div className="flex items-center space-x-2.5 min-w-0">
             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700">
               <Camera className="h-5 w-5" />
@@ -1139,9 +1139,9 @@ export const CameraReturnModal: React.FC<CameraReturnModalProps> = ({
                   MVP Feature
                 </span>
               </h2>
-              <p className="text-[11px] sm:text-xs text-slate-500 truncate sm:whitespace-normal">
+              <p className="text-[11px] sm:text-xs text-slate-500 break-words">
                 Phiếu mượn: <strong className="text-slate-700">{borrowRecord.requestNumber}</strong>{' '}
-                | Người mượn: {borrowRecord.borrowerName || 'N/A'}
+                | Người mượn: <span className="text-slate-700 font-medium">{borrowRecord.borrowerName || 'N/A'}</span>
               </p>
             </div>
           </div>
@@ -1166,7 +1166,7 @@ export const CameraReturnModal: React.FC<CameraReturnModalProps> = ({
         {/* Status banner */}
         {statusNotice && (
           <div
-            className={`flex items-center justify-between px-4 py-2 text-xs border-b ${
+            className={`flex items-center justify-between px-3.5 py-2 text-xs border-b shrink-0 ${
               statusNotice.type === 'error'
                 ? 'bg-rose-50 text-rose-800 border-rose-200'
                 : statusNotice.type === 'warning'
@@ -1177,18 +1177,18 @@ export const CameraReturnModal: React.FC<CameraReturnModalProps> = ({
             }`}
           >
             <div className="flex items-center space-x-2">
-              {statusNotice.type === 'error' && <AlertCircle className="h-4 w-4 text-rose-600" />}
+              {statusNotice.type === 'error' && <AlertCircle className="h-4 w-4 text-rose-600 shrink-0" />}
               {statusNotice.type === 'warning' && (
-                <AlertTriangle className="h-4 w-4 text-amber-600" />
+                <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0" />
               )}
               {statusNotice.type === 'success' && (
-                <CheckCircle className="h-4 w-4 text-emerald-600" />
+                <CheckCircle className="h-4 w-4 text-emerald-600 shrink-0" />
               )}
-              {statusNotice.type === 'info' && <Sparkles className="h-4 w-4 text-blue-600" />}
-              <span>{statusNotice.text}</span>
+              {statusNotice.type === 'info' && <Sparkles className="h-4 w-4 text-blue-600 shrink-0" />}
+              <span className="font-medium">{statusNotice.text}</span>
             </div>
             {inferenceTime !== null && (
-              <span className="font-mono text-[11px] text-slate-500">
+              <span className="font-mono text-[11px] text-slate-500 shrink-0 ml-2">
                 Inference: {inferenceTime}ms
               </span>
             )}
@@ -1196,13 +1196,13 @@ export const CameraReturnModal: React.FC<CameraReturnModalProps> = ({
         )}
 
         {/* Main Content Layout: Left Camera / Right Staged & Detections Panels */}
-        <div className="grid flex-1 grid-cols-1 md:grid-cols-12 overflow-hidden">
+        <div className="flex-1 grid grid-cols-1 md:grid-cols-12 overflow-y-auto md:overflow-hidden min-h-0">
           {/* Left Column: Camera Viewport */}
-          <div className="relative flex flex-col items-stretch justify-start bg-slate-900 md:col-span-7 p-3 overflow-hidden">
+          <div className="relative flex flex-col items-stretch justify-start bg-slate-900 md:col-span-7 p-2.5 sm:p-3 overflow-visible md:overflow-hidden shrink-0 md:shrink">
             {/* Simple AI Recognition Summary Bar (Directly Above Camera Viewport) */}
             <div
               data-testid="ai-simple-recognition-bar"
-              className="mb-2.5 w-full rounded-xl bg-slate-800/95 border border-slate-700/80 p-2.5 text-xs shadow-md"
+              className="mb-2 w-full rounded-xl bg-slate-800/95 border border-slate-700/80 p-2 sm:p-2.5 text-xs shadow-md shrink-0"
             >
               <div className="flex flex-wrap items-center justify-between gap-1.5">
                 <div className="flex items-center space-x-1.5 text-slate-200 font-semibold shrink-0">
@@ -1233,14 +1233,14 @@ export const CameraReturnModal: React.FC<CameraReturnModalProps> = ({
               {/* Chips container */}
               <div
                 data-testid="ai-recognition-chips"
-                className="mt-2 flex flex-wrap items-center gap-1.5"
+                className="mt-1.5 flex flex-wrap items-center gap-1.5"
               >
                 {uniqueDetectedClasses.length === 0 ? (
                   <span
                     data-testid="ai-empty-recognition"
                     className="italic text-slate-400 text-[11px] py-0.5"
                   >
-                    Chưa nhận diện được
+                    Chưa nhận diện được — Bấm &quot;Bắt đầu nhận diện&quot; bên dưới để AI quét linh kiện
                   </span>
                 ) : (
                   <>
@@ -1333,7 +1333,7 @@ export const CameraReturnModal: React.FC<CameraReturnModalProps> = ({
             </div>
 
             {/* Viewport container */}
-            <div className="relative flex flex-1 w-full min-h-[280px] items-center justify-center overflow-hidden rounded-xl bg-black border border-slate-800 shadow-inner">
+            <div className="relative flex w-full aspect-[4/3] sm:aspect-video md:aspect-auto md:flex-1 md:min-h-[280px] items-center justify-center overflow-hidden rounded-xl bg-black border border-slate-800 shadow-inner shrink-0 md:shrink">
               {uploadedPreview ? (
                 <>
                   <img
@@ -1367,6 +1367,18 @@ export const CameraReturnModal: React.FC<CameraReturnModalProps> = ({
                     ref={canvasRef}
                     className="pointer-events-none absolute inset-0 h-full w-full object-contain"
                   />
+                  {/* Real-time scanning visual pulse line */}
+                  {cameraActive && isRecognizing && (
+                    <div className="pointer-events-none absolute inset-0 z-10 flex flex-col justify-between p-2">
+                      <div className="flex items-center justify-between">
+                        <span className="inline-flex items-center space-x-1.5 rounded-full bg-emerald-600/90 backdrop-blur-md px-2.5 py-1 text-[10px] font-bold text-white shadow-md">
+                          <span className="h-2 w-2 rounded-full bg-white animate-ping" />
+                          <span>AI ĐANG QUÉT LIVE (YOLO11)</span>
+                        </span>
+                      </div>
+                      <div className="h-0.5 w-full bg-gradient-to-r from-transparent via-emerald-400 to-transparent shadow-[0_0_10px_#34d399] opacity-80" />
+                    </div>
+                  )}
                 </>
               )}
 
@@ -1392,28 +1404,28 @@ export const CameraReturnModal: React.FC<CameraReturnModalProps> = ({
               )}
             </div>
 
-            {/* Camera Controls Toolbar */}
-            <div className="mt-2.5 flex flex-col w-full rounded-lg bg-slate-800/80 px-3 py-2 text-xs text-slate-300 space-y-1.5">
-              <div className="flex w-full items-center justify-between">
-                <div className="flex items-center space-x-2">
+            {/* Camera Controls Toolbar - Fully responsive, highly visible on mobile and desktop */}
+            <div className="mt-2.5 flex flex-col w-full rounded-xl bg-slate-800/95 border border-slate-700/80 p-2 sm:p-2.5 text-xs text-slate-300 shadow-md space-y-2 shrink-0">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex flex-1 flex-wrap items-center gap-2">
                   {cameraActive && !capturedLivePhoto && (
                     <button
                       type="button"
                       onClick={toggleRecognition}
-                      className={`inline-flex items-center space-x-1.5 rounded-md px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition ${
+                      className={`flex-1 sm:flex-initial inline-flex items-center justify-center space-x-2 rounded-xl px-4 py-2.5 text-xs sm:text-sm font-bold text-white shadow-md active:scale-95 transition ${
                         isRecognizing
-                          ? 'bg-rose-600 hover:bg-rose-500'
-                          : 'bg-emerald-600 hover:bg-emerald-500'
+                          ? 'bg-rose-600 hover:bg-rose-500 animate-pulse shadow-rose-900/50'
+                          : 'bg-emerald-600 hover:bg-emerald-500 shadow-emerald-900/50'
                       }`}
                     >
                       {isRecognizing ? (
                         <>
-                          <Square className="h-3.5 w-3.5 fill-current" />
+                          <Square className="h-4 w-4 fill-current shrink-0" />
                           <span>Dừng nhận diện</span>
                         </>
                       ) : (
                         <>
-                          <Play className="h-3.5 w-3.5 fill-current" />
+                          <Play className="h-4 w-4 fill-current shrink-0" />
                           <span>Bắt đầu nhận diện</span>
                         </>
                       )}
@@ -1425,9 +1437,9 @@ export const CameraReturnModal: React.FC<CameraReturnModalProps> = ({
                     <button
                       type="button"
                       onClick={captureLivePhoto}
-                      className="inline-flex items-center space-x-1.5 rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-emerald-500 transition"
+                      className="flex-1 sm:flex-initial inline-flex items-center justify-center space-x-1.5 rounded-xl bg-blue-600 px-3.5 py-2.5 text-xs sm:text-sm font-bold text-white shadow-md shadow-blue-900/40 hover:bg-blue-500 active:scale-95 transition"
                     >
-                      <Camera className="h-3.5 w-3.5" />
+                      <Camera className="h-4 w-4 shrink-0" />
                       <span>Chụp ảnh hiện tại (Live)</span>
                     </button>
                   )}
@@ -1440,9 +1452,9 @@ export const CameraReturnModal: React.FC<CameraReturnModalProps> = ({
                         setUploadedPreview(null);
                         startCameraStream();
                       }}
-                      className="inline-flex items-center space-x-1.5 rounded-md bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-amber-500 transition"
+                      className="flex-1 sm:flex-initial inline-flex items-center justify-center space-x-1.5 rounded-xl bg-amber-600 px-4 py-2.5 text-xs sm:text-sm font-bold text-white shadow-md hover:bg-amber-500 active:scale-95 transition"
                     >
-                      <RefreshCw className="h-3.5 w-3.5" />
+                      <RefreshCw className="h-4 w-4 shrink-0" />
                       <span>Chụp lại</span>
                     </button>
                   )}
@@ -1453,9 +1465,10 @@ export const CameraReturnModal: React.FC<CameraReturnModalProps> = ({
                       onClick={() => {
                         setFacingMode((prev) => (prev === 'environment' ? 'user' : 'environment'));
                       }}
-                      className="inline-flex items-center space-x-1 rounded-md bg-slate-700 px-2.5 py-1.5 text-xs font-medium text-slate-300 hover:bg-slate-600"
+                      title="Đổi camera trước / sau"
+                      className="shrink-0 inline-flex items-center justify-center space-x-1 rounded-xl bg-slate-700/90 px-3 py-2.5 text-xs font-semibold text-slate-200 hover:bg-slate-600 active:scale-95 border border-slate-600 transition"
                     >
-                      <RefreshCw className="h-3.5 w-3.5" />
+                      <RefreshCw className="h-3.5 w-3.5 shrink-0" />
                       <span>Đổi Camera</span>
                     </button>
                   )}
@@ -1473,15 +1486,15 @@ export const CameraReturnModal: React.FC<CameraReturnModalProps> = ({
                 />
               </div>
 
-              <div className="flex items-center space-x-1.5 text-[10px] text-slate-400 pt-1 border-t border-slate-700/60">
-                <AlertCircle className="h-3 w-3 text-amber-400 shrink-0" />
+              <div className="flex items-center space-x-1.5 text-[11px] text-slate-400 pt-1.5 border-t border-slate-700/60">
+                <AlertCircle className="h-3.5 w-3.5 text-amber-400 shrink-0" />
                 <span>Chỉ chấp nhận ảnh chụp thời gian thực tại chỗ. Ảnh cũ từ ngày hôm qua sẽ bị từ chối.</span>
               </div>
             </div>
           </div>
 
           {/* Right Column: Tabbed Interface (Staged Return Items & AI Detections Breakdown) */}
-          <div className="flex flex-col md:col-span-5 bg-white border-l border-slate-200 p-4 overflow-hidden">
+          <div className="flex flex-col md:col-span-5 bg-white border-t md:border-t-0 md:border-l border-slate-200 p-3 sm:p-4 overflow-visible md:overflow-y-auto">
             {/* If there is an unresolved rejected return for this borrow */}
             {rejectedReturn && (
               <div className="mb-3 p-3 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-800 space-y-2">
@@ -1632,6 +1645,19 @@ export const CameraReturnModal: React.FC<CameraReturnModalProps> = ({
                               Số lượng trả (tối đa {item.remaining}):
                             </label>
                             <div className="flex items-center space-x-1">
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handleUpdateQuantity(
+                                    item.detailId,
+                                    Math.max(autoPopulateBorrowItems ? 0 : 1, item.quantity - 1)
+                                  )
+                                }
+                                disabled={item.quantity <= (autoPopulateBorrowItems ? 0 : 1)}
+                                className="h-8 w-8 rounded-lg border border-slate-300 bg-slate-100 text-slate-700 hover:bg-slate-200 disabled:opacity-40 flex items-center justify-center font-bold text-sm cursor-pointer select-none active:scale-95 transition"
+                              >
+                                -
+                              </button>
                               <input
                                 id={`return-qty-${item.detailId}`}
                                 aria-label={`Số lượng trả ${item.itemCode}`}
@@ -1645,9 +1671,22 @@ export const CameraReturnModal: React.FC<CameraReturnModalProps> = ({
                                     parseInt(e.target.value, 10) || 0
                                   )
                                 }
-                                className="w-full rounded border border-slate-300 bg-white px-2 py-1 text-xs font-semibold text-slate-800 focus:border-blue-500 focus:outline-none"
+                                className="w-16 text-center rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-xs font-bold text-slate-900 focus:border-blue-500 focus:outline-none"
                               />
-                              <span className="text-[10px] text-slate-500">{item.unit}</span>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handleUpdateQuantity(
+                                    item.detailId,
+                                    Math.min(item.remaining, item.quantity + 1)
+                                  )
+                                }
+                                disabled={item.quantity >= item.remaining}
+                                className="h-8 w-8 rounded-lg border border-slate-300 bg-slate-100 text-slate-700 hover:bg-slate-200 disabled:opacity-40 flex items-center justify-center font-bold text-sm cursor-pointer select-none active:scale-95 transition"
+                              >
+                                +
+                              </button>
+                              <span className="text-[10px] text-slate-500 pl-1">{item.unit}</span>
                             </div>
                           </div>
 
@@ -1727,13 +1766,13 @@ export const CameraReturnModal: React.FC<CameraReturnModalProps> = ({
             {activeTab === 'detections' && (
               <div className="flex flex-1 flex-col overflow-hidden pt-2.5">
                 {/* Filter Sub-bar */}
-                <div className="flex items-center space-x-1 mb-2 text-[11px]">
+                <div className="flex flex-wrap items-center gap-1.5 mb-2 text-[11px]">
                   <button
                     type="button"
                     onClick={() => setDetectionFilter('ALL')}
-                    className={`rounded px-2 py-0.5 font-medium ${
+                    className={`rounded-lg px-2.5 py-1 font-semibold transition ${
                       detectionFilter === 'ALL'
-                        ? 'bg-slate-800 text-white'
+                        ? 'bg-slate-800 text-white shadow-xs'
                         : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                     }`}
                   >
@@ -1742,9 +1781,9 @@ export const CameraReturnModal: React.FC<CameraReturnModalProps> = ({
                   <button
                     type="button"
                     onClick={() => setDetectionFilter('MATCHED_BORROW')}
-                    className={`rounded px-2 py-0.5 font-medium ${
+                    className={`rounded-lg px-2.5 py-1 font-semibold transition ${
                       detectionFilter === 'MATCHED_BORROW'
-                        ? 'bg-emerald-600 text-white'
+                        ? 'bg-emerald-600 text-white shadow-xs'
                         : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
                     }`}
                   >
@@ -1753,9 +1792,9 @@ export const CameraReturnModal: React.FC<CameraReturnModalProps> = ({
                   <button
                     type="button"
                     onClick={() => setDetectionFilter('MATCHED_CATALOG_ONLY')}
-                    className={`rounded px-2 py-0.5 font-medium ${
+                    className={`rounded-lg px-2.5 py-1 font-semibold transition ${
                       detectionFilter === 'MATCHED_CATALOG_ONLY'
-                        ? 'bg-blue-600 text-white'
+                        ? 'bg-blue-600 text-white shadow-xs'
                         : 'bg-blue-50 text-blue-700 hover:bg-blue-100'
                     }`}
                   >
@@ -1764,9 +1803,9 @@ export const CameraReturnModal: React.FC<CameraReturnModalProps> = ({
                   <button
                     type="button"
                     onClick={() => setDetectionFilter('UNMAPPED')}
-                    className={`rounded px-2 py-0.5 font-medium ${
+                    className={`rounded-lg px-2.5 py-1 font-semibold transition ${
                       detectionFilter === 'UNMAPPED'
-                        ? 'bg-amber-600 text-white'
+                        ? 'bg-amber-600 text-white shadow-xs'
                         : 'bg-amber-50 text-amber-700 hover:bg-amber-100'
                     }`}
                   >
@@ -1928,11 +1967,11 @@ export const CameraReturnModal: React.FC<CameraReturnModalProps> = ({
             )}
 
             {/* Footer Buttons */}
-            <div className="mt-3 flex flex-col-reverse sm:flex-row sm:items-center sm:justify-between gap-2 border-t border-slate-200 pt-2.5">
+            <div className="mt-4 flex flex-col-reverse sm:flex-row sm:items-center sm:justify-between gap-2.5 border-t border-slate-200 pt-3 sticky bottom-0 bg-white/95 backdrop-blur-sm z-10">
               <button
                 type="button"
                 onClick={handleModalClose}
-                className="w-full sm:w-auto rounded-lg border border-slate-300 px-3 py-2 sm:py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 cursor-pointer text-center"
+                className="w-full sm:w-auto rounded-xl border border-slate-300 px-4 py-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 cursor-pointer text-center active:scale-95 transition"
               >
                 Hủy bỏ
               </button>
@@ -1945,10 +1984,10 @@ export const CameraReturnModal: React.FC<CameraReturnModalProps> = ({
                   Boolean(rejectedReturn && rejectedReturn.borrowId === borrowRecord.id) ||
                   !Object.values(stagedItems).some((item) => item.quantity > 0)
                 }
-                className="w-full sm:w-auto inline-flex items-center justify-center space-x-1.5 rounded-lg bg-emerald-600 px-4 py-2 text-xs font-bold text-white shadow hover:bg-emerald-500 disabled:opacity-50 cursor-pointer"
+                className="w-full sm:w-auto inline-flex items-center justify-center space-x-1.5 rounded-xl bg-emerald-600 px-5 py-2.5 text-xs sm:text-sm font-bold text-white shadow-md hover:bg-emerald-500 disabled:opacity-50 cursor-pointer active:scale-95 transition"
               >
                 <span>{actionLoading ? 'Đang xử lý...' : 'Xác nhận hoàn trả'}</span>
-                <CornerDownLeft className="h-3.5 w-3.5" />
+                <CornerDownLeft className="h-4 w-4" />
               </button>
             </div>
           </div>

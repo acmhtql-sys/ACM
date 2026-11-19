@@ -618,11 +618,11 @@ export const CameraBorrowModal: React.FC<CameraBorrowModalProps> = ({
   return (
     <div
       {...backdropDismiss}
-      className="fixed inset-0 z-50 flex items-center justify-center p-2.5 sm:p-4 md:p-6 bg-slate-950/75 backdrop-blur-sm animate-fade-in"
+      className="fixed inset-0 z-50 flex items-center justify-center p-0 sm:p-3 md:p-4 bg-slate-950/80 backdrop-blur-sm animate-fade-in"
     >
-      <div className="relative w-full max-w-5xl bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[92vh]">
+      <div className="relative w-full max-w-5xl bg-white sm:rounded-2xl shadow-2xl border-0 sm:border border-slate-200 overflow-hidden flex flex-col h-[100dvh] sm:h-auto sm:max-h-[92vh]">
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 sm:px-5 sm:py-3.5 border-b border-slate-200 bg-gradient-to-r from-blue-50 via-indigo-50 to-emerald-50">
+        <div className="flex items-center justify-between px-3.5 py-2.5 sm:px-5 sm:py-3.5 border-b border-slate-200 bg-gradient-to-r from-blue-50 via-indigo-50 to-emerald-50 shrink-0">
           <div className="flex items-center space-x-2.5 sm:space-x-3 min-w-0">
             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-600 text-white shadow-sm">
               <Camera className="h-5 w-5" />
@@ -635,7 +635,7 @@ export const CameraBorrowModal: React.FC<CameraBorrowModalProps> = ({
                   Live Anti-Fraud
                 </span>
               </h3>
-              <p className="text-[11px] sm:text-xs text-slate-500 truncate sm:whitespace-normal">
+              <p className="text-[11px] sm:text-xs text-slate-500 break-words">
                 Nhận diện trực tiếp qua Camera thời gian thực. Nghiêm cấm sử dụng ảnh cũ từ ngày hôm qua.
               </p>
             </div>
@@ -681,10 +681,10 @@ export const CameraBorrowModal: React.FC<CameraBorrowModalProps> = ({
         )}
 
         {/* Main Body: Grid 2 Columns */}
-        <div className="grid grid-cols-1 md:grid-cols-12 flex-1 overflow-hidden">
+        <div className="flex-1 grid grid-cols-1 md:grid-cols-12 overflow-y-auto md:overflow-hidden min-h-0">
           {/* Left Column: Camera Feed & Controls (7 cols) */}
-          <div className="md:col-span-7 bg-slate-900 flex flex-col justify-between p-3 relative overflow-hidden">
-            <div className="relative w-full aspect-video bg-black rounded-xl overflow-hidden flex items-center justify-center border border-slate-700 shadow-inner">
+          <div className="md:col-span-7 bg-slate-900 flex flex-col justify-start p-2.5 sm:p-3 relative overflow-visible md:overflow-hidden shrink-0 md:shrink space-y-2.5">
+            <div className="relative w-full aspect-[4/3] sm:aspect-video md:aspect-auto md:flex-1 md:min-h-[280px] bg-black rounded-xl overflow-hidden flex items-center justify-center border border-slate-700 shadow-inner">
               {liveCapturedPhoto ? (
                 <div className="relative w-full h-full flex items-center justify-center bg-black">
                   <img
@@ -730,91 +730,110 @@ export const CameraBorrowModal: React.FC<CameraBorrowModalProps> = ({
                       Đang khởi động camera...
                     </div>
                   )}
+                  {cameraActive && isRecognizing && (
+                    <div className="pointer-events-none absolute inset-0 z-10 flex flex-col justify-between p-2">
+                      <div className="flex items-center justify-between">
+                        <span className="inline-flex items-center space-x-1.5 rounded-full bg-emerald-600/90 backdrop-blur-md px-2.5 py-1 text-[10px] font-bold text-white shadow-md">
+                          <span className="h-2 w-2 rounded-full bg-white animate-ping" />
+                          <span>AI ĐANG QUÉT (YOLO11)</span>
+                        </span>
+                      </div>
+                      <div className="h-0.5 w-full bg-gradient-to-r from-transparent via-blue-400 to-transparent shadow-[0_0_10px_#60a5fa] opacity-80" />
+                    </div>
+                  )}
                 </>
               )}
             </div>
 
             {/* Camera Toolbar Buttons */}
-            <div className="mt-3 flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-800">
-              <div className="flex items-center space-x-2">
-                {cameraActive && !liveCapturedPhoto && (
-                  <button
-                    type="button"
-                    onClick={toggleRecognition}
-                    className={`inline-flex items-center space-x-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition ${
-                      isRecognizing
-                        ? 'bg-rose-600 hover:bg-rose-500'
-                        : 'bg-blue-600 hover:bg-blue-500'
-                    }`}
-                  >
-                    {isRecognizing ? (
-                      <>
-                        <Square className="h-3.5 w-3.5" />
-                        <span>Dừng nhận diện</span>
-                      </>
-                    ) : (
-                      <>
-                        <Play className="h-3.5 w-3.5" />
-                        <span>Bắt đầu nhận diện</span>
-                      </>
-                    )}
-                  </button>
-                )}
+            <div className="flex flex-col w-full rounded-xl bg-slate-800/95 border border-slate-700/80 p-2 sm:p-2.5 text-xs text-slate-300 shadow-md space-y-2 shrink-0">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex flex-1 flex-wrap items-center gap-2">
+                  {cameraActive && !liveCapturedPhoto && (
+                    <button
+                      type="button"
+                      onClick={toggleRecognition}
+                      className={`flex-1 sm:flex-initial inline-flex items-center justify-center space-x-2 rounded-xl px-4 py-2.5 text-xs sm:text-sm font-bold text-white shadow-md active:scale-95 transition ${
+                        isRecognizing
+                          ? 'bg-rose-600 hover:bg-rose-500 animate-pulse shadow-rose-900/50'
+                          : 'bg-blue-600 hover:bg-blue-500 shadow-blue-900/50'
+                      }`}
+                    >
+                      {isRecognizing ? (
+                        <>
+                          <Square className="h-4 w-4 fill-current shrink-0" />
+                          <span>Dừng nhận diện</span>
+                        </>
+                      ) : (
+                        <>
+                          <Play className="h-4 w-4 fill-current shrink-0" />
+                          <span>Bắt đầu nhận diện</span>
+                        </>
+                      )}
+                    </button>
+                  )}
 
-                {/* Primary Button: CHỤP ẢNH HIỆN TẠI */}
-                {cameraActive && !liveCapturedPhoto && (
-                  <button
-                    type="button"
-                    onClick={captureLivePhoto}
-                    className="inline-flex items-center space-x-1.5 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white shadow-md hover:bg-emerald-500 transition"
-                  >
-                    <Camera className="h-3.5 w-3.5" />
-                    <span>Chụp ảnh hiện tại (Live)</span>
-                  </button>
-                )}
+                  {/* Primary Button: CHỤP ẢNH HIỆN TẠI */}
+                  {cameraActive && !liveCapturedPhoto && (
+                    <button
+                      type="button"
+                      onClick={captureLivePhoto}
+                      className="flex-1 sm:flex-initial inline-flex items-center justify-center space-x-1.5 rounded-xl bg-emerald-600 px-3.5 py-2.5 text-xs sm:text-sm font-bold text-white shadow-md shadow-emerald-900/40 hover:bg-emerald-500 active:scale-95 transition"
+                    >
+                      <Camera className="h-4 w-4 shrink-0" />
+                      <span>Chụp ảnh hiện tại (Live)</span>
+                    </button>
+                  )}
 
-                {liveCapturedPhoto && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setLiveCapturedPhoto(null);
-                      startCameraStream();
-                    }}
-                    className="inline-flex items-center space-x-1.5 rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-amber-500 transition"
-                  >
-                    <RefreshCw className="h-3.5 w-3.5" />
-                    <span>Chụp lại</span>
-                  </button>
-                )}
+                  {liveCapturedPhoto && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setLiveCapturedPhoto(null);
+                        startCameraStream();
+                      }}
+                      className="flex-1 sm:flex-initial inline-flex items-center justify-center space-x-1.5 rounded-xl bg-amber-600 px-4 py-2.5 text-xs sm:text-sm font-bold text-white shadow-md hover:bg-amber-500 active:scale-95 transition"
+                    >
+                      <RefreshCw className="h-4 w-4 shrink-0" />
+                      <span>Chụp lại</span>
+                    </button>
+                  )}
 
-                {cameraActive && !liveCapturedPhoto && (
-                  <button
-                    type="button"
-                    onClick={() => setFacingMode((prev) => (prev === 'environment' ? 'user' : 'environment'))}
-                    className="inline-flex items-center space-x-1 rounded-lg bg-slate-800 px-2.5 py-1.5 text-xs font-medium text-slate-300 hover:bg-slate-700"
-                  >
-                    <RefreshCw className="h-3 w-3" />
-                    <span>Đổi Camera</span>
-                  </button>
-                )}
+                  {cameraActive && !liveCapturedPhoto && (
+                    <button
+                      type="button"
+                      onClick={() => setFacingMode((prev) => (prev === 'environment' ? 'user' : 'environment'))}
+                      title="Đổi camera trước / sau"
+                      className="shrink-0 inline-flex items-center justify-center space-x-1 rounded-xl bg-slate-700/90 px-3 py-2.5 text-xs font-semibold text-slate-200 hover:bg-slate-600 active:scale-95 border border-slate-600 transition"
+                    >
+                      <RefreshCw className="h-3.5 w-3.5 shrink-0" />
+                      <span>Đổi Camera</span>
+                    </button>
+                  )}
+                </div>
+
+                {/* Hidden file input for test fixtures / automated mocks only (No upload UI visible to user) */}
+                <input
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  onChange={handleStrictFileUpload}
+                  className="hidden"
+                  style={{ display: 'none' }}
+                  tabIndex={-1}
+                  aria-hidden="true"
+                />
               </div>
 
-              {/* Hidden file input for test fixtures / automated mocks only (No upload UI visible to user) */}
-              <input
-                type="file"
-                accept="image/*"
-                capture="environment"
-                onChange={handleStrictFileUpload}
-                className="hidden"
-                style={{ display: 'none' }}
-                tabIndex={-1}
-                aria-hidden="true"
-              />
+              <div className="flex items-center space-x-1.5 text-[11px] text-slate-400 pt-1.5 border-t border-slate-700/60">
+                <AlertCircle className="h-3.5 w-3.5 text-amber-400 shrink-0" />
+                <span>Chỉ chấp nhận ảnh chụp thời gian thực tại chỗ. Ảnh cũ từ ngày hôm qua sẽ bị từ chối tự động.</span>
+              </div>
             </div>
           </div>
 
           {/* Right Column: Detected & Staged Borrow Items (5 cols) */}
-          <div className="md:col-span-5 bg-white border-l border-slate-200 p-4 flex flex-col justify-between overflow-hidden">
+          <div className="md:col-span-5 bg-white border-t md:border-t-0 md:border-l border-slate-200 p-3 sm:p-4 flex flex-col justify-between overflow-visible md:overflow-y-auto">
             <div className="flex-1 overflow-y-auto space-y-3">
               <div className="flex items-center justify-between border-b border-slate-200 pb-2">
                 <div className="flex items-center space-x-2">
@@ -867,7 +886,15 @@ export const CameraBorrowModal: React.FC<CameraBorrowModalProps> = ({
 
                       <div className="flex items-center justify-between pt-1 border-t border-slate-200/60">
                         <label className="text-[11px] text-slate-600 font-medium">Số lượng mượn:</label>
-                        <div className="flex items-center space-x-1.5">
+                        <div className="flex items-center space-x-1">
+                          <button
+                            type="button"
+                            onClick={() => handleQuantityChange(item.itemId, Math.max(1, item.quantity - 1))}
+                            disabled={item.quantity <= 1}
+                            className="h-8 w-8 rounded-lg border border-slate-300 bg-slate-100 text-slate-700 hover:bg-slate-200 disabled:opacity-40 flex items-center justify-center font-bold text-sm cursor-pointer select-none active:scale-95 transition"
+                          >
+                            -
+                          </button>
                           <input
                             type="number"
                             min={1}
@@ -876,9 +903,17 @@ export const CameraBorrowModal: React.FC<CameraBorrowModalProps> = ({
                             onChange={(e) =>
                               handleQuantityChange(item.itemId, parseInt(e.target.value, 10) || 1)
                             }
-                            className="w-16 rounded border border-slate-300 bg-white px-2 py-1 text-xs text-center font-bold focus:border-blue-500 focus:outline-none"
+                            className="w-16 rounded-lg border border-slate-300 bg-white px-1.5 py-1 text-xs text-center font-bold focus:border-blue-500 focus:outline-none"
                           />
-                          <span className="text-slate-500 text-[11px]">{item.unit}</span>
+                          <button
+                            type="button"
+                            onClick={() => handleQuantityChange(item.itemId, Math.min(item.maxAvailable, item.quantity + 1))}
+                            disabled={item.quantity >= item.maxAvailable}
+                            className="h-8 w-8 rounded-lg border border-slate-300 bg-slate-100 text-slate-700 hover:bg-slate-200 disabled:opacity-40 flex items-center justify-center font-bold text-sm cursor-pointer select-none active:scale-95 transition"
+                          >
+                            +
+                          </button>
+                          <span className="text-slate-500 text-[11px] pl-1">{item.unit}</span>
                         </div>
                       </div>
                     </div>
@@ -888,19 +923,12 @@ export const CameraBorrowModal: React.FC<CameraBorrowModalProps> = ({
             </div>
 
             {/* Anti-fraud reminder notice & Actions */}
-            <div className="pt-3 border-t border-slate-200 space-y-2 mt-3">
-              <div className="flex items-start space-x-1.5 p-2 rounded-lg bg-amber-50 border border-amber-200 text-[11px] text-amber-800">
-                <AlertCircle className="h-3.5 w-3.5 text-amber-600 shrink-0 mt-0.5" />
-                <span>
-                  Chỉ chấp nhận ảnh chụp thời gian thực tại chỗ. Ảnh cũ từ ngày hôm qua sẽ bị từ chối tự động.
-                </span>
-              </div>
-
+            <div className="pt-3 border-t border-slate-200 space-y-2.5 mt-3 sticky bottom-0 bg-white/95 backdrop-blur-sm z-10">
               <div className="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-end gap-2">
                 <button
                   type="button"
                   onClick={handleModalClose}
-                  className="w-full sm:w-auto rounded-lg border border-slate-200 bg-white px-3 py-2 sm:py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 text-center"
+                  className="w-full sm:w-auto rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 text-center active:scale-95 transition cursor-pointer"
                 >
                   Hủy bỏ
                 </button>
@@ -908,10 +936,10 @@ export const CameraBorrowModal: React.FC<CameraBorrowModalProps> = ({
                   type="button"
                   onClick={handleConfirmApply}
                   disabled={Object.keys(stagedItems).length === 0}
-                  className="w-full sm:w-auto inline-flex items-center justify-center space-x-1.5 rounded-lg bg-blue-600 px-4 py-2 sm:py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-blue-500 disabled:opacity-50"
+                  className="w-full sm:w-auto inline-flex items-center justify-center space-x-1.5 rounded-xl bg-blue-600 px-5 py-2.5 text-xs sm:text-sm font-bold text-white shadow-md hover:bg-blue-500 disabled:opacity-50 active:scale-95 transition cursor-pointer"
                 >
-                  <Check className="h-3.5 w-3.5" />
-                  <span>Áp dụng vào phiếu mượn</span>
+                  <Check className="h-4 w-4" />
+                  <span>Áp dụng vào phiếu mượn ({Object.keys(stagedItems).length})</span>
                 </button>
               </div>
             </div>

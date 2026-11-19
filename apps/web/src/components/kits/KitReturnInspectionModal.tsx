@@ -583,11 +583,11 @@ export const KitReturnInspectionModal: React.FC<KitReturnInspectionModalProps> =
   return (
     <div
       {...modalDismiss}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-2.5 sm:p-4 backdrop-blur-xs overflow-y-auto"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/75 p-0 sm:p-3 md:p-4 backdrop-blur-xs overflow-y-auto"
     >
-      <div className="flex max-h-[94vh] w-full max-w-4xl flex-col rounded-2xl bg-white shadow-2xl border border-slate-200 overflow-hidden">
+      <div className="flex h-[100dvh] sm:h-auto sm:max-h-[94vh] w-full max-w-4xl flex-col sm:rounded-2xl bg-white shadow-2xl border-0 sm:border border-slate-200 overflow-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50/75 px-4 py-3 sm:px-6 sm:py-4">
+        <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50/75 px-3.5 py-2.5 sm:px-6 sm:py-3.5 shrink-0">
           <div className="flex items-center space-x-2.5 min-w-0">
             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-200/60 shadow-2xs">
               <ClipboardCheck className="h-4 w-4" />
@@ -600,7 +600,7 @@ export const KitReturnInspectionModal: React.FC<KitReturnInspectionModalProps> =
                   <span>AI Camera Nhận diện linh kiện</span>
                 </span>
               </h3>
-              <p className="text-[11px] text-slate-500 truncate sm:whitespace-normal">
+              <p className="text-[11px] text-slate-500 break-words">
                 Đối soát số lượng và tình trạng linh kiện bên trong hộp kit qua Camera AI trước khi thu hồi về kho
               </p>
             </div>
@@ -1162,22 +1162,22 @@ export const KitReturnInspectionModal: React.FC<KitReturnInspectionModalProps> =
           </div>
 
           {/* Actions */}
-          <div className="pt-3 border-t border-slate-100 flex flex-col-reverse sm:flex-row sm:items-center sm:justify-end gap-2">
+          <div className="pt-3 border-t border-slate-200 flex flex-col-reverse sm:flex-row sm:items-center sm:justify-end gap-2 sticky bottom-0 bg-white/95 backdrop-blur-sm z-10 pb-2 sm:pb-0">
             <button
               type="button"
               onClick={onClose}
               disabled={submitting}
-              className="w-full sm:w-auto rounded-xl border border-slate-200 bg-white px-4 py-2.5 sm:py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 cursor-pointer transition text-center"
+              className="w-full sm:w-auto rounded-xl border border-slate-300 bg-white px-4 py-2.5 sm:py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 cursor-pointer transition text-center active:scale-95"
             >
               Hủy bỏ
             </button>
             <button
               type="submit"
               disabled={submitting}
-              className={`w-full sm:w-auto inline-flex items-center justify-center space-x-2 rounded-xl px-5 py-2.5 sm:py-2 text-xs font-semibold text-white shadow-sm cursor-pointer transition disabled:opacity-60 ${
+              className={`w-full sm:w-auto inline-flex items-center justify-center space-x-2 rounded-xl px-5 py-2.5 sm:py-2 text-xs font-bold text-white shadow-md cursor-pointer transition disabled:opacity-60 active:scale-95 ${
                 assessment.isPerfect
-                  ? 'bg-emerald-600 hover:bg-emerald-700 active:scale-[0.99]'
-                  : 'bg-amber-600 hover:bg-amber-700 active:scale-[0.99]'
+                  ? 'bg-emerald-600 hover:bg-emerald-700'
+                  : 'bg-amber-600 hover:bg-amber-700'
               }`}
             >
               <ClipboardCheck className="h-4 w-4" />
