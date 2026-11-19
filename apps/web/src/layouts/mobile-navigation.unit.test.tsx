@@ -4,6 +4,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
 import { Header } from './Header';
 import { Sidebar } from './Sidebar';
+import { MobileBottomNav } from './MobileBottomNav';
 
 // Zero-network SSR rendering. Use real canAccessPage RBAC policy in the drawer.
 vi.mock('../hooks/useAuth', () => ({
@@ -45,5 +46,16 @@ describe('L1 mobile navigation - safe responsive Web candidate', () => {
     expect(html).toContain('-translate-x-full invisible lg:visible');
     // Tailwind visibility:hidden removes offscreen mobile links from tab order.
     // lg:visible preserves normal desktop navigation when the drawer is closed.
+  });
+
+  it('renders mobile bottom navigation bar with essential lab actions and accessibility labels', () => {
+    const html = render(<MobileBottomNav onOpenSidebar={() => undefined} />);
+    expect(html).toContain('id="acm-mobile-bottom-nav"');
+    expect(html).toContain('href="/dashboard"');
+    expect(html).toContain('href="/items"');
+    expect(html).toContain('href="/borrow-return"');
+    expect(html).toContain('href="/kits"');
+    expect(html).toContain('aria-label="Quét Camera AI Nhận diện linh kiện &amp; Mượn trả"');
+    expect(html).toContain('aria-label="Mở danh mục điều hướng mở rộng"');
   });
 });

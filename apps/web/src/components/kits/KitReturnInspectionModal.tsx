@@ -80,6 +80,7 @@ export const KitReturnInspectionModal: React.FC<KitReturnInspectionModalProps> =
 
   // Camera & AI State
   const [isCameraActive, setIsCameraActive] = useState<boolean>(false);
+  const [facingMode, setFacingMode] = useState<'environment' | 'user'>('environment');
   const [isAiScanning, setIsAiScanning] = useState<boolean>(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [visionError, setVisionError] = useState<string | null>(null);
@@ -182,12 +183,17 @@ export const KitReturnInspectionModal: React.FC<KitReturnInspectionModalProps> =
   }, []);
 
   // Start camera helper
-  const handleStartCamera = async () => {
+  const handleStartCamera = async (targetFacing?: 'environment' | 'user') => {
+    const activeFacing = targetFacing === 'user' || targetFacing === 'environment' ? targetFacing : facingMode;
     setCameraError(null);
     setUploadedPreview(null);
+    if (mediaStreamRef.current) {
+      mediaStreamRef.current.getTracks().forEach((track) => track.stop());
+      mediaStreamRef.current = null;
+    }
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'environment' },
+        video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: { ideal: activeFacing } },
         audio: false,
       });
       mediaStreamRef.current = stream;
@@ -200,6 +206,14 @@ export const KitReturnInspectionModal: React.FC<KitReturnInspectionModalProps> =
       console.warn('Camera access denied or error:', err);
       setCameraError('Không thể mở Camera (chưa cấp quyền hoặc không tìm thấy thiết bị). Bạn có thể tải ảnh lên.');
       setIsCameraActive(false);
+    }
+  };
+
+  const handleToggleFacingMode = () => {
+    const next = facingMode === 'environment' ? 'user' : 'environment';
+    setFacingMode(next);
+    if (isCameraActive) {
+      handleStartCamera(next);
     }
   };
 
@@ -681,7 +695,7 @@ export const KitReturnInspectionModal: React.FC<KitReturnInspectionModalProps> =
 
                     <button
                       type="button"
-                      onClick={handleStartCamera}
+                      onClick={() => handleStartCamera()}
                       className="inline-flex items-center space-x-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white shadow-2xs hover:bg-blue-700 cursor-pointer transition"
                     >
                       <Camera className="h-3.5 w-3.5" />
@@ -787,6 +801,16 @@ export const KitReturnInspectionModal: React.FC<KitReturnInspectionModalProps> =
                   >
                     <RefreshCw className="h-3 w-3" />
                     <span>Quét 1 khung hình</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleToggleFacingMode}
+                    className="inline-flex items-center space-x-1 rounded-lg bg-slate-800 text-slate-200 border border-slate-700 px-2.5 py-1.5 text-xs font-medium hover:bg-slate-700 cursor-pointer"
+                    title="Đổi camera trước / sau (tiện cho điện thoại)"
+                  >
+                    <RefreshCw className="h-3 w-3 text-blue-400" />
+                    <span>{facingMode === 'environment' ? 'Camera sau' : 'Camera trước'}</span>
                   </button>
                 </div>
 

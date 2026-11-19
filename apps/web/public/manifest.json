@@ -1,0 +1,19 @@
+{
+  "name": "ACM Lab & Robotics - Quản lý Linh kiện",
+  "short_name": "ACM Lab",
+  "description": "Hệ thống Quản lý Linh kiện, Thiết bị & Hộp Kit Thực hành Phòng Lab AI & Robotics",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0B1329",
+  "theme_color": "#1E40AF",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/pwa-icon.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["education", "productivity", "utilities"]
+}

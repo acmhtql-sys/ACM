@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Outlet } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { Header } from './Header';
+import { MobileBottomNav } from './MobileBottomNav';
 
 export const DashboardLayout: React.FC = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -24,11 +25,14 @@ export const DashboardLayout: React.FC = () => {
       <div className="flex flex-1 flex-col overflow-hidden">
         <Header onOpenSidebar={() => setSidebarOpen(true)} isSidebarOpen={sidebarOpen} />
 
-        <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
+        <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 pb-24 lg:pb-8">
           <div className="mx-auto max-w-7xl">
             <Outlet />
           </div>
         </main>
+
+        {/* Mobile App Bottom Navigation Bar */}
+        <MobileBottomNav onOpenSidebar={() => setSidebarOpen(true)} />
       </div>
     </div>
   );
