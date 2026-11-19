@@ -35,3 +35,19 @@ services:
         sync: false
       - key: JWT_SECRET
         generateValue: true
+
+  - type: web
+    name: acm-vision-service
+    runtime: python
+    plan: free
+    region: singapore
+    branch: main
+    autoDeploy: true
+    buildCommand: pip install -r apps/vision-service/requirements.txt
+    startCommand: python apps/vision-service/server.py
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11.9"
+      - key: VISION_SERVICE_HOST
+        value: "0.0.0.0"

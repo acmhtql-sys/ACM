@@ -35,7 +35,7 @@ from starlette.routing import Route
 from ultralytics import YOLO
 
 # Configuration
-PORT = int(os.environ.get("VISION_SERVICE_PORT", "5055"))
+PORT = int(os.environ.get("PORT", os.environ.get("VISION_SERVICE_PORT", "5055")))
 HOST = os.environ.get("VISION_SERVICE_HOST", "0.0.0.0")
 MAX_PAYLOAD_BYTES = 5 * 1024 * 1024  # 5MB
 CONFIDENCE_THRESHOLD = 0.45

@@ -83,6 +83,7 @@ apps/api/scripts/*
 test-log.txt
 *-log.txt
 *.txt
+!apps/vision-service/requirements.txt
 
 # Temporary step reports, live evidence, and sandbox audit markdown
 ACM_CLOUD_C1*.md

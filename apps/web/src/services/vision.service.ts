@@ -43,6 +43,8 @@ export interface VisionHealthResponse {
   device: string;
 }
 
+export const CLOUD_VISION_FALLBACK_URL = 'https://acm-vision-service.onrender.com';
+
 export function getVisionServiceUrl(): string {
   if (typeof window !== 'undefined') {
     const custom = localStorage.getItem('acm_vision_service_url');
@@ -56,6 +58,11 @@ export function getVisionServiceUrl(): string {
       const isLanIp = /^(\d{1,3}\.){3}\d{1,3}$/.test(hostname);
       if (isLanIp) {
         return `http://${hostname}:5055`;
+      }
+      // If we are on an HTTPS production/preview domain (like Vercel acm-*.vercel.app),
+      // default to Cloud Vision service URL so mobile browsers don't block mixed content!
+      if (window.location.protocol === 'https:') {
+        return import.meta.env.VITE_VISION_SERVICE_URL || CLOUD_VISION_FALLBACK_URL;
       }
     }
   }
@@ -77,6 +84,9 @@ export async function checkVisionHealth(): Promise<VisionHealthResponse | null> 
   const urlsToTry = [
     `${base}/health`,
     base.includes('localhost') ? `${base.replace('localhost', '127.0.0.1')}/health` : null,
+    base !== CLOUD_VISION_FALLBACK_URL && typeof window !== 'undefined' && window.location.protocol === 'https:'
+      ? `${CLOUD_VISION_FALLBACK_URL}/health`
+      : null,
   ].filter(Boolean) as string[];
 
   for (const url of urlsToTry) {
@@ -109,6 +119,9 @@ export async function detectFrameBase64(
   const urlsToTry = [
     `${base}/api/v1/vision/detect`,
     base.includes('localhost') ? `${base.replace('localhost', '127.0.0.1')}/api/v1/vision/detect` : null,
+    base !== CLOUD_VISION_FALLBACK_URL && typeof window !== 'undefined' && window.location.protocol === 'https:'
+      ? `${CLOUD_VISION_FALLBACK_URL}/api/v1/vision/detect`
+      : null,
   ].filter(Boolean) as string[];
 
   let lastError = 'Không thể kết nối Vision Service (Offline)';
@@ -166,6 +179,9 @@ export async function detectFrameFile(
   const urlsToTry = [
     `${base}/api/v1/vision/detect`,
     base.includes('localhost') ? `${base.replace('localhost', '127.0.0.1')}/api/v1/vision/detect` : null,
+    base !== CLOUD_VISION_FALLBACK_URL && typeof window !== 'undefined' && window.location.protocol === 'https:'
+      ? `${CLOUD_VISION_FALLBACK_URL}/api/v1/vision/detect`
+      : null,
   ].filter(Boolean) as string[];
 
   let lastError = 'Không thể kết nối Vision Service (Offline)';
