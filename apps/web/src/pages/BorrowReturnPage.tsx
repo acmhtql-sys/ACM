@@ -589,10 +589,10 @@ export const BorrowReturnPage: React.FC = () => {
       {/* Header */}
       <div className="flex flex-col justify-between space-y-4 sm:flex-row sm:items-center sm:space-y-0">
         <div>
-          <h1 className="text-xl font-extrabold tracking-tight text-slate-900 sm:text-2xl">
+          <h1 className="text-lg font-extrabold tracking-tight text-slate-900 sm:text-2xl break-words">
             Quản lý Mượn & Trả (Borrow & Return)
           </h1>
-          <p className="mt-1 text-xs text-slate-500 font-medium">
+          <p className="mt-1 text-xs text-slate-500 font-medium break-words">
             Quy trình đăng ký, duyệt giữ chỗ (Reserved), bàn giao kho và xác nhận hoàn trả linh kiện an toàn
           </p>
         </div>
@@ -658,7 +658,7 @@ export const BorrowReturnPage: React.FC = () => {
           </div>
           <div className="space-y-2 pl-6">
             {pendingReturns.map((p) => (
-              <div key={p.key} className="flex items-center justify-between">
+              <div key={p.key} className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                 <span>
                   Phiếu <strong>{p.borrowId}</strong> (Khóa: <code className="font-mono bg-white px-1.5 py-0.5 rounded border border-indigo-200">{p.key}</code>)
                 </span>
@@ -684,7 +684,7 @@ export const BorrowReturnPage: React.FC = () => {
               </div>
             ))}
             {lostReturnGuards.map((g) => (
-              <div key={g.key} className="flex items-center justify-between">
+              <div key={g.key} className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                 <span>
                   Dấu chặn phiên trước: Phiếu <strong>{g.borrowId}</strong> (Khóa: <code className="font-mono bg-white px-1.5 py-0.5 rounded border border-indigo-200">{g.key}</code>)
                 </span>

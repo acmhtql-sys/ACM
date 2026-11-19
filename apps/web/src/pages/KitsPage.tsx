@@ -916,18 +916,18 @@ export const KitsPage: React.FC = () => {
       {/* Top Header */}
       <div className="flex flex-col justify-between space-y-4 sm:flex-row sm:items-center sm:space-y-0">
         <div>
-          <div className="flex items-center space-x-2.5">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand-50 text-brand-600 border border-brand-200/60">
+          <div className="flex items-center flex-wrap gap-2">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-brand-600 border border-brand-200/60">
               <Boxes className="h-5 w-5" />
             </div>
-            <h1 className="text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">
+            <h1 className="text-lg font-bold tracking-tight text-slate-900 sm:text-2xl break-words">
               Hộp Kit thực hành (Practice Kits)
             </h1>
-            <span className="inline-flex items-center rounded-full bg-brand-50 px-2.5 py-0.5 text-xs font-semibold text-brand-700 border border-brand-200/60">
+            <span className="inline-flex items-center rounded-full bg-brand-50 px-2.5 py-0.5 text-xs font-semibold text-brand-700 border border-brand-200/60 shrink-0">
               {kits.length} bộ kit
             </span>
           </div>
-          <p className="mt-1 text-xs text-slate-500">
+          <p className="mt-1 text-xs text-slate-500 break-words">
             Quản lý vòng đời hộp kit, linh kiện thành phần và phân bổ tồn kho (KitAllocated)
           </p>
         </div>
@@ -1070,8 +1070,8 @@ export const KitsPage: React.FC = () => {
                           </button>
                         </td>
                         <td className="px-4 py-3">
-                          <div className="font-medium text-slate-900">{k.name}</div>
-                          {k.description && <div className="text-[11px] text-slate-400 truncate max-w-sm mt-0.5">{k.description}</div>}
+                          <div className="font-medium text-slate-900 break-words">{k.name}</div>
+                          {k.description && <div className="text-[11px] text-slate-500 line-clamp-2 break-words max-w-xs sm:max-w-sm mt-0.5">{k.description}</div>}
                         </td>
                         <td className="px-4 py-3 text-slate-600">
                           {k.location ? `${k.location.name} (${k.location.code})` : '—'}

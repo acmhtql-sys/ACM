@@ -583,37 +583,37 @@ export const KitReturnInspectionModal: React.FC<KitReturnInspectionModalProps> =
   return (
     <div
       {...modalDismiss}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-xs overflow-y-auto"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-2.5 sm:p-4 backdrop-blur-xs overflow-y-auto"
     >
       <div className="flex max-h-[94vh] w-full max-w-4xl flex-col rounded-2xl bg-white shadow-2xl border border-slate-200 overflow-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50/75 px-6 py-4">
-          <div className="flex items-center space-x-2.5">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-200/60 shadow-2xs">
+        <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50/75 px-4 py-3 sm:px-6 sm:py-4">
+          <div className="flex items-center space-x-2.5 min-w-0">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-200/60 shadow-2xs">
               <ClipboardCheck className="h-4 w-4" />
             </div>
-            <div>
-              <h3 className="text-sm font-bold text-slate-900 flex items-center space-x-2">
+            <div className="min-w-0">
+              <h3 className="text-sm font-bold text-slate-900 flex items-center flex-wrap gap-1.5">
                 <span>Kiểm đếm & Nghiệm thu Hoàn trả Hộp Kit</span>
                 <span className="inline-flex items-center space-x-1 rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-semibold text-blue-700 border border-blue-200">
                   <Sparkles className="h-3 w-3 text-blue-500" />
                   <span>AI Camera Nhận diện linh kiện</span>
                 </span>
               </h3>
-              <p className="text-[11px] text-slate-500">
+              <p className="text-[11px] text-slate-500 truncate sm:whitespace-normal">
                 Đối soát số lượng và tình trạng linh kiện bên trong hộp kit qua Camera AI trước khi thu hồi về kho
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 cursor-pointer transition-colors"
+            className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 cursor-pointer transition-colors shrink-0 ml-2"
           >
             <X className="h-4 w-4" />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-4">
+        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-3.5 sm:p-6 space-y-4">
           {errorMessage && (
             <div className="flex items-center space-x-2 rounded-xl bg-rose-50 border border-rose-200 p-3 text-xs text-rose-700">
               <AlertCircle className="h-4 w-4 shrink-0 text-rose-600" />
@@ -624,7 +624,7 @@ export const KitReturnInspectionModal: React.FC<KitReturnInspectionModalProps> =
           {/* Kit Identification & Status Bar */}
           <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
-              <div className="flex items-center space-x-2">
+              <div className="flex items-center flex-wrap gap-1.5">
                 <span className="font-mono text-xs font-bold text-slate-900 bg-white px-2 py-0.5 rounded border border-slate-200 shadow-2xs">
                   {kit.code}
                 </span>
@@ -633,7 +633,7 @@ export const KitReturnInspectionModal: React.FC<KitReturnInspectionModalProps> =
                   Đang thu hồi từ sinh viên
                 </span>
               </div>
-              <p className="text-xs text-slate-500 mt-1">
+              <p className="text-xs text-slate-500 mt-1 break-words">
                 Kho lưu trữ: <span className="font-medium text-slate-700">{kit.location?.name || 'Kho phòng Lab'}</span>
                 {kit.description ? ` • ${kit.description}` : ''}
               </p>
@@ -872,13 +872,13 @@ export const KitReturnInspectionModal: React.FC<KitReturnInspectionModalProps> =
                       <Sparkles className="h-3.5 w-3.5" />
                     </span>
                     <div>
-                      <div className="text-xs font-bold text-slate-900 flex items-center space-x-1.5">
+                      <div className="text-xs font-bold text-slate-900 flex items-center flex-wrap gap-1.5">
                         <span>AI đã phát hiện {rawDetections.length} đối tượng linh kiện</span>
                         <span className="text-[10px] bg-emerald-100 text-emerald-800 px-1.5 py-0.2 rounded font-semibold">
                           Khớp {recognizedSummary.filter((s) => s.isMatched).length}/{kit.items?.length || 0} linh kiện trong kit
                         </span>
                       </div>
-                      <p className="text-[11px] text-slate-500">
+                      <p className="text-[11px] text-slate-500 break-words">
                         Hệ thống đã nhận diện các linh kiện và định vị trong khung hình hộp kit
                       </p>
                     </div>
@@ -887,7 +887,7 @@ export const KitReturnInspectionModal: React.FC<KitReturnInspectionModalProps> =
                   <button
                     type="button"
                     onClick={handleApplyAiToChecklist}
-                    className={`inline-flex items-center space-x-1.5 rounded-lg px-3.5 py-1.5 text-xs font-bold transition shadow-xs cursor-pointer ${
+                    className={`w-full sm:w-auto inline-flex items-center justify-center space-x-1.5 rounded-lg px-3.5 py-1.5 text-xs font-bold transition shadow-xs cursor-pointer ${
                       aiApplied
                         ? 'bg-slate-100 text-slate-600 border border-slate-200'
                         : 'bg-emerald-600 text-white hover:bg-emerald-700 active:scale-[0.99]'
@@ -974,8 +974,8 @@ export const KitReturnInspectionModal: React.FC<KitReturnInspectionModalProps> =
               </span>
             </div>
 
-            <div className="max-h-72 overflow-y-auto">
-              <table className="w-full text-left text-xs">
+            <div className="max-h-72 overflow-y-auto overflow-x-auto">
+              <table className="w-full text-left text-xs min-w-[500px]">
                 <thead className="bg-slate-50/80 border-b border-slate-100 text-[11px] font-semibold text-slate-500 uppercase tracking-wider sticky top-0 z-10">
                   <tr>
                     <th className="py-2 px-3">Linh kiện</th>
@@ -1162,19 +1162,19 @@ export const KitReturnInspectionModal: React.FC<KitReturnInspectionModalProps> =
           </div>
 
           {/* Actions */}
-          <div className="pt-3 border-t border-slate-100 flex items-center justify-end space-x-2.5">
+          <div className="pt-3 border-t border-slate-100 flex flex-col-reverse sm:flex-row sm:items-center sm:justify-end gap-2">
             <button
               type="button"
               onClick={onClose}
               disabled={submitting}
-              className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 cursor-pointer transition"
+              className="w-full sm:w-auto rounded-xl border border-slate-200 bg-white px-4 py-2.5 sm:py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 cursor-pointer transition text-center"
             >
               Hủy bỏ
             </button>
             <button
               type="submit"
               disabled={submitting}
-              className={`inline-flex items-center space-x-2 rounded-xl px-5 py-2 text-xs font-semibold text-white shadow-sm cursor-pointer transition disabled:opacity-60 ${
+              className={`w-full sm:w-auto inline-flex items-center justify-center space-x-2 rounded-xl px-5 py-2.5 sm:py-2 text-xs font-semibold text-white shadow-sm cursor-pointer transition disabled:opacity-60 ${
                 assessment.isPerfect
                   ? 'bg-emerald-600 hover:bg-emerald-700 active:scale-[0.99]'
                   : 'bg-amber-600 hover:bg-amber-700 active:scale-[0.99]'

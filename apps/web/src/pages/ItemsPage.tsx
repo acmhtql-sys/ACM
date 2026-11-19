@@ -244,15 +244,15 @@ export const ItemsPage: React.FC = () => {
       {/* Modern SaaS Header */}
       <div className="flex flex-col justify-between space-y-4 sm:flex-row sm:items-center sm:space-y-0">
         <div>
-          <div className="flex items-center space-x-2">
-            <h1 className="text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">
+          <div className="flex items-center flex-wrap gap-2">
+            <h1 className="text-lg font-bold tracking-tight text-slate-900 sm:text-2xl break-words">
               Quản lý Linh kiện & Thiết bị
             </h1>
-            <span className="inline-flex items-center rounded-full bg-brand-50 px-2.5 py-0.5 text-xs font-semibold text-brand-700 border border-brand-200/60">
+            <span className="inline-flex items-center rounded-full bg-brand-50 px-2.5 py-0.5 text-xs font-semibold text-brand-700 border border-brand-200/60 shrink-0">
               {meta.totalItems} mục
             </span>
           </div>
-          <p className="mt-1 text-xs text-slate-500">
+          <p className="mt-1 text-xs text-slate-500 break-words">
             Danh mục phần cứng phòng Lab, theo dõi số lượng khả dụng và cảnh báo tồn kho an toàn
           </p>
         </div>
@@ -497,9 +497,9 @@ export const ItemsPage: React.FC = () => {
 
                     {/* Name */}
                     <td className="py-3 px-4">
-                      <div className="font-medium text-slate-900">{item.name}</div>
+                      <div className="font-medium text-slate-900 break-words">{item.name}</div>
                       {item.description && (
-                        <div className="text-[11px] text-slate-400 truncate max-w-xs mt-0.5">
+                        <div className="text-[11px] text-slate-500 line-clamp-2 break-words max-w-xs mt-0.5">
                           {item.description}
                         </div>
                       )}

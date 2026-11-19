@@ -179,10 +179,10 @@ export const DashboardPage: React.FC = () => {
       {/* Page Header */}
       <div className="flex flex-col justify-between space-y-4 sm:flex-row sm:items-center sm:space-y-0">
         <div>
-          <h1 className="text-xl font-extrabold tracking-tight text-slate-900 sm:text-2xl">
+          <h1 className="text-lg font-extrabold tracking-tight text-slate-900 sm:text-2xl break-words">
             Bảng điều khiển Tổng quan (Dashboard)
           </h1>
-          <p className="mt-1 text-xs text-slate-500 font-medium">
+          <p className="mt-1 text-xs text-slate-500 font-medium break-words">
             Hệ thống giám sát tồn kho linh kiện, thiết bị phòng Lab & AI Robotic thời gian thực
           </p>
         </div>

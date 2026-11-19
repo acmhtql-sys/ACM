@@ -158,33 +158,33 @@ export const StudentBorrowKitModal: React.FC<StudentBorrowKitModalProps> = ({
   return (
     <div
       {...modalDismiss}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-xs overflow-y-auto"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-2.5 sm:p-4 backdrop-blur-xs overflow-y-auto"
     >
       <div className="flex max-h-[92vh] w-full max-w-2xl flex-col rounded-2xl bg-white shadow-2xl border border-slate-200 overflow-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50/75 px-6 py-4">
-          <div className="flex items-center space-x-2.5">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-50 text-blue-600 border border-blue-200/60 shadow-2xs">
+        <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50/75 px-4 py-3 sm:px-6 sm:py-4">
+          <div className="flex items-center space-x-2.5 min-w-0">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-600 border border-blue-200/60 shadow-2xs">
               <BookOpen className="h-4 w-4" />
             </div>
-            <div>
-              <h3 className="text-sm font-bold text-slate-900">
+            <div className="min-w-0">
+              <h3 className="text-sm font-bold text-slate-900 truncate">
                 Đăng ký mượn Hộp Kit thực hành
               </h3>
-              <p className="text-[11px] text-slate-500">
+              <p className="text-[11px] text-slate-500 truncate sm:whitespace-normal">
                 Nhận trọn bộ linh kiện thực hành cho môn học và nghiên cứu phòng Lab
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 cursor-pointer transition-colors"
+            className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 cursor-pointer transition-colors shrink-0 ml-2"
           >
             <X className="h-4 w-4" />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-4">
+        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-3.5 sm:p-6 space-y-4">
           {errorMessage && (
             <div className="flex items-center space-x-2 rounded-xl bg-rose-50 border border-rose-200 p-3 text-xs text-rose-700">
               <AlertCircle className="h-4 w-4 shrink-0 text-rose-600" />
@@ -242,8 +242,8 @@ export const StudentBorrowKitModal: React.FC<StudentBorrowKitModalProps> = ({
               </button>
 
               {isComponentsExpanded && (
-                <div className="mt-2.5 max-h-48 overflow-y-auto rounded-lg border border-slate-200 bg-white p-2">
-                  <table className="w-full text-left text-[11px]">
+                <div className="mt-2.5 max-h-48 overflow-y-auto overflow-x-auto rounded-lg border border-slate-200 bg-white p-2">
+                  <table className="w-full text-left text-[11px] min-w-[320px]">
                     <thead>
                       <tr className="border-b border-slate-100 text-slate-400 font-semibold">
                         <th className="py-1 px-2">Mã SKU</th>
@@ -403,19 +403,19 @@ export const StudentBorrowKitModal: React.FC<StudentBorrowKitModalProps> = ({
           </div>
 
           {/* Actions */}
-          <div className="pt-3 border-t border-slate-100 flex items-center justify-end space-x-2.5">
+          <div className="pt-3 border-t border-slate-100 flex flex-col-reverse sm:flex-row sm:items-center sm:justify-end gap-2">
             <button
               type="button"
               onClick={onClose}
               disabled={submitting}
-              className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 cursor-pointer transition"
+              className="w-full sm:w-auto rounded-xl border border-slate-200 bg-white px-4 py-2.5 sm:py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 cursor-pointer transition text-center"
             >
               Hủy bỏ
             </button>
             <button
               type="submit"
               disabled={submitting}
-              className="inline-flex items-center space-x-2 rounded-xl bg-blue-600 px-5 py-2 text-xs font-semibold text-white shadow-sm hover:bg-blue-700 active:scale-[0.99] cursor-pointer transition disabled:opacity-60"
+              className="w-full sm:w-auto inline-flex items-center justify-center space-x-2 rounded-xl bg-blue-600 px-5 py-2.5 sm:py-2 text-xs font-semibold text-white shadow-sm hover:bg-blue-700 active:scale-[0.99] cursor-pointer transition disabled:opacity-60"
             >
               <BookOpen className="h-4 w-4" />
               <span>{submitting ? 'Đang gửi đăng ký...' : 'Xác nhận Đăng ký mượn Kit'}</span>

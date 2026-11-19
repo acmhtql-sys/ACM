@@ -118,15 +118,15 @@ export const CategoriesPage: React.FC = () => {
       {/* Header */}
       <div className="flex flex-col justify-between space-y-4 sm:flex-row sm:items-center sm:space-y-0">
         <div>
-          <div className="flex items-center space-x-2.5">
-            <h1 className="text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">
+          <div className="flex items-center flex-wrap gap-2">
+            <h1 className="text-lg font-bold tracking-tight text-slate-900 sm:text-2xl break-words">
               Danh mục Linh kiện (Categories)
             </h1>
-            <span className="inline-flex items-center rounded-full bg-brand-50 px-2.5 py-0.5 text-xs font-semibold text-brand-700 border border-brand-200/60">
+            <span className="inline-flex items-center rounded-full bg-brand-50 px-2.5 py-0.5 text-xs font-semibold text-brand-700 border border-brand-200/60 shrink-0">
               {categories.length} danh mục
             </span>
           </div>
-          <p className="mt-1 text-xs text-slate-500">
+          <p className="mt-1 text-xs text-slate-500 break-words">
             Cấu trúc phân loại theo nhóm phần cứng và mục đích đào tạo phòng Lab ACM
           </p>
         </div>
@@ -141,8 +141,8 @@ export const CategoriesPage: React.FC = () => {
           </button>
         ) : (
           <div className="inline-flex items-center space-x-1.5 rounded-xl bg-slate-100/80 px-3.5 py-2 text-xs font-medium text-slate-600 border border-slate-200/80">
-            <ShieldAlert className="h-4 w-4 text-slate-500" />
-            <span>Chế độ Xem (Chỉ Admin / Lab Manager có quyền sửa)</span>
+            <ShieldAlert className="h-4 w-4 text-slate-500 shrink-0" />
+            <span className="break-words">Chế độ Xem (Chỉ Admin / Lab Manager có quyền sửa)</span>
           </div>
         )}
       </div>

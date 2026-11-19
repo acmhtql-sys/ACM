@@ -267,10 +267,10 @@ export const Header: React.FC<HeaderProps> = ({ onOpenSidebar, isSidebarOpen }) 
         </button>
 
         {/* Dynamic Breadcrumbs */}
-        <div className="flex items-center space-x-2 text-xs">
+        <div className="flex items-center space-x-2 text-xs min-w-0">
           <span className="font-medium text-slate-400 hidden sm:inline">{currentRoute.parent}</span>
           <ChevronRight className="h-3.5 w-3.5 text-slate-300 hidden sm:inline" />
-          <h1 className="font-bold text-slate-800 text-sm">{currentRoute.title}</h1>
+          <h1 className="font-bold text-slate-800 text-sm truncate max-w-[140px] xs:max-w-[200px] sm:max-w-none">{currentRoute.title}</h1>
         </div>
       </div>
 
@@ -321,7 +321,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenSidebar, isSidebarOpen }) 
 
           {/* Notifications Dropdown Panel */}
           {isNotifOpen && (
-            <div className="absolute right-0 top-full mt-2 w-80 sm:w-96 rounded-2xl border border-slate-200/90 bg-white shadow-modal z-50 overflow-hidden animate-in fade-in slide-in-from-top-1 duration-150">
+            <div className="fixed sm:absolute left-2.5 right-2.5 sm:left-auto sm:right-0 top-16 sm:top-full mt-2 sm:w-96 max-w-[calc(100vw-20px)] rounded-2xl border border-slate-200/90 bg-white shadow-modal z-50 overflow-hidden animate-in fade-in slide-in-from-top-1 duration-150">
               {/* Dropdown Header */}
               <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3 bg-slate-50/70">
                 <div className="flex items-center space-x-2 min-w-0">

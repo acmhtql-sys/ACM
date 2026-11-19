@@ -23,7 +23,7 @@ export const KpiCard: React.FC<KpiCardProps> = ({
   return (
     <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-5 shadow-card transition-all duration-200 hover:shadow-md hover:border-slate-300 group">
       <div className="flex items-center justify-between">
-        <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+        <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 break-words">
           {title}
         </span>
         <div className={`flex h-9 w-9 items-center justify-center rounded-xl shadow-xs transition-transform duration-200 group-hover:scale-105 ${iconColor}`}>
@@ -44,7 +44,7 @@ export const KpiCard: React.FC<KpiCardProps> = ({
           </span>
         )}
       </div>
-      {subtitle && <p className="mt-1.5 text-xs text-slate-500 leading-normal">{subtitle}</p>}
+      {subtitle && <p className="mt-1.5 text-xs text-slate-500 leading-normal break-words">{subtitle}</p>}
     </div>
   );
 };
