@@ -27,6 +27,7 @@ import {
   detectFrameBase64,
   detectFrameFile,
   checkVisionHealth,
+  compressImageForVision,
   type VisionDetection,
   type VisionDetectResponse,
 } from '../../services/vision.service';
@@ -85,6 +86,7 @@ export const KitReturnInspectionModal: React.FC<KitReturnInspectionModalProps> =
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [visionError, setVisionError] = useState<string | null>(null);
   const [isVisionOnline, setIsVisionOnline] = useState<boolean | null>(null);
+  const [isCheckingHealth, setIsCheckingHealth] = useState<boolean>(false);
   const [qcPhotoUrl, setQcPhotoUrl] = useState<string | null>(null);
   const [qcTimestamp, setQcTimestamp] = useState<string | null>(null);
   const [rawDetections, setRawDetections] = useState<VisionDetection[]>([]);
@@ -114,12 +116,17 @@ export const KitReturnInspectionModal: React.FC<KitReturnInspectionModalProps> =
     setAiApplied(false);
     setUploadedPreview(null);
 
+    setIsCheckingHealth(true);
     checkVisionHealth()
       .then((health) => {
         setIsVisionOnline(!!health);
+        if (health) setVisionError(null);
       })
       .catch(() => {
         setIsVisionOnline(false);
+      })
+      .finally(() => {
+        setIsCheckingHealth(false);
       });
 
     const rows: ComponentInspectionRow[] = (kit.items || []).map((ki) => ({
@@ -286,23 +293,47 @@ export const KitReturnInspectionModal: React.FC<KitReturnInspectionModalProps> =
     }
   }, [uploadedPreview, kit]);
 
+  // Manual retry connection to Vision Service
+  const handleCheckHealth = useCallback(async () => {
+    setIsCheckingHealth(true);
+    try {
+      const health = await checkVisionHealth();
+      setIsVisionOnline(!!health);
+      if (health) {
+        setVisionError(null);
+      }
+    } catch {
+      setIsVisionOnline(false);
+    } finally {
+      setIsCheckingHealth(false);
+    }
+  }, []);
+
   // Execute AI detection frame processing
-  const runAiDetection = useCallback(async () => {
+  const runAiDetection = useCallback(async (overrideB64?: string) => {
     if (isInFlightRef.current) return;
     isInFlightRef.current = true;
 
     try {
-      let b64 = '';
-      if (uploadedPreview) {
-        b64 = uploadedPreview;
-      } else if (videoRef.current && videoRef.current.readyState >= 2) {
-        const offscreen = document.createElement('canvas');
-        offscreen.width = videoRef.current.videoWidth || 640;
-        offscreen.height = videoRef.current.videoHeight || 480;
-        const ctx = offscreen.getContext('2d');
-        if (ctx) {
-          ctx.drawImage(videoRef.current, 0, 0, offscreen.width, offscreen.height);
-          b64 = offscreen.toDataURL('image/jpeg', 0.85);
+      let b64 = overrideB64 || '';
+      if (!b64) {
+        if (uploadedPreview) {
+          b64 = uploadedPreview;
+        } else if (videoRef.current && videoRef.current.readyState >= 2) {
+          const offscreen = document.createElement('canvas');
+          const vw = videoRef.current.videoWidth || 640;
+          const vh = videoRef.current.videoHeight || 480;
+          const maxDim = 1024;
+          const scale = Math.min(1, maxDim / Math.max(vw, vh));
+          offscreen.width = Math.round(vw * scale);
+          offscreen.height = Math.round(vh * scale);
+          const ctx = offscreen.getContext('2d');
+          if (ctx) {
+            ctx.drawImage(videoRef.current, 0, 0, offscreen.width, offscreen.height);
+            b64 = offscreen.toDataURL('image/jpeg', 0.85);
+          }
+        } else if (qcPhotoUrl) {
+          b64 = qcPhotoUrl;
         }
       }
 
@@ -356,7 +387,7 @@ export const KitReturnInspectionModal: React.FC<KitReturnInspectionModalProps> =
     } finally {
       isInFlightRef.current = false;
     }
-  }, [uploadedPreview, drawBoundingBoxes, kit]);
+  }, [uploadedPreview, qcPhotoUrl, drawBoundingBoxes, kit]);
 
   // Toggle Continuous AI Scan
   const handleToggleAiScan = useCallback(() => {
@@ -462,22 +493,29 @@ export const KitReturnInspectionModal: React.FC<KitReturnInspectionModalProps> =
     handleStopCamera();
   };
 
-  // File Upload handler
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // File Upload handler with automatic compression for fast AI inference
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     handleStopCamera();
-    const reader = new FileReader();
-    reader.onload = () => {
-      const b64 = reader.result as string;
-      setUploadedPreview(b64);
-      // Run AI recognition on the uploaded image immediately
+    try {
+      const compressedB64 = await compressImageForVision(file, 1024, 0.85);
+      setUploadedPreview(compressedB64);
       setTimeout(() => {
-        runAiDetection();
-      }, 200);
-    };
-    reader.readAsDataURL(file);
+        runAiDetection(compressedB64);
+      }, 150);
+    } catch {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const b64 = reader.result as string;
+        setUploadedPreview(b64);
+        setTimeout(() => {
+          runAiDetection(b64);
+        }, 150);
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
   // Update line row in checklist
@@ -663,16 +701,22 @@ export const KitReturnInspectionModal: React.FC<KitReturnInspectionModalProps> =
                   <p className="text-[11px] text-slate-500">
                     Đưa hộp kit hoặc các linh kiện vào khung hình để AI tự động nhận dạng và đếm số lượng
                   </p>
-                  {isVisionOnline === true && (
+                  {isCheckingHealth && (
+                    <span className="inline-flex items-center space-x-1 rounded-full bg-blue-100/80 px-2 py-0.5 text-[10px] font-bold text-blue-800">
+                      <RefreshCw className="h-2.5 w-2.5 animate-spin text-blue-600" />
+                      <span>Đang kết nối AI...</span>
+                    </span>
+                  )}
+                  {!isCheckingHealth && isVisionOnline === true && (
                     <span className="inline-flex items-center space-x-1 rounded-full bg-emerald-100/80 px-2 py-0.5 text-[10px] font-bold text-emerald-800">
                       <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
                       <span>YOLO11: Sẵn sàng</span>
                     </span>
                   )}
-                  {isVisionOnline === false && (
+                  {!isCheckingHealth && isVisionOnline === false && (
                     <span className="inline-flex items-center space-x-1 rounded-full bg-amber-100/80 px-2 py-0.5 text-[10px] font-bold text-amber-800">
                       <AlertTriangle className="h-2.5 w-2.5 text-amber-600" />
-                      <span>Vision: Offline</span>
+                      <span>Vision: Chưa kết nối</span>
                     </span>
                   )}
                 </div>
@@ -796,7 +840,7 @@ export const KitReturnInspectionModal: React.FC<KitReturnInspectionModalProps> =
 
                   <button
                     type="button"
-                    onClick={runAiDetection}
+                    onClick={() => runAiDetection()}
                     className="inline-flex items-center space-x-1 rounded-lg bg-slate-800 text-slate-200 border border-slate-700 px-2.5 py-1.5 text-xs font-medium hover:bg-slate-700 cursor-pointer"
                   >
                     <RefreshCw className="h-3 w-3" />
@@ -829,12 +873,25 @@ export const KitReturnInspectionModal: React.FC<KitReturnInspectionModalProps> =
 
             {/* VISION SERVICE OFFLINE NOTICE */}
             {visionError && (
-              <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900 shadow-2xs flex items-start space-x-2">
+              <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900 shadow-2xs flex items-start space-x-2.5">
                 <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
-                <div className="space-y-1">
-                  <p className="font-bold">Dịch vụ nhận diện AI chưa kết nối (Vision Service Offline)</p>
-                  <p className="text-[11px] text-amber-800">
-                    Vui lòng chạy lệnh: <code className="bg-amber-100 px-1.5 py-0.5 rounded font-mono font-bold text-amber-900">npm run vision</code> trên terminal máy tính để kích hoạt mô hình YOLO11 (85 lớp trên port 5055). Khi dùng trên Vercel, bạn cũng có thể mở web tại <code className="bg-amber-100 px-1 py-0.5 rounded font-mono font-semibold">http://localhost:5173</code> để tránh trình duyệt chặn HTTPS mixed content.
+                <div className="space-y-1.5 flex-1 min-w-0">
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <p className="font-bold">Dịch vụ nhận diện AI chưa phản hồi</p>
+                    <button
+                      type="button"
+                      disabled={isCheckingHealth}
+                      onClick={handleCheckHealth}
+                      className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-lg bg-amber-600 text-white font-semibold hover:bg-amber-700 transition cursor-pointer text-[11px] disabled:opacity-50"
+                    >
+                      <RefreshCw className={`h-3 w-3 ${isCheckingHealth ? 'animate-spin' : ''}`} />
+                      <span>{isCheckingHealth ? 'Đang kiểm tra...' : 'Thử lại kết nối AI'}</span>
+                    </button>
+                  </div>
+                  <p className="text-[11px] text-amber-800 break-words leading-relaxed">
+                    {typeof window !== 'undefined' && window.location.protocol === 'https:'
+                      ? 'Máy chủ AI trên Cloud (Render) có thể đang khởi động lại sau thời gian rỗi hoặc đang bận xử lý. Vui lòng bấm "Thử lại kết nối AI" hoặc chờ khoảng 15-30 giây.'
+                      : 'Vui lòng chạy lệnh: npm run vision trên terminal máy tính để kích hoạt mô hình YOLO11 (85 lớp trên port 5055).'}
                   </p>
                 </div>
               </div>
@@ -933,31 +990,44 @@ export const KitReturnInspectionModal: React.FC<KitReturnInspectionModalProps> =
 
             {/* Saved QC Photo Banner */}
             {qcPhotoUrl && (
-              <div className="flex items-center space-x-3 rounded-xl border border-emerald-200 bg-emerald-50/50 p-3">
-                <img
-                  src={qcPhotoUrl}
-                  alt="QC Photo"
-                  className="h-16 w-24 object-cover rounded-lg border border-emerald-300 shadow-2xs"
-                />
-                <div className="flex-1 text-xs">
-                  <div className="font-semibold text-emerald-800 flex items-center space-x-1">
-                    <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
-                    <span>Đã lưu ảnh chụp nghiệm thu hiện trạng hộp kit (Có dấu xác thực QC)</span>
-                  </div>
-                  <div className="text-[11px] text-emerald-700 mt-0.5">
-                    Thời gian xác thực: <span className="font-mono font-medium">{qcTimestamp}</span>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl border border-emerald-200 bg-emerald-50/50 p-3">
+                <div className="flex items-center space-x-3 min-w-0">
+                  <img
+                    src={qcPhotoUrl}
+                    alt="QC Photo"
+                    className="h-16 w-24 object-cover rounded-lg border border-emerald-300 shadow-2xs shrink-0"
+                  />
+                  <div className="min-w-0 text-xs">
+                    <div className="font-semibold text-emerald-800 flex items-center space-x-1">
+                      <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
+                      <span>Đã lưu ảnh chụp nghiệm thu hiện trạng hộp kit (Có dấu xác thực QC)</span>
+                    </div>
+                    <div className="text-[11px] text-emerald-700 mt-0.5">
+                      Thời gian xác thực: <span className="font-mono font-medium">{qcTimestamp}</span>
+                    </div>
                   </div>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setQcPhotoUrl(null);
-                    setQcTimestamp(null);
-                  }}
-                  className="text-xs text-slate-400 hover:text-slate-600 cursor-pointer font-medium"
-                >
-                  Chụp lại
-                </button>
+                <div className="flex items-center space-x-2 shrink-0 self-end sm:self-center">
+                  <button
+                    type="button"
+                    onClick={() => runAiDetection(qcPhotoUrl)}
+                    className="inline-flex items-center space-x-1 rounded-lg bg-emerald-600 px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 shadow-2xs cursor-pointer transition active:scale-[0.99]"
+                    title="Nhận diện lại các linh kiện trong ảnh đã chụp bằng AI"
+                  >
+                    <Sparkles className="h-3.5 w-3.5" />
+                    <span>Quét AI ảnh này</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setQcPhotoUrl(null);
+                      setQcTimestamp(null);
+                    }}
+                    className="text-xs text-slate-500 hover:text-slate-700 cursor-pointer font-medium px-2 py-1"
+                  >
+                    Chụp lại
+                  </button>
+                </div>
               </div>
             )}
           </div>

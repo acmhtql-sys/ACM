@@ -37,9 +37,9 @@ from ultralytics import YOLO
 # Configuration
 PORT = int(os.environ.get("PORT", os.environ.get("VISION_SERVICE_PORT", "5055")))
 HOST = os.environ.get("VISION_SERVICE_HOST", "0.0.0.0")
-MAX_PAYLOAD_BYTES = 5 * 1024 * 1024  # 5MB
+MAX_PAYLOAD_BYTES = 10 * 1024 * 1024  # 10MB
 CONFIDENCE_THRESHOLD = 0.45
-INFERENCE_TIMEOUT_SEC = 5.0
+INFERENCE_TIMEOUT_SEC = float(os.environ.get("INFERENCE_TIMEOUT_SEC", "30.0"))
 
 # Model Path Resolution
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -304,6 +304,11 @@ async def detect_endpoint(request: Request) -> JSONResponse:
                 img = Image.open(io.BytesIO(img_bytes))
                 img.load()
                 img = img.convert("RGB")
+                # Downscale huge mobile camera uploads to max 1024px for fast CPU inference
+                max_dim = max(img.width, img.height)
+                if max_dim > 1024:
+                    scale = 1024.0 / max_dim
+                    img = img.resize((int(img.width * scale), int(img.height * scale)), Image.Resampling.BILINEAR)
             except Exception as e:
                 return JSONResponse(
                     {"success": False, "error": f"Invalid or malformed image data: {str(e)}"},
