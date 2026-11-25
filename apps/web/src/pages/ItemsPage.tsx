@@ -307,10 +307,10 @@ export const ItemsPage: React.FC = () => {
         </div>
 
         {/* Filters Row */}
-        <div className="flex flex-wrap items-center gap-2 pt-3 border-t border-slate-100">
-          <div className="flex items-center space-x-1.5 text-xs text-slate-500 mr-1">
-            <Filter className="h-3.5 w-3.5 text-slate-400" />
-            <span className="font-medium text-slate-600">Bộ lọc:</span>
+        <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2 pt-3 border-t border-slate-100">
+          <div className="col-span-2 sm:col-span-1 flex items-center space-x-1.5 text-xs text-slate-500 sm:mr-1">
+            <Filter className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+            <span className="font-semibold text-slate-700">Bộ lọc linh kiện:</span>
           </div>
 
           {/* Category Filter */}
@@ -320,7 +320,7 @@ export const ItemsPage: React.FC = () => {
               setSelectedCategory(e.target.value);
               setPage(1);
             }}
-            className="rounded-xl border border-slate-200 bg-slate-50/50 py-1.5 px-3 text-xs text-slate-700 focus:bg-white focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 transition-all cursor-pointer"
+            className="w-full sm:w-auto rounded-xl border border-slate-200 bg-slate-50/50 py-1.5 px-3 text-xs text-slate-700 focus:bg-white focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 transition-all cursor-pointer"
           >
             <option value="">Tất cả danh mục</option>
             {categories.map((c) => (
@@ -337,7 +337,7 @@ export const ItemsPage: React.FC = () => {
               setSelectedType(e.target.value);
               setPage(1);
             }}
-            className="rounded-xl border border-slate-200 bg-slate-50/50 py-1.5 px-3 text-xs text-slate-700 focus:bg-white focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 transition-all cursor-pointer"
+            className="w-full sm:w-auto rounded-xl border border-slate-200 bg-slate-50/50 py-1.5 px-3 text-xs text-slate-700 focus:bg-white focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 transition-all cursor-pointer"
           >
             <option value="">Tất cả loại (Item Type)</option>
             <option value={ItemType.CONSUMABLE}>Tiêu hao (CONSUMABLE)</option>
@@ -353,7 +353,7 @@ export const ItemsPage: React.FC = () => {
                 setSelectedStatus(e.target.value);
                 setPage(1);
               }}
-              className="rounded-xl border border-slate-200 bg-slate-50/50 py-1.5 px-3 text-xs text-slate-700 focus:bg-white focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 transition-all cursor-pointer"
+              className="w-full sm:w-auto rounded-xl border border-slate-200 bg-slate-50/50 py-1.5 px-3 text-xs text-slate-700 focus:bg-white focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 transition-all cursor-pointer"
             >
               <option value="all">Tất cả trạng thái</option>
               <option value="active">Đang hoạt động (Active)</option>
@@ -368,7 +368,7 @@ export const ItemsPage: React.FC = () => {
               setSelectedStockStatus(e.target.value);
               setPage(1);
             }}
-            className="rounded-xl border border-slate-200 bg-slate-50/50 py-1.5 px-3 text-xs text-slate-700 focus:bg-white focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 transition-all cursor-pointer"
+            className="w-full sm:w-auto rounded-xl border border-slate-200 bg-slate-50/50 py-1.5 px-3 text-xs text-slate-700 focus:bg-white focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 transition-all cursor-pointer"
           >
             <option value="all">Tất cả tình trạng tồn</option>
             <option value={StockStatus.IN_STOCK}>Sẵn sàng (IN_STOCK)</option>
@@ -383,7 +383,7 @@ export const ItemsPage: React.FC = () => {
               setIsLowStockFilter(!isLowStockFilter);
               setPage(1);
             }}
-            className={`inline-flex items-center space-x-1.5 rounded-xl border px-3 py-1.5 text-xs font-medium transition-all ${
+            className={`col-span-2 sm:col-span-1 inline-flex items-center justify-center space-x-1.5 rounded-xl border px-3 py-1.5 text-xs font-medium transition-all ${
               isLowStockFilter
                 ? 'border-amber-300 bg-amber-50/80 text-amber-800 shadow-xs'
                 : 'border-slate-200 bg-slate-50/50 text-slate-600 hover:bg-slate-100 hover:text-slate-900'
@@ -397,7 +397,7 @@ export const ItemsPage: React.FC = () => {
           {(debouncedSearch || selectedCategory || selectedType || selectedStatus !== 'all' || selectedStockStatus !== 'all' || isLowStockFilter) && (
             <button
               onClick={handleResetFilters}
-              className="inline-flex items-center space-x-1.5 text-xs text-rose-600 hover:text-rose-700 ml-auto font-medium transition-colors"
+              className="col-span-2 sm:col-span-1 inline-flex items-center justify-center space-x-1.5 text-xs text-rose-600 hover:text-rose-700 sm:ml-auto font-medium transition-colors py-1"
             >
               <RotateCcw className="h-3.5 w-3.5" />
               <span>Xóa bộ lọc</span>
@@ -408,7 +408,8 @@ export const ItemsPage: React.FC = () => {
 
       {/* Items Table Card */}
       <div className="rounded-2xl border border-slate-200/80 bg-white shadow-card overflow-hidden">
-        <div className="overflow-x-auto">
+        {/* Desktop Table View */}
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-left text-xs">
             <thead className="border-b border-slate-200/80 bg-slate-50/75 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
               <tr>
@@ -623,6 +624,152 @@ export const ItemsPage: React.FC = () => {
               )}
             </tbody>
           </table>
+        </div>
+
+        {/* Mobile Touch-Friendly Card View */}
+        <div className="block md:hidden divide-y divide-slate-100 p-3 space-y-3">
+          {loading ? (
+            <div className="py-12 text-center text-slate-400">
+              <div className="flex flex-col items-center justify-center space-y-2">
+                <div className="h-7 w-7 animate-spin rounded-full border-2 border-brand-600 border-t-transparent" />
+                <span className="text-xs text-slate-500">Đang tải danh sách linh kiện...</span>
+              </div>
+            </div>
+          ) : error ? (
+            <div className="py-8 text-center text-rose-500">
+              <AlertTriangle className="h-7 w-7 mx-auto mb-2" />
+              <p className="text-xs mb-3">{error}</p>
+              <button
+                onClick={() => fetchItems()}
+                className="rounded-xl bg-slate-100 px-3.5 py-1.5 text-xs font-medium text-slate-700"
+              >
+                Thử lại
+              </button>
+            </div>
+          ) : items.length === 0 ? (
+            <div className="py-12 text-center text-slate-400">
+              <Layers className="h-8 w-8 mx-auto text-slate-300 mb-2" />
+              <p className="font-semibold text-slate-700 text-sm">Không tìm thấy linh kiện nào</p>
+              <p className="text-xs text-slate-400 mt-1">Thử thay đổi bộ lọc hoặc từ khóa tìm kiếm.</p>
+            </div>
+          ) : (
+            items.map((item) => (
+              <div
+                key={item.id}
+                className={`rounded-xl border p-3.5 transition-all space-y-2.5 ${
+                  item.isLowStock
+                    ? 'border-amber-300 bg-amber-50/30'
+                    : 'border-slate-200/90 bg-white shadow-2xs'
+                } ${!item.isActive ? 'opacity-70 bg-slate-50' : ''}`}
+              >
+                {/* Header: SKU & Badges */}
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <div className="inline-flex items-center space-x-1.5 bg-slate-100/90 px-2 py-0.5 rounded-md border border-slate-200/70 font-mono text-xs font-bold text-slate-800">
+                    <Barcode className="h-3.5 w-3.5 text-slate-400" />
+                    <span>{item.code}</span>
+                  </div>
+
+                  <div className="flex items-center space-x-1.5">
+                    <StatusBadge status={item.stockStatus} variant="stockStatus" />
+                    <StatusBadge
+                      status={item.isActive ? 'ACTIVE' : 'INACTIVE'}
+                      variant="activeStatus"
+                    />
+                  </div>
+                </div>
+
+                {/* Title & Category */}
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900 leading-snug break-words">
+                    {item.name}
+                  </h3>
+                  <div className="flex items-center space-x-2 text-xs text-slate-500 mt-1">
+                    <span className="font-medium text-slate-600">
+                      {item.category?.name || item.categoryName || 'Chưa phân loại'}
+                    </span>
+                    <span>•</span>
+                    <StatusBadge status={item.type} variant="itemType" />
+                  </div>
+                </div>
+
+                {/* Stock Stats Grid */}
+                <div className="grid grid-cols-3 gap-2 bg-slate-50/80 rounded-lg p-2 text-center border border-slate-100">
+                  <div>
+                    <span className="block text-[10px] text-slate-400 font-medium uppercase">Tồn vật lý</span>
+                    <span className="font-bold text-slate-800 text-xs">
+                      {item.totalOnHand} <span className="font-normal text-[10px] text-slate-400">{item.unit}</span>
+                    </span>
+                  </div>
+                  <div>
+                    <span className="block text-[10px] text-slate-400 font-medium uppercase">Khả dụng</span>
+                    {item.isLowStock ? (
+                      <span className="inline-flex items-center font-bold text-amber-700 text-xs">
+                        <AlertTriangle className="h-3 w-3 mr-0.5 text-amber-600" />
+                        {item.available}
+                      </span>
+                    ) : (
+                      <span className="font-bold text-emerald-700 text-xs">{item.available}</span>
+                    )}
+                  </div>
+                  <div>
+                    <span className="block text-[10px] text-slate-400 font-medium uppercase">Ngưỡng báo</span>
+                    <span className="font-mono text-xs text-slate-500">&lt; {item.minStockAlert}</span>
+                  </div>
+                </div>
+
+                {/* Actions Row */}
+                <div className="flex items-center justify-between pt-1 border-t border-slate-100/80">
+                  <button
+                    onClick={() => {
+                      setSelectedItemIdForDetail(item.id);
+                      setDetailModalOpen(true);
+                    }}
+                    className="inline-flex items-center space-x-1.5 rounded-lg bg-blue-50 border border-blue-200/60 px-3 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-100 active:scale-95 transition"
+                  >
+                    <Eye className="h-3.5 w-3.5" />
+                    <span>Chi tiết</span>
+                  </button>
+
+                  {canManage && (
+                    <div className="flex items-center space-x-1.5">
+                      <button
+                        onClick={() => {
+                          setSelectedItemForForm(item);
+                          setFormModalMode('edit');
+                          setFormModalOpen(true);
+                        }}
+                        className="rounded-lg p-1.5 text-slate-500 hover:bg-amber-50 hover:text-amber-600 border border-slate-200/60"
+                        title="Sửa"
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                      </button>
+                      <button
+                        onClick={() => {
+                          setSelectedItemForStatus(item);
+                          setStatusModalOpen(true);
+                        }}
+                        className={`rounded-lg p-1.5 border border-slate-200/60 ${
+                          item.isActive
+                            ? 'text-slate-400 hover:bg-rose-50 hover:text-rose-600'
+                            : 'text-slate-400 hover:bg-emerald-50 hover:text-emerald-600'
+                        }`}
+                        title={item.isActive ? 'Khóa' : 'Mở'}
+                      >
+                        <Power className="h-3.5 w-3.5" />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteItem(item)}
+                        className="rounded-lg p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600 border border-slate-200/60"
+                        title="Xóa"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))
+          )}
         </div>
 
         {/* Pagination Footer */}

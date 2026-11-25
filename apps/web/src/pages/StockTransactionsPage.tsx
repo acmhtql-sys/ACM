@@ -318,10 +318,10 @@ export const StockTransactionsPage: React.FC = () => {
 
         {/* Action Buttons Toolbar with UI Safety & Read-Only indicator */}
         {canWrite && (
-          <div className="flex flex-wrap items-center gap-2" data-testid="write-actions-toolbar">
+          <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2 w-full sm:w-auto" data-testid="write-actions-toolbar">
             {!writeEnabled && (
               <div
-                className="inline-flex items-center space-x-1.5 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] font-medium text-amber-800 shadow-xs"
+                className="col-span-2 sm:col-span-1 inline-flex items-center space-x-1.5 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] font-medium text-amber-800 shadow-xs"
                 data-testid="read-only-safety-badge"
                 title="Chế độ giám sát Read-Only S2C-2: Thao tác ghi bị khóa để bảo đảm toàn vẹn dữ liệu"
               >
@@ -332,7 +332,7 @@ export const StockTransactionsPage: React.FC = () => {
             <button
               onClick={() => handleOpenModal(setIsImportOpen)}
               disabled={!writeEnabled}
-              className={`inline-flex items-center space-x-1.5 rounded-xl px-3.5 py-2 text-xs font-semibold shadow-soft transition-all ${
+              className={`inline-flex items-center justify-center space-x-1.5 rounded-xl px-3.5 py-2 text-xs font-semibold shadow-soft transition-all ${
                 writeEnabled
                   ? 'bg-brand-600 text-white hover:bg-brand-700 active:scale-[0.99] cursor-pointer'
                   : 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed opacity-60'
@@ -346,7 +346,7 @@ export const StockTransactionsPage: React.FC = () => {
             <button
               onClick={() => handleOpenModal(setIsExportOpen)}
               disabled={!writeEnabled}
-              className={`inline-flex items-center space-x-1.5 rounded-xl px-3.5 py-2 text-xs font-semibold shadow-soft transition-all ${
+              className={`inline-flex items-center justify-center space-x-1.5 rounded-xl px-3.5 py-2 text-xs font-semibold shadow-soft transition-all ${
                 writeEnabled
                   ? 'bg-amber-600 text-white hover:bg-amber-700 active:scale-[0.99] cursor-pointer'
                   : 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed opacity-60'
@@ -360,7 +360,7 @@ export const StockTransactionsPage: React.FC = () => {
             <button
               onClick={() => handleOpenModal(setIsTransferOpen)}
               disabled={!writeEnabled}
-              className={`inline-flex items-center space-x-1.5 rounded-xl px-3.5 py-2 text-xs font-semibold shadow-soft transition-all ${
+              className={`inline-flex items-center justify-center space-x-1.5 rounded-xl px-3.5 py-2 text-xs font-semibold shadow-soft transition-all ${
                 writeEnabled
                   ? 'bg-purple-600 text-white hover:bg-purple-700 active:scale-[0.99] cursor-pointer'
                   : 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed opacity-60'
@@ -374,7 +374,7 @@ export const StockTransactionsPage: React.FC = () => {
             <button
               onClick={() => handleOpenModal(setIsAdjustmentOpen)}
               disabled={!writeEnabled || !isAdjustmentEnabled}
-              className={`inline-flex items-center space-x-1.5 rounded-xl px-3.5 py-2 text-xs font-semibold shadow-soft transition-all ${
+              className={`inline-flex items-center justify-center space-x-1.5 rounded-xl px-3.5 py-2 text-xs font-semibold shadow-soft transition-all ${
                 writeEnabled && isAdjustmentEnabled
                   ? 'bg-amber-600 text-white hover:bg-amber-700 active:scale-[0.99] cursor-pointer'
                   : 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed opacity-60'
@@ -529,96 +529,167 @@ export const StockTransactionsPage: React.FC = () => {
               />
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs" data-testid="stock-transactions-table">
-                <thead className="border-b border-slate-200/80 bg-slate-50 font-semibold text-slate-600">
-                  <tr>
-                    <th className="py-3 px-4">Mã chứng từ</th>
-                    <th className="py-3 px-4">Loại giao dịch</th>
-                    <th className="py-3 px-4">Trạng thái</th>
-                    <th className="py-3 px-4">Người lập</th>
-                    <th className="py-3 px-4 text-center">Số dòng</th>
-                    <th className="py-3 px-4 text-right">Tổng số lượng</th>
-                    <th className="py-3 px-4">Thời gian</th>
-                    <th className="py-3 px-4">Ghi chú</th>
-                    <th className="py-3 px-4 text-center">Thao tác</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 text-slate-700">
-                  {transactions.map((tx) => {
-                    const itemCount = typeof tx.itemCount === 'number' ? tx.itemCount : (tx.details?.length ?? 0);
-                    const totalQty = typeof tx.totalQuantity === 'number' ? tx.totalQuantity : (tx.details?.reduce((s, d) => s + d.quantity, 0) ?? 0);
+            <>
+              {/* Desktop Table View */}
+              <div className="hidden md:block overflow-x-auto">
+                <table className="w-full text-left text-xs" data-testid="stock-transactions-table">
+                  <thead className="border-b border-slate-200/80 bg-slate-50 font-semibold text-slate-600">
+                    <tr>
+                      <th className="py-3 px-4">Mã chứng từ</th>
+                      <th className="py-3 px-4">Loại giao dịch</th>
+                      <th className="py-3 px-4">Trạng thái</th>
+                      <th className="py-3 px-4">Người lập</th>
+                      <th className="py-3 px-4 text-center">Số dòng</th>
+                      <th className="py-3 px-4 text-right">Tổng số lượng</th>
+                      <th className="py-3 px-4">Thời gian</th>
+                      <th className="py-3 px-4">Ghi chú</th>
+                      <th className="py-3 px-4 text-center">Thao tác</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 text-slate-700">
+                    {transactions.map((tx) => {
+                      const itemCount = typeof tx.itemCount === 'number' ? tx.itemCount : (tx.details?.length ?? 0);
+                      const totalQty = typeof tx.totalQuantity === 'number' ? tx.totalQuantity : (tx.details?.reduce((s, d) => s + d.quantity, 0) ?? 0);
 
-                    return (
-                      <tr
-                        key={tx.id}
-                        className="hover:bg-slate-50/50 transition cursor-pointer"
-                        onClick={() => {
-                          setSelectedTx(tx);
-                          setSelectedTxId(tx.id);
-                          setIsDetailOpen(true);
-                        }}
-                        data-testid={`tx-row-${tx.id}`}
-                      >
-                        <td className="py-3 px-4 font-mono font-semibold text-blue-600">
+                      return (
+                        <tr
+                          key={tx.id}
+                          className="hover:bg-slate-50/50 transition cursor-pointer"
+                          onClick={() => {
+                            setSelectedTx(tx);
+                            setSelectedTxId(tx.id);
+                            setIsDetailOpen(true);
+                          }}
+                          data-testid={`tx-row-${tx.id}`}
+                        >
+                          <td className="py-3 px-4 font-mono font-semibold text-blue-600">
+                            {tx.transactionNumber}
+                          </td>
+                          <td className="py-3 px-4">
+                            <span
+                              className={`inline-flex rounded-full px-2 py-0.5 font-semibold text-[11px] border ${getTypeBadgeColor(
+                                tx.type
+                              )}`}
+                            >
+                              {tx.type}
+                            </span>
+                          </td>
+                          <td className="py-3 px-4">
+                            <span className="inline-flex items-center rounded-full px-2 py-0.5 font-semibold text-[11px] bg-emerald-50 text-emerald-700 border border-emerald-200">
+                              <CheckCircle2 className="h-3 w-3 mr-1" />
+                              {tx.status}
+                            </span>
+                          </td>
+                          <td className="py-3 px-4 font-medium text-slate-900">
+                            {tx.creatorName || tx.createdBy?.fullName || 'N/A'}
+                          </td>
+                          <td className="py-3 px-4 text-center font-mono">
+                            {itemCount === 0 ? (
+                              <span className="text-slate-400" title="Chứng từ lịch sử 0 dòng">
+                                0
+                              </span>
+                            ) : (
+                              itemCount
+                            )}
+                          </td>
+                          <td className="py-3 px-4 text-right font-mono font-bold text-slate-800">
+                            {totalQty}
+                          </td>
+                          <td className="py-3 px-4 text-slate-500">
+                            {new Date(tx.createdAt).toLocaleString('vi-VN')}
+                          </td>
+                          <td className="py-3 px-4 text-slate-500 max-w-xs truncate" title={tx.notes || ''}>
+                            {tx.notes || '-'}
+                          </td>
+                          <td className="py-3 px-4 text-center" onClick={(e) => e.stopPropagation()}>
+                            <button
+                              onClick={() => {
+                                setSelectedTx(tx);
+                                setSelectedTxId(tx.id);
+                                setIsDetailOpen(true);
+                              }}
+                              className="inline-flex items-center space-x-1 rounded-md p-1.5 text-slate-500 hover:bg-slate-100 hover:text-blue-600 transition"
+                              title="Xem chi tiết"
+                              data-testid={`btn-view-detail-${tx.id}`}
+                            >
+                              <Eye className="h-4 w-4" />
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Mobile Touch-Friendly Card View */}
+              <div className="block md:hidden divide-y divide-slate-100 p-3 space-y-3">
+                {transactions.map((tx) => {
+                  const itemCount = typeof tx.itemCount === 'number' ? tx.itemCount : (tx.details?.length ?? 0);
+                  const totalQty = typeof tx.totalQuantity === 'number' ? tx.totalQuantity : (tx.details?.reduce((s, d) => s + d.quantity, 0) ?? 0);
+
+                  return (
+                    <div
+                      key={tx.id}
+                      onClick={() => {
+                        setSelectedTx(tx);
+                        setSelectedTxId(tx.id);
+                        setIsDetailOpen(true);
+                      }}
+                      className="rounded-xl border border-slate-200/90 bg-white p-3.5 space-y-2.5 shadow-2xs cursor-pointer active:scale-[0.99] transition"
+                    >
+                      {/* Top: Voucher & Badges */}
+                      <div className="flex items-center justify-between gap-2 flex-wrap">
+                        <span className="font-mono text-xs font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
                           {tx.transactionNumber}
-                        </td>
-                        <td className="py-3 px-4">
-                          <span
-                            className={`inline-flex rounded-full px-2 py-0.5 font-semibold text-[11px] border ${getTypeBadgeColor(
-                              tx.type
-                            )}`}
-                          >
+                        </span>
+
+                        <div className="flex items-center space-x-1.5">
+                          <span className={`inline-flex rounded-full px-2 py-0.5 font-semibold text-[10px] border ${getTypeBadgeColor(tx.type)}`}>
                             {tx.type}
                           </span>
-                        </td>
-                        <td className="py-3 px-4">
-                          <span className="inline-flex items-center rounded-full px-2 py-0.5 font-semibold text-[11px] bg-emerald-50 text-emerald-700 border border-emerald-200">
-                            <CheckCircle2 className="h-3 w-3 mr-1" />
+                          <span className="inline-flex items-center rounded-full px-2 py-0.5 font-semibold text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-200">
+                            <CheckCircle2 className="h-2.5 w-2.5 mr-0.5" />
                             {tx.status}
                           </span>
-                        </td>
-                        <td className="py-3 px-4 font-medium text-slate-900">
+                        </div>
+                      </div>
+
+                      {/* Creator & Date */}
+                      <div className="flex items-center justify-between text-xs text-slate-500">
+                        <span className="font-medium text-slate-700">
                           {tx.creatorName || tx.createdBy?.fullName || 'N/A'}
-                        </td>
-                        <td className="py-3 px-4 text-center font-mono">
-                          {itemCount === 0 ? (
-                            <span className="text-slate-400" title="Chứng từ lịch sử 0 dòng">
-                              0
-                            </span>
-                          ) : (
-                            itemCount
-                          )}
-                        </td>
-                        <td className="py-3 px-4 text-right font-mono font-bold text-slate-800">
-                          {totalQty}
-                        </td>
-                        <td className="py-3 px-4 text-slate-500">
-                          {new Date(tx.createdAt).toLocaleString('vi-VN')}
-                        </td>
-                        <td className="py-3 px-4 text-slate-500 max-w-xs truncate" title={tx.notes || ''}>
-                          {tx.notes || '-'}
-                        </td>
-                        <td className="py-3 px-4 text-center" onClick={(e) => e.stopPropagation()}>
-                          <button
-                            onClick={() => {
-                              setSelectedTx(tx);
-                              setSelectedTxId(tx.id);
-                              setIsDetailOpen(true);
-                            }}
-                            className="inline-flex items-center space-x-1 rounded-md p-1.5 text-slate-500 hover:bg-slate-100 hover:text-blue-600 transition"
-                            title="Xem chi tiết"
-                            data-testid={`btn-view-detail-${tx.id}`}
-                          >
-                            <Eye className="h-4 w-4" />
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+                        </span>
+                        <span>{new Date(tx.createdAt).toLocaleDateString('vi-VN')}</span>
+                      </div>
+
+                      {/* Stats */}
+                      <div className="grid grid-cols-2 gap-2 bg-slate-50/80 rounded-lg p-2 text-xs border border-slate-100">
+                        <div>
+                          <span className="block text-[10px] text-slate-400 font-medium uppercase">Số dòng</span>
+                          <span className="font-semibold text-slate-800">{itemCount} linh kiện</span>
+                        </div>
+                        <div>
+                          <span className="block text-[10px] text-slate-400 font-medium uppercase">Tổng số lượng</span>
+                          <span className="font-bold text-slate-900">{totalQty} món</span>
+                        </div>
+                      </div>
+
+                      {/* Notes & Detail button */}
+                      <div className="flex items-center justify-between pt-1 border-t border-slate-100/80">
+                        <span className="text-xs text-slate-500 truncate max-w-[200px]" title={tx.notes || ''}>
+                          {tx.notes || 'Không có ghi chú'}
+                        </span>
+                        <span className="inline-flex items-center space-x-1 text-xs font-semibold text-blue-600">
+                          <span>Chi tiết</span>
+                          <Eye className="h-3.5 w-3.5" />
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </>
           )}
 
           {/* Pagination Bar for Transactions */}

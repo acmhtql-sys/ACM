@@ -240,57 +240,142 @@ export const UsersPage: React.FC = () => {
       <p className="mt-2 text-xs text-slate-500">{visibleUsers.length} người dùng hiển thị. Dữ liệu lấy từ API /users.</p>
     </section>
 
-    <section className="overflow-x-auto rounded-2xl border border-slate-200/80 bg-white shadow-card" aria-label="Danh sách người dùng">
-      <table className="w-full min-w-[900px] border-collapse text-left text-xs">
-        <thead className="bg-slate-50/75 text-[11px] font-semibold uppercase tracking-wider text-slate-500"><tr>
-          {['Người dùng', 'Vai trò', 'Mã/Đơn vị', 'Trạng thái', 'Thao tác'].map(label =>
-            <th key={label} className="border-b border-slate-200/80 p-3.5">{label}</th>)}
-        </tr></thead>
-        <tbody className="divide-y divide-slate-100">
-          {visibleUsers.map(u => <tr key={u.id} className="hover:bg-slate-50/75 transition-colors">
-            <td className="p-3.5">
-              <div className="flex items-center space-x-3">
-                <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-brand-50 border border-brand-200/60 font-semibold text-brand-700 text-xs shrink-0">
+    <section className="rounded-2xl border border-slate-200/80 bg-white shadow-card overflow-hidden" aria-label="Danh sách người dùng">
+      {/* Desktop Table View */}
+      <div className="hidden md:block overflow-x-auto">
+        <table className="w-full min-w-[900px] border-collapse text-left text-xs">
+          <thead className="bg-slate-50/75 text-[11px] font-semibold uppercase tracking-wider text-slate-500"><tr>
+            {['Người dùng', 'Vai trò', 'Mã/Đơn vị', 'Trạng thái', 'Thao tác'].map(label =>
+              <th key={label} className="border-b border-slate-200/80 p-3.5">{label}</th>)}
+          </tr></thead>
+          <tbody className="divide-y divide-slate-100">
+            {visibleUsers.map(u => <tr key={u.id} className="hover:bg-slate-50/75 transition-colors">
+              <td className="p-3.5">
+                <div className="flex items-center space-x-3">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-brand-50 border border-brand-200/60 font-semibold text-brand-700 text-xs shrink-0">
+                    {u.fullName ? u.fullName.charAt(0).toUpperCase() : 'U'}
+                  </div>
+                  <div>
+                    <span className="block font-semibold text-slate-900">{u.fullName}</span>
+                    <span className="text-[11px] text-slate-400">{u.email}</span>
+                  </div>
+                </div>
+              </td>
+              <td className="p-3.5"><StatusBadge status={u.role} variant="role"/></td>
+              <td className="p-3.5 text-slate-600 font-medium">
+                <span className="font-mono text-slate-800">{u.studentOrStaffId || '—'}</span>
+                <span className="text-slate-300 mx-1.5">•</span>
+                <span>{u.department || '—'}</span>
+              </td>
+              <td className="p-3.5">
+                <div className="flex items-center space-x-2">
+                  <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                    u.isActive ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/60' : 'bg-slate-100 text-slate-500'
+                  }`}>
+                    {u.isActive ? 'Hoạt động' : 'Vô hiệu hóa'}
+                  </span>
+                  <span className="text-slate-300">·</span>
+                  <span className={`text-[11px] font-medium ${u.isLocked ? 'text-rose-600' : 'text-slate-500'}`}>
+                    {u.isLocked ? 'Đang khóa' : 'Mở'}
+                  </span>
+                </div>
+              </td>
+              <td className="p-3.5"><div className="flex flex-wrap gap-1.5">
+                <button className={secondaryButton} disabled={busy} onClick={() => beginEdit(u)}>Sửa</button>
+                <button className={secondaryButton} disabled={busy} onClick={() => beginToggle(u, 'isActive')}>
+                  {u.isActive ? 'Vô hiệu hóa' : 'Kích hoạt'}</button>
+                <button className={secondaryButton} disabled={busy} onClick={() => beginToggle(u, 'isLocked')}>
+                  {u.isLocked ? 'Mở khóa' : 'Khóa'}</button>
+                <button className={secondaryButton} disabled={busy} onClick={() => beginReset(u)}>Đặt lại mật khẩu</button>
+              </div></td>
+            </tr>)}
+            {!loading && visibleUsers.length === 0 && <tr><td className="p-8 text-center text-slate-400 text-xs" colSpan={5}>
+              Không có người dùng phù hợp hoặc chưa có dữ liệu.</td></tr>}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Mobile Touch-Friendly Card View */}
+      <div className="block md:hidden divide-y divide-slate-100 p-3 space-y-3">
+        {visibleUsers.map((u) => (
+          <div
+            key={u.id}
+            className="rounded-xl border border-slate-200/90 bg-white p-3.5 space-y-2.5 shadow-2xs"
+          >
+            {/* Header: User avatar, name, email & Role */}
+            <div className="flex items-start justify-between gap-2">
+              <div className="flex items-center space-x-2.5 min-w-0">
+                <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-brand-50 border border-brand-200/60 font-bold text-brand-700 text-xs shrink-0">
                   {u.fullName ? u.fullName.charAt(0).toUpperCase() : 'U'}
                 </div>
-                <div>
-                  <span className="block font-semibold text-slate-900">{u.fullName}</span>
-                  <span className="text-[11px] text-slate-400">{u.email}</span>
+                <div className="min-w-0">
+                  <span className="block font-bold text-slate-900 text-xs leading-snug truncate">
+                    {u.fullName}
+                  </span>
+                  <span className="text-[11px] text-slate-400 truncate block">{u.email}</span>
                 </div>
               </div>
-            </td>
-            <td className="p-3.5"><StatusBadge status={u.role} variant="role"/></td>
-            <td className="p-3.5 text-slate-600 font-medium">
-              <span className="font-mono text-slate-800">{u.studentOrStaffId || '—'}</span>
-              <span className="text-slate-300 mx-1.5">•</span>
-              <span>{u.department || '—'}</span>
-            </td>
-            <td className="p-3.5">
-              <div className="flex items-center space-x-2">
+              <StatusBadge status={u.role} variant="role" />
+            </div>
+
+            {/* Department & Status */}
+            <div className="flex items-center justify-between text-xs bg-slate-50/80 rounded-lg p-2 border border-slate-100">
+              <span className="font-mono text-slate-700 text-[11px]">
+                {u.studentOrStaffId || 'Không có mã'} {u.department ? `• ${u.department}` : ''}
+              </span>
+              <div className="flex items-center space-x-1.5 shrink-0">
                 <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ${
                   u.isActive ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/60' : 'bg-slate-100 text-slate-500'
                 }`}>
-                  {u.isActive ? 'Hoạt động' : 'Vô hiệu hóa'}
+                  {u.isActive ? 'Hoạt động' : 'Tắt'}
                 </span>
-                <span className="text-slate-300">·</span>
-                <span className={`text-[11px] font-medium ${u.isLocked ? 'text-rose-600' : 'text-slate-500'}`}>
-                  {u.isLocked ? 'Đang khóa' : 'Mở'}
-                </span>
+                {u.isLocked && (
+                  <span className="inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
+                    Khóa
+                  </span>
+                )}
               </div>
-            </td>
-            <td className="p-3.5"><div className="flex flex-wrap gap-1.5">
-              <button className={secondaryButton} disabled={busy} onClick={() => beginEdit(u)}>Sửa</button>
-              <button className={secondaryButton} disabled={busy} onClick={() => beginToggle(u, 'isActive')}>
-                {u.isActive ? 'Vô hiệu hóa' : 'Kích hoạt'}</button>
-              <button className={secondaryButton} disabled={busy} onClick={() => beginToggle(u, 'isLocked')}>
-                {u.isLocked ? 'Mở khóa' : 'Khóa'}</button>
-              <button className={secondaryButton} disabled={busy} onClick={() => beginReset(u)}>Đặt lại mật khẩu</button>
-            </div></td>
-          </tr>)}
-          {!loading && visibleUsers.length === 0 && <tr><td className="p-8 text-center text-slate-400 text-xs" colSpan={5}>
-            Không có người dùng phù hợp hoặc chưa có dữ liệu.</td></tr>}
-        </tbody>
-      </table>
+            </div>
+
+            {/* Actions Grid */}
+            <div className="grid grid-cols-2 gap-1.5 pt-1 border-t border-slate-100/80">
+              <button
+                className="rounded-lg border border-slate-200 bg-white py-1.5 px-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 text-center"
+                disabled={busy}
+                onClick={() => beginEdit(u)}
+              >
+                Chỉnh sửa
+              </button>
+              <button
+                className="rounded-lg border border-slate-200 bg-white py-1.5 px-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 text-center"
+                disabled={busy}
+                onClick={() => beginReset(u)}
+              >
+                Đổi mật khẩu
+              </button>
+              <button
+                className="rounded-lg border border-slate-200 bg-white py-1.5 px-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 text-center"
+                disabled={busy}
+                onClick={() => beginToggle(u, 'isActive')}
+              >
+                {u.isActive ? 'Vô hiệu hóa' : 'Kích hoạt'}
+              </button>
+              <button
+                className="rounded-lg border border-slate-200 bg-white py-1.5 px-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 text-center"
+                disabled={busy}
+                onClick={() => beginToggle(u, 'isLocked')}
+              >
+                {u.isLocked ? 'Mở khóa' : 'Khóa TK'}
+              </button>
+            </div>
+          </div>
+        ))}
+        {!loading && visibleUsers.length === 0 && (
+          <div className="py-8 text-center text-slate-400 text-xs">
+            Không có người dùng phù hợp.
+          </div>
+        )}
+      </div>
     </section>
 
     {operation && <div {...modalDismiss} className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm">

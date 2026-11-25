@@ -783,7 +783,8 @@ export const BorrowReturnPage: React.FC = () => {
 
       {/* Table */}
       <div className="rounded-2xl border border-slate-200/80 bg-white shadow-card overflow-hidden">
-        <div className="overflow-x-auto">
+        {/* Desktop Table View */}
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-left text-xs">
             <thead className="border-b border-slate-200/80 bg-slate-50/70 text-[11px] font-bold uppercase tracking-wider text-slate-500">
               <tr>
@@ -953,6 +954,184 @@ export const BorrowReturnPage: React.FC = () => {
               )}
             </tbody>
           </table>
+        </div>
+
+        {/* Mobile Touch-Friendly Card View */}
+        <div className="block md:hidden divide-y divide-slate-100 p-3 space-y-3">
+          {filtered.length === 0 ? (
+            <div className="py-12 text-center text-slate-400 text-xs">
+              Không tìm thấy phiếu mượn nào phù hợp với bộ lọc hiện tại.
+            </div>
+          ) : (
+            filtered.map((b) => {
+              const pendingForThis = pendingReturns.find((p) => p.borrowId === b.id);
+              const guardForThis = lostReturnGuards.find((g) => g.borrowId === b.id);
+              const activeKey = pendingForThis?.key || guardForThis?.key;
+
+              return (
+                <div
+                  key={b.id}
+                  className={`rounded-xl border p-3.5 space-y-2.5 transition-all ${
+                    b.isOverdue
+                      ? 'border-rose-300 bg-rose-50/20'
+                      : 'border-slate-200/90 bg-white shadow-2xs'
+                  }`}
+                >
+                  {/* Top: Voucher Code & Status */}
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <span className="font-mono text-xs font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
+                      {b.requestNumber}
+                    </span>
+
+                    <div className="flex items-center space-x-1.5 flex-wrap">
+                      <StatusBadge status={b.status} variant="borrow" />
+                      {b.isOverdue && (
+                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-700 border border-rose-200">
+                          Quá hạn
+                        </span>
+                      )}
+                      {activeKey && (
+                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-indigo-100 text-indigo-800 border border-indigo-200">
+                          Chờ đối soát
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Borrower Info */}
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-900 leading-snug">
+                      {b.borrowerName || 'Sinh viên'}
+                    </h3>
+                    {b.borrowerEmail && (
+                      <p className="text-xs text-slate-400">{b.borrowerEmail}</p>
+                    )}
+                    {b.purpose && (
+                      <p className="text-xs text-slate-600 mt-1 line-clamp-2">
+                        <span className="font-semibold text-slate-500">Mục đích:</span> {b.purpose}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Dates & Items */}
+                  <div className="grid grid-cols-2 gap-2 bg-slate-50/80 rounded-lg p-2 text-xs border border-slate-100">
+                    <div>
+                      <span className="block text-[10px] text-slate-400 font-medium uppercase">Hạn trả</span>
+                      <span className={`font-semibold text-xs ${b.isOverdue ? 'text-rose-600' : 'text-slate-700'}`}>
+                        {b.expectedReturnDate}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="block text-[10px] text-slate-400 font-medium uppercase">Linh kiện</span>
+                      <span className="font-semibold text-slate-800 text-xs">
+                        {b.itemCount} loại linh kiện
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Actions */}
+                  <div className="pt-2 border-t border-slate-100/80">
+                    {activeKey ? (
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handleReconcile(b.id, activeKey)}
+                          disabled={actionLoading === b.id}
+                          className="inline-flex items-center justify-center space-x-1 rounded-xl bg-indigo-600 py-2 text-xs font-bold text-white shadow-xs hover:bg-indigo-700"
+                        >
+                          <RefreshCw className={`h-3.5 w-3.5 ${actionLoading === b.id ? 'animate-spin' : ''}`} />
+                          <span>Đối soát</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDismissGuard(b.id, activeKey)}
+                          disabled={actionLoading === b.id}
+                          className="rounded-xl bg-slate-100 text-slate-700 py-2 text-xs font-semibold hover:bg-rose-50 hover:text-rose-700"
+                        >
+                          Gỡ chặn
+                        </button>
+                      </div>
+                    ) : (
+                      <>
+                        {b.status === 'PENDING' && (
+                          <div className="grid grid-cols-2 gap-2">
+                            <button
+                              onClick={() => handleApprove(b.id)}
+                              disabled={actionLoading === b.id || !isManager}
+                              className="inline-flex items-center justify-center space-x-1 rounded-xl bg-blue-600 py-2 text-xs font-bold text-white shadow-xs hover:bg-blue-700 disabled:opacity-50"
+                            >
+                              <Check className="h-3.5 w-3.5" />
+                              <span>Phê duyệt</span>
+                            </button>
+                            <button
+                              onClick={() => {
+                                setRejectingBorrowId(b.id);
+                                setRejectReason('');
+                              }}
+                              disabled={actionLoading === b.id || !isManager}
+                              className="inline-flex items-center justify-center space-x-1 rounded-xl bg-rose-50 border border-rose-200 py-2 text-xs font-semibold text-rose-700 hover:bg-rose-100 disabled:opacity-50"
+                            >
+                              <XCircle className="h-3.5 w-3.5" />
+                              <span>Từ chối</span>
+                            </button>
+                          </div>
+                        )}
+
+                        {b.status === 'APPROVED' && (
+                          <div className="grid grid-cols-2 gap-2">
+                            <button
+                              onClick={() => handleHandover(b.id)}
+                              disabled={actionLoading === b.id || !isOperator}
+                              className="inline-flex items-center justify-center space-x-1 rounded-xl bg-indigo-600 py-2 text-xs font-bold text-white shadow-xs hover:bg-indigo-700 disabled:opacity-50"
+                            >
+                              <ArrowRight className="h-3.5 w-3.5" />
+                              <span>Bàn giao kho</span>
+                            </button>
+                            <button
+                              onClick={() => handleCancel(b.id)}
+                              disabled={actionLoading === b.id || !isManager}
+                              className="rounded-xl bg-slate-100 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-200 disabled:opacity-50"
+                            >
+                              Hủy phiếu
+                            </button>
+                          </div>
+                        )}
+
+                        {(b.status === 'HANDED_OVER' || b.status === 'PARTIALLY_RETURNED') && isOperator && (
+                          <button
+                            onClick={() => openReturnModal(b)}
+                            disabled={actionLoading === b.id}
+                            className="w-full inline-flex items-center justify-center space-x-1.5 rounded-xl bg-emerald-600 py-2.5 text-xs font-bold text-white shadow-md hover:bg-emerald-700 active:scale-95 transition"
+                          >
+                            <CornerDownLeft className="h-4 w-4" />
+                            <span>Nhận hoàn trả (Quét Camera AI / Kiểm đếm)</span>
+                          </button>
+                        )}
+
+                        {b.status === 'RETURNED' && (
+                          <span className="block text-center text-xs text-slate-400 font-medium py-1">
+                            Đã hoàn tất thanh toán & đối soát
+                          </span>
+                        )}
+
+                        {b.status === 'REJECTED' && (
+                          <span className="block text-center text-xs text-rose-500 font-medium py-1">
+                            Đã từ chối mượn
+                          </span>
+                        )}
+
+                        {b.status === 'CANCELLED' && (
+                          <span className="block text-center text-xs text-slate-400 font-medium py-1">
+                            Đã hủy phiếu
+                          </span>
+                        )}
+                      </>
+                    )}
+                  </div>
+                </div>
+              );
+            })
+          )}
         </div>
       </div>
 

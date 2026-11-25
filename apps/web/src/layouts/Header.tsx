@@ -270,7 +270,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenSidebar, isSidebarOpen }) 
         <div className="flex items-center space-x-2 text-xs min-w-0">
           <span className="font-medium text-slate-400 hidden sm:inline">{currentRoute.parent}</span>
           <ChevronRight className="h-3.5 w-3.5 text-slate-300 hidden sm:inline" />
-          <h1 className="font-bold text-slate-800 text-sm truncate max-w-[140px] xs:max-w-[200px] sm:max-w-none">{currentRoute.title}</h1>
+          <h1 className="font-bold text-slate-800 text-sm truncate max-w-[230px] xs:max-w-[280px] sm:max-w-md md:max-w-none">{currentRoute.title}</h1>
         </div>
       </div>
 

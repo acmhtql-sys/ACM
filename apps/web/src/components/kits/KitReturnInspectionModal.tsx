@@ -1410,19 +1410,20 @@ export const KitReturnInspectionModal: React.FC<KitReturnInspectionModalProps> =
             )}
           </div>
 
-          {/* Inspection Checklist Table */}
+          {/* Inspection Checklist Table & Mobile Cards */}
           <div className="rounded-xl border border-slate-200 bg-white shadow-2xs overflow-hidden">
             <div className="bg-slate-50 px-4 py-2.5 border-b border-slate-200 flex items-center justify-between">
               <h4 className="text-xs font-bold text-slate-800 flex items-center space-x-1.5 uppercase tracking-wider">
                 <Package className="h-3.5 w-3.5 text-blue-600" />
                 <span>Danh mục kiểm đếm từng linh kiện thành phần</span>
               </h4>
-              <span className="text-[11px] text-slate-500 font-medium">
+              <span className="text-[11px] text-slate-500 font-medium hidden sm:inline">
                 Kiểm tra đầy đủ số lượng & ngoại quan
               </span>
             </div>
 
-            <div className="max-h-72 overflow-y-auto overflow-x-auto">
+            {/* Desktop Table View */}
+            <div className="hidden md:block max-h-72 overflow-y-auto overflow-x-auto">
               <table className="w-full text-left text-xs min-w-[500px]">
                 <thead className="bg-slate-50/80 border-b border-slate-100 text-[11px] font-semibold text-slate-500 uppercase tracking-wider sticky top-0 z-10">
                   <tr>
@@ -1552,6 +1553,133 @@ export const KitReturnInspectionModal: React.FC<KitReturnInspectionModalProps> =
                   })}
                 </tbody>
               </table>
+            </div>
+
+            {/* Mobile Touch-Friendly Card View */}
+            <div className="block md:hidden max-h-96 overflow-y-auto divide-y divide-slate-100 p-2 space-y-2.5">
+              {inspectionRows.map((row, idx) => {
+                const isMissing = row.returnedQuantity < row.initialQuantity;
+                const isDamaged = row.condition === 'DAMAGED';
+                const hasIssue = isMissing || isDamaged;
+
+                return (
+                  <div
+                    key={row.itemId}
+                    className={`rounded-xl border p-3 transition-colors ${
+                      hasIssue
+                        ? 'border-amber-300 bg-amber-50/40'
+                        : 'border-slate-200/90 bg-white shadow-2xs'
+                    }`}
+                  >
+                    {/* Top: SKU, AI Badge & Standard Qty */}
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center space-x-1.5 flex-wrap">
+                          <span className="font-mono text-xs font-bold text-slate-800 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">
+                            {row.itemCode}
+                          </span>
+                          {row.aiVerified && (
+                            <span className="inline-flex items-center space-x-0.5 rounded px-1.5 py-0.5 text-[9px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                              <Sparkles className="h-2.5 w-2.5 text-blue-500" />
+                              <span>AI Đã đếm</span>
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-xs font-semibold text-slate-900 mt-1">
+                          {row.itemName}
+                        </div>
+                      </div>
+
+                      <div className="text-right shrink-0">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-slate-100 text-slate-700 border border-slate-200">
+                          Chuẩn: {row.initialQuantity} {row.unit}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Controls Row: Touch Stepper & Condition Selector */}
+                    <div className="mt-2.5 grid grid-cols-2 gap-2 items-center">
+                      {/* Quantity Stepper with large touch buttons */}
+                      <div className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50/60 p-1">
+                        <span className="text-[11px] text-slate-500 font-medium pl-1">Thực nhận:</span>
+                        <div className="flex items-center space-x-1 bg-white rounded-md border border-slate-200 p-0.5 shadow-2xs">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              handleUpdateRow(idx, {
+                                returnedQuantity: Math.max(0, row.returnedQuantity - 1),
+                              })
+                            }
+                            className="h-7 w-7 flex items-center justify-center rounded text-slate-600 hover:bg-slate-100 active:bg-slate-200 text-sm font-bold"
+                            aria-label="Giảm"
+                          >
+                            <Minus className="h-3.5 w-3.5" />
+                          </button>
+                          <input
+                            type="number"
+                            min={0}
+                            max={row.initialQuantity}
+                            value={row.returnedQuantity}
+                            onChange={(e) =>
+                              handleUpdateRow(idx, {
+                                returnedQuantity: Math.max(
+                                  0,
+                                  Math.min(row.initialQuantity, parseInt(e.target.value, 10) || 0)
+                                ),
+                              })
+                            }
+                            className={`w-8 text-center text-xs font-bold focus:outline-none ${
+                              isMissing ? 'text-rose-600 font-black' : 'text-slate-800'
+                            }`}
+                          />
+                          <button
+                            type="button"
+                            onClick={() =>
+                              handleUpdateRow(idx, {
+                                returnedQuantity: Math.min(row.initialQuantity, row.returnedQuantity + 1),
+                              })
+                            }
+                            className="h-7 w-7 flex items-center justify-center rounded text-slate-600 hover:bg-slate-100 active:bg-slate-200 text-sm font-bold"
+                            aria-label="Tăng"
+                          >
+                            <Plus className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Condition Dropdown */}
+                      <select
+                        value={row.condition}
+                        onChange={(e) =>
+                          handleUpdateRow(idx, { condition: e.target.value as ComponentCondition })
+                        }
+                        className={`w-full rounded-lg border py-1.5 px-2 text-xs font-semibold focus:outline-none ${
+                          row.condition === 'GOOD'
+                            ? 'bg-emerald-50 border-emerald-300 text-emerald-800'
+                            : row.condition === 'DAMAGED'
+                            ? 'bg-amber-50 border-amber-300 text-amber-800'
+                            : 'bg-rose-50 border-rose-300 text-rose-800'
+                        }`}
+                      >
+                        <option value="GOOD">🟢 Tốt (Đầy đủ)</option>
+                        <option value="DAMAGED">🟡 Hỏng hóc</option>
+                        <option value="LOST">🔴 Thiếu / Mất</option>
+                      </select>
+                    </div>
+
+                    {/* Note input if issue or user custom note */}
+                    <div className="mt-2">
+                      <input
+                        type="text"
+                        value={row.notes}
+                        onChange={(e) => handleUpdateRow(idx, { notes: e.target.value })}
+                        placeholder={hasIssue ? 'Ghi rõ tình trạng thiếu/lỗi...' : 'Ghi chú đối soát (tùy chọn)'}
+                        className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs text-slate-700 placeholder-slate-400 focus:border-blue-500 focus:outline-none"
+                      />
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
 

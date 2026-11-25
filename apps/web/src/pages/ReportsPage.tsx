@@ -301,7 +301,8 @@ export const ReportsPage: React.FC = () => {
           </div>
 
           <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-card">
-            <div className="overflow-x-auto">
+            {/* Desktop Table View */}
+            <div className="hidden md:block overflow-x-auto">
               <table className="w-full text-left text-xs">
                 <thead className="border-b border-slate-200 bg-slate-50 text-[11px] font-semibold text-slate-600">
                   <tr>
@@ -353,6 +354,73 @@ export const ReportsPage: React.FC = () => {
                   )}
                 </tbody>
               </table>
+            </div>
+
+            {/* Mobile Touch-Friendly Card View */}
+            <div className="block md:hidden divide-y divide-slate-100 p-3 space-y-3">
+              {loading ? (
+                <div className="py-8 text-center text-slate-400">
+                  <RefreshCw className="mx-auto h-5 w-5 animate-spin text-blue-600" />
+                  <span className="mt-2 block text-xs">Đang tổng hợp báo cáo kiểm kê...</span>
+                </div>
+              ) : filteredInventory.length === 0 ? (
+                <div className="py-8 text-center text-slate-400 text-xs">
+                  Không có linh kiện nào khớp với tiêu chí tìm kiếm.
+                </div>
+              ) : (
+                filteredInventory.map((item) => (
+                  <div
+                    key={item.id}
+                    className="rounded-xl border border-slate-200/90 bg-white p-3.5 space-y-2.5 shadow-2xs"
+                  >
+                    {/* Header: SKU & Status */}
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-mono text-xs font-bold text-slate-800 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
+                        {item.code}
+                      </span>
+                      <StatusBadge status={item.stockStatus} variant="stockStatus" />
+                    </div>
+
+                    {/* Title & Category */}
+                    <div>
+                      <h4 className="text-sm font-bold text-slate-900 leading-snug break-words">
+                        {item.name}
+                      </h4>
+                      <p className="text-xs text-slate-500 mt-0.5">
+                        {item.categoryName} • Đơn vị: {item.unit}
+                      </p>
+                    </div>
+
+                    {/* Metric Grid */}
+                    <div className="grid grid-cols-3 gap-2 bg-slate-50/80 rounded-lg p-2.5 text-center border border-slate-100 text-xs">
+                      <div>
+                        <span className="block text-[10px] text-slate-400 font-medium uppercase">Tồn vật lý</span>
+                        <span className="font-bold text-slate-900">{item.onHand}</span>
+                      </div>
+                      <div>
+                        <span className="block text-[10px] text-emerald-600 font-bold uppercase">Khả dụng</span>
+                        <span className="font-bold text-emerald-700">{item.available}</span>
+                      </div>
+                      <div>
+                        <span className="block text-[10px] text-indigo-600 font-medium uppercase">Đang mượn</span>
+                        <span className="font-semibold text-indigo-700">{item.borrowed}</span>
+                      </div>
+                      <div>
+                        <span className="block text-[10px] text-teal-600 font-medium uppercase">Gán Kit</span>
+                        <span className="font-semibold text-teal-700">{item.kitAllocated}</span>
+                      </div>
+                      <div>
+                        <span className="block text-[10px] text-amber-600 font-medium uppercase">Giữ chỗ</span>
+                        <span className="font-semibold text-amber-700">{item.reserved}</span>
+                      </div>
+                      <div>
+                        <span className="block text-[10px] text-rose-600 font-medium uppercase">Cách ly</span>
+                        <span className="font-semibold text-rose-700">{item.quarantined}</span>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         </div>

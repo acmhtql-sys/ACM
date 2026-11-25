@@ -242,13 +242,13 @@ export const AuditLogsPage: React.FC = () => {
           />
         </div>
 
-        <div className="flex items-center space-x-2">
-          <div className="flex items-center space-x-1">
-            <Filter className="h-3.5 w-3.5 text-slate-400" />
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:flex lg:items-center gap-2 w-full lg:w-auto">
+          <div className="flex items-center space-x-1.5 w-full">
+            <Filter className="h-3.5 w-3.5 text-slate-400 shrink-0" />
             <select
               value={selectedAction}
               onChange={(e) => setSelectedAction(e.target.value)}
-              className="rounded-xl border border-slate-200 bg-slate-50/50 px-3 py-2 text-xs text-slate-700 focus:border-brand-500 focus:bg-white focus:outline-none cursor-pointer"
+              className="w-full lg:w-auto rounded-xl border border-slate-200 bg-slate-50/50 px-3 py-2 text-xs text-slate-700 focus:border-brand-500 focus:bg-white focus:outline-none cursor-pointer"
             >
               <option value="ALL">Tất cả hành động ({availableActions.length})</option>
               {availableActions.map((action) => (
@@ -259,18 +259,20 @@ export const AuditLogsPage: React.FC = () => {
             </select>
           </div>
 
-          <select
-            value={selectedEntity}
-            onChange={(e) => setSelectedEntity(e.target.value)}
-            className="rounded-xl border border-slate-200 bg-slate-50/50 px-3 py-2 text-xs text-slate-700 focus:border-brand-500 focus:bg-white focus:outline-none cursor-pointer"
-          >
-            <option value="ALL">Tất cả đối tượng ({availableEntities.length})</option>
-            {availableEntities.map((entity) => (
-              <option key={entity} value={entity}>
-                {entity}
-              </option>
-            ))}
-          </select>
+          <div className="flex items-center space-x-1.5 w-full">
+            <select
+              value={selectedEntity}
+              onChange={(e) => setSelectedEntity(e.target.value)}
+              className="w-full lg:w-auto rounded-xl border border-slate-200 bg-slate-50/50 px-3 py-2 text-xs text-slate-700 focus:border-brand-500 focus:bg-white focus:outline-none cursor-pointer"
+            >
+              <option value="ALL">Tất cả đối tượng ({availableEntities.length})</option>
+              {availableEntities.map((entity) => (
+                <option key={entity} value={entity}>
+                  {entity}
+                </option>
+              ))}
+            </select>
+          </div>
 
           {(searchTerm || selectedAction !== 'ALL' || selectedEntity !== 'ALL') && (
             <button
@@ -279,7 +281,7 @@ export const AuditLogsPage: React.FC = () => {
                 setSelectedAction('ALL');
                 setSelectedEntity('ALL');
               }}
-              className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition-all cursor-pointer"
+              className="sm:col-span-2 lg:col-span-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition-all cursor-pointer text-center"
               title="Xóa bộ lọc"
             >
               Xóa lọc
@@ -357,7 +359,8 @@ export const AuditLogsPage: React.FC = () => {
       {/* Table Data */}
       {!loading && !error && filteredLogs.length > 0 && (
         <div className="rounded-2xl border border-slate-200/80 bg-white shadow-card overflow-hidden">
-          <div className="overflow-x-auto">
+          {/* Desktop Table View */}
+          <div className="hidden md:block overflow-x-auto">
             <table className="w-full text-left text-xs">
               <thead className="border-b border-slate-200/80 bg-slate-50/75 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
                 <tr>
@@ -412,6 +415,58 @@ export const AuditLogsPage: React.FC = () => {
                 ))}
               </tbody>
             </table>
+          </div>
+
+          {/* Mobile Touch-Friendly Card View */}
+          <div className="block md:hidden divide-y divide-slate-100 p-3 space-y-3">
+            {filteredLogs.map((log) => (
+              <div
+                key={log.id}
+                onClick={() => setInspectLog(log)}
+                className="rounded-xl border border-slate-200/90 bg-white p-3.5 space-y-2.5 shadow-2xs cursor-pointer active:scale-[0.99] transition"
+              >
+                {/* Top: Action Badge & Time */}
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <span
+                    className={`inline-flex items-center rounded-md px-2.5 py-1 text-xs font-semibold border ${getActionBadgeClass(
+                      log.action
+                    )}`}
+                  >
+                    {log.action}
+                  </span>
+                  <div className="flex items-center space-x-1 text-xs text-slate-500 font-medium">
+                    <Clock className="h-3.5 w-3.5 text-slate-400" />
+                    <span>{new Date(log.createdAt).toLocaleTimeString('vi-VN')} {new Date(log.createdAt).toLocaleDateString('vi-VN')}</span>
+                  </div>
+                </div>
+
+                {/* Entity & Entity ID */}
+                <div className="bg-slate-50/80 rounded-lg p-2.5 border border-slate-100 text-xs space-y-1">
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-500 font-medium">Đối tượng:</span>
+                    <span className="font-bold text-slate-800">{log.entity}</span>
+                  </div>
+                  {log.entityId && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-400 font-medium">Mã ID:</span>
+                      <span className="font-mono text-slate-600 truncate max-w-[180px]">{log.entityId}</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* User & View Detail */}
+                <div className="flex items-center justify-between pt-1 border-t border-slate-100/80">
+                  <div className="flex items-center space-x-1.5 text-xs text-slate-600">
+                    <User className="h-3.5 w-3.5 text-slate-400" />
+                    <span className="font-semibold text-slate-800">{log.userName}</span>
+                  </div>
+                  <span className="inline-flex items-center space-x-1 text-xs font-semibold text-blue-600">
+                    <span>Xem chi tiết</span>
+                    <Eye className="h-3.5 w-3.5" />
+                  </span>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       )}
