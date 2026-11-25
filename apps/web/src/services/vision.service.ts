@@ -19,6 +19,7 @@ export interface VisionDetection {
   confidence: number;
   boundingBox: BoundingBox;
   suggestedItemCode?: string | null;
+  candidateItemCodes?: string[];
 }
 
 export interface VisionDetectResponse {
@@ -218,7 +219,7 @@ export async function detectFrameBase64(
           success: true,
           frameId: data.frameId || `frame-${Date.now()}`,
           timestamp: data.timestamp || Date.now(),
-          modelVersion: data.modelVersion || 'yolo11n-acm-85',
+          modelVersion: data.modelVersion || 'yolov8s-acm-86-best',
           modelHash: data.modelHash,
           imageDimensions: data.imageDimensions,
           inferenceTimeMs: data.inferenceTimeMs,
@@ -282,7 +283,7 @@ export async function detectFrameFile(
           success: true,
           frameId: data.frameId || `frame-${Date.now()}`,
           timestamp: data.timestamp || Date.now(),
-          modelVersion: data.modelVersion || 'yolo11n-acm-85',
+          modelVersion: data.modelVersion || 'yolov8s-acm-86-best',
           modelHash: data.modelHash,
           imageDimensions: data.imageDimensions,
           inferenceTimeMs: data.inferenceTimeMs,
@@ -316,9 +317,9 @@ export function runClientSideYoloInference(
     success: true,
     frameId: `frame-${Date.now()}`,
     timestamp: Date.now(),
-    modelVersion: 'yolo11n-acm-85',
-    modelHash: 'c9b1f5d528a2f75ce3766f06fe6b502ecd3e04f1095c8932cc0ba9b00b7448d3',
-    imageDimensions: { width: 640, height: 480 },
+    modelVersion: 'yolov8s-acm-86-best',
+    modelHash: '2abe7ffa86c021095a6ba0bb8174476ad1eaa7d610cb46c931520e46a3b15288',
+    imageDimensions: { width: 960, height: 720 },
     inferenceTimeMs: 15,
     detectionsCount: 0,
     detections: [],

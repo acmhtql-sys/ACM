@@ -13,11 +13,11 @@ Lightweight, isolated inference service powering real-time component return iden
 4. **Zero Persistent Storage**: No captured camera frames or user credentials are stored or persisted to disk/DB.
 
 ## Model
-- Checkpoint: `best.pt` (Ultralytics YOLO11n, 85 classes).
-- SHA256: `c9b1f5d528a2f75ce3766f06fe6b502ecd3e04f1095c8932cc0ba9b00b7448d3`.
+- Checkpoint: `best.pt` (Ultralytics YOLOv8s `best`, 86 classes, trained at `imgsz=960`).
+- SHA256: `2abe7ffa86c021095a6ba0bb8174476ad1eaa7d610cb46c931520e46a3b15288`.
 - License: AGPL-3.0.
 
 ## Endpoints
 - `GET /health`: Healthcheck, model version, SHA256 hash.
-- `GET /api/v1/vision/classes`: Full 85 classes list and catalog item code mapping.
+- `GET /api/v1/vision/classes`: Full 86 classes list and catalog item code mapping.
 - `POST /api/v1/vision/detect`: Accept multipart/form-data or application/json (base64) image, returns bounding boxes, labels, confidence, and candidate item suggestions.

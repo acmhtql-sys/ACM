@@ -823,6 +823,85 @@ describe('CameraReturnModal Test Suite (SUP-VISION-01, 02, 04, 05, 06, 08)', () 
         expect(screen.getByText(/Chưa có linh kiện nào được nhận diện hoặc chọn hoàn trả/i)).toBeTruthy();
       });
     });
+
+    it('TC-BEST-86: integrates new 86-class best model (including class 0 Large_curved_panel -White- and UBTECH SKU aliases)', async () => {
+      const ubtechBorrowRecord = {
+        id: 'borrow-ubtech-001',
+        requestNumber: 'BR-UBTECH-001',
+        borrowerName: 'Nguyen Van B',
+        details: [
+          {
+            id: 'detail-panel-wht',
+            itemId: 'item-panel-wht',
+            item: {
+              id: 'item-panel-wht',
+              code: 'PNL-LRG-WHT',
+              name: 'Large curved panel (White)',
+              unit: 'Tấm',
+            },
+            quantity: 2,
+            returnedQuantity: 0,
+          },
+          {
+            id: 'detail-act-led',
+            itemId: 'item-act-led',
+            item: {
+              id: 'item-act-led',
+              code: 'ACT-LED',
+              name: 'LED lamp',
+              unit: 'Cái',
+            },
+            quantity: 2,
+            returnedQuantity: 0,
+          },
+        ],
+      };
+
+      vi.spyOn(visionService, 'detectFrameFile').mockResolvedValueOnce({
+        success: true,
+        frameId: 'frame_best_86',
+        modelVersion: 'yolov8s-acm-86-best',
+        inferenceTimeMs: 65.0,
+        detectionsCount: 2,
+        detections: [
+          {
+            classId: 0,
+            className: 'Large_curved_panel -White-',
+            confidence: 0.91,
+            boundingBox: { x1: 20, y1: 20, x2: 180, y2: 160 },
+            suggestedItemCode: 'PNL-LRG-CRV-WHT',
+            candidateItemCodes: ['PNL-LRG-CRV-WHT', 'PNL-LRG-WHT'],
+          },
+          {
+            classId: 46,
+            className: 'LED_lamp',
+            confidence: 0.87,
+            boundingBox: { x1: 200, y1: 40, x2: 280, y2: 120 },
+            suggestedItemCode: 'LED-5MM-RGB',
+            candidateItemCodes: ['LED-5MM-RGB', 'ACT-LED'],
+          },
+        ],
+      });
+
+      render(
+        <CameraReturnModal
+          isOpen={true}
+          onClose={vi.fn()}
+          borrowRecord={ubtechBorrowRecord}
+          onApplyReturnRows={vi.fn()}
+        />
+      );
+
+      const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+      fireEvent.change(input, { target: { files: [new File(['fake'], 'best86.jpg', { type: 'image/jpeg' })] } });
+
+      await waitFor(() => {
+        expect(screen.getAllByText(/2 khớp phiếu/i).length).toBeGreaterThan(0);
+        expect(screen.getByText(/Linh kiện hoàn trả \(2\)/i)).toBeTruthy();
+        expect(screen.getAllByText(/Large curved panel \(White\)/i).length).toBeGreaterThan(0);
+        expect(screen.getAllByText(/LED lamp/i).length).toBeGreaterThan(0);
+      });
+    });
   });
 
 });

@@ -31,7 +31,7 @@ import {
   type VisionDetection,
   type VisionDetectResponse,
 } from '../../services/vision.service';
-import { findMatchingTrainedClass } from '../../services/vision-classes';
+import { doesDetectionMatchItem } from '../../services/vision-classes';
 import type { KitRecordForBorrow } from './StudentBorrowKitModal';
 
 export type ComponentCondition = 'GOOD' | 'DAMAGED' | 'LOST';
@@ -100,9 +100,9 @@ export const KitReturnInspectionModal: React.FC<KitReturnInspectionModalProps> =
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const scanIntervalRef = useRef<number | null>(null);
   const isInFlightRef = useRef<boolean>(false);
-  // Debounce: only commit detection to UI if same count appears ≥2 consecutive scans
-  const lastDetectionCountRef = useRef<number>(-1);
-  const stableCountRef = useRef<number>(0);
+  const lastInferenceDimsRef = useRef<{ width: number; height: number } | null>(null);
+  // Anti-flicker for continuous live scan: require ≥2 empty frames before clearing active detections
+  const emptyFrameStreakRef = useRef<number>(0);
 
   // Initialize checklist rows from kit items
   useEffect(() => {
@@ -243,14 +243,14 @@ export const KitReturnInspectionModal: React.FC<KitReturnInspectionModalProps> =
       const img = imageRef.current;
       displayW = img.clientWidth || img.width;
       displayH = img.clientHeight || img.height;
-      naturalW = img.naturalWidth || 640;
-      naturalH = img.naturalHeight || 480;
+      naturalW = lastInferenceDimsRef.current?.width || img.naturalWidth || 640;
+      naturalH = lastInferenceDimsRef.current?.height || img.naturalHeight || 480;
     } else if (videoRef.current) {
       const v = videoRef.current;
       displayW = v.clientWidth || 640;
       displayH = v.clientHeight || 480;
-      naturalW = v.videoWidth || 640;
-      naturalH = v.videoHeight || 480;
+      naturalW = lastInferenceDimsRef.current?.width || v.videoWidth || 640;
+      naturalH = lastInferenceDimsRef.current?.height || v.videoHeight || 480;
     }
 
     if (displayW === 0 || displayH === 0) return;
@@ -270,12 +270,7 @@ export const KitReturnInspectionModal: React.FC<KitReturnInspectionModalProps> =
       const rh = (y2 - y1) * scaleY;
 
       // Color scheme: Green for matched kit item, Blue for others
-      const isMatched = kit?.items?.some(
-        (ki) =>
-          ki.item?.code?.toLowerCase() === det.suggestedItemCode?.toLowerCase() ||
-          ki.item?.name?.toLowerCase().includes(det.className.toLowerCase()) ||
-          det.className.toLowerCase().includes(ki.item?.name?.toLowerCase() || '___')
-      );
+      const isMatched = kit?.items?.some((ki) => doesDetectionMatchItem(det, ki.item));
 
       const strokeColor = isMatched ? '#10B981' : '#3B82F6';
       ctx.strokeStyle = strokeColor;
@@ -347,6 +342,7 @@ export const KitReturnInspectionModal: React.FC<KitReturnInspectionModalProps> =
           if (res.success) {
             setVisionError(null);
             setIsVisionOnline(true);
+            lastInferenceDimsRef.current = res.imageDimensions || null;
             detections = res.detections || [];
           } else {
             setVisionError(res.error || 'Dịch vụ Vision AI chưa phản hồi');
@@ -360,30 +356,26 @@ export const KitReturnInspectionModal: React.FC<KitReturnInspectionModalProps> =
         }
       }
 
+      // Prevent momentary single-frame hand blur from flashing existing live detections to 0
+      if (detections.length === 0 && isAiScanning && !overrideB64) {
+        emptyFrameStreakRef.current += 1;
+        if (emptyFrameStreakRef.current < 2) {
+          return;
+        }
+      } else {
+        emptyFrameStreakRef.current = 0;
+      }
+
       setRawDetections(detections);
       drawBoundingBoxes(detections);
 
-      // Debounce: only update summary UI when detection count is stable across ≥2 consecutive scans
-      // This prevents the result panel from flickering every frame
-      if (detections.length === lastDetectionCountRef.current) {
-        stableCountRef.current += 1;
-      } else {
-        stableCountRef.current = 1;
-        lastDetectionCountRef.current = detections.length;
-      }
-      const shouldUpdateSummary = stableCountRef.current >= 2 || !!overrideB64;
-
-      // Build recognized items summary strictly based on real detections
-      if (kit?.items && shouldUpdateSummary) {
+      // Build recognized items summary strictly based on real 86-class `best` detections
+      if (kit?.items) {
         const summary: RecognizedItemSummary[] = kit.items.map((ki) => {
-          const matchedClass = findMatchingTrainedClass(ki.item?.code || ki.item?.name || '');
-          const matchedDets = detections.filter(
-            (d) =>
-              (matchedClass && d.classId === matchedClass.classId) ||
-              (matchedClass && d.className.toLowerCase() === matchedClass.className.toLowerCase()) ||
-              d.suggestedItemCode?.toUpperCase() === ki.item?.code?.toUpperCase() ||
-              d.className.toLowerCase().includes((ki.item?.name || '').toLowerCase()) ||
-              (ki.item?.name || '').toLowerCase().includes(d.className.toLowerCase())
+          const matchedDets = detections.filter((d) => doesDetectionMatchItem(d, ki.item));
+          const bestConf = matchedDets.reduce(
+            (max, d) => Math.max(max, d.confidence || 0.9),
+            0
           );
           return {
             itemCode: ki.item?.code || 'N/A',
@@ -392,7 +384,7 @@ export const KitReturnInspectionModal: React.FC<KitReturnInspectionModalProps> =
             expectedQty: ki.quantity,
             detectedQty: matchedDets.length,
             isMatched: matchedDets.length > 0,
-            confidence: matchedDets.length > 0 ? Math.round((matchedDets[0].confidence || 0.9) * 100) : 0,
+            confidence: matchedDets.length > 0 ? Math.round(bestConf * 100) : 0,
           };
         });
         setRecognizedSummary(summary);
@@ -400,7 +392,7 @@ export const KitReturnInspectionModal: React.FC<KitReturnInspectionModalProps> =
     } finally {
       isInFlightRef.current = false;
     }
-  }, [uploadedPreview, qcPhotoUrl, drawBoundingBoxes, kit]);
+  }, [uploadedPreview, qcPhotoUrl, drawBoundingBoxes, kit, isAiScanning]);
 
   // Toggle Continuous AI Scan
   const handleToggleAiScan = useCallback(() => {
@@ -412,12 +404,10 @@ export const KitReturnInspectionModal: React.FC<KitReturnInspectionModalProps> =
       setIsAiScanning(false);
     } else {
       setIsAiScanning(true);
-      // Reset debounce state before new scan session
-      lastDetectionCountRef.current = -1;
-      stableCountRef.current = 0;
+      emptyFrameStreakRef.current = 0;
       runAiDetection();
-      // 6000ms interval — matches cloud inference latency (~3-5s), avoids UI thrash
-      scanIntervalRef.current = window.setInterval(runAiDetection, 6000);
+      const isCloud = typeof window !== 'undefined' && window.location.protocol === 'https:';
+      scanIntervalRef.current = window.setInterval(runAiDetection, isCloud ? 5000 : 2500);
     }
   }, [isAiScanning, runAiDetection]);
 
@@ -429,11 +419,12 @@ export const KitReturnInspectionModal: React.FC<KitReturnInspectionModalProps> =
       prev.map((r) => {
         const found = recognizedSummary.find((s) => s.itemCode === r.itemCode);
         if (found && found.isMatched) {
+          const appliedQty = Math.min(Math.max(found.detectedQty, 1), found.expectedQty);
           return {
             ...r,
-            returnedQuantity: found.expectedQty,
-            condition: 'GOOD',
-            aiDetectedCount: found.expectedQty,
+            returnedQuantity: appliedQty,
+            condition: appliedQty < found.expectedQty ? 'LOST' : 'GOOD',
+            aiDetectedCount: found.detectedQty,
             aiVerified: true,
           };
         }
@@ -727,7 +718,7 @@ export const KitReturnInspectionModal: React.FC<KitReturnInspectionModalProps> =
                   {!isCheckingHealth && isVisionOnline === true && (
                     <span className="inline-flex items-center space-x-1 rounded-full bg-emerald-100/80 px-2 py-0.5 text-[10px] font-bold text-emerald-800">
                       <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                      <span>YOLO11: Sẵn sàng</span>
+                      <span>Model best (86 lớp): Sẵn sàng</span>
                     </span>
                   )}
                   {!isCheckingHealth && isVisionOnline === false && (
@@ -908,7 +899,7 @@ export const KitReturnInspectionModal: React.FC<KitReturnInspectionModalProps> =
                   <p className="text-[11px] text-amber-800 break-words leading-relaxed">
                     {typeof window !== 'undefined' && window.location.protocol === 'https:'
                       ? 'Máy chủ AI trên Cloud (Render) có thể đang khởi động lại sau thời gian rỗi hoặc đang bận xử lý. Vui lòng bấm "Thử lại kết nối AI" hoặc chờ khoảng 15-30 giây.'
-                      : 'Vui lòng chạy lệnh: npm run vision trên terminal máy tính để kích hoạt mô hình YOLO11 (85 lớp trên port 5055).'}
+                      : 'Vui lòng chạy lệnh: npm run vision trên terminal máy tính để kích hoạt mô hình best.pt (86 lớp trên port 5055).'}
                   </p>
                 </div>
               </div>
@@ -994,7 +985,9 @@ export const KitReturnInspectionModal: React.FC<KitReturnInspectionModalProps> =
                     >
                       <span className="font-semibold">{item.itemName}:</span>
                       <span>
-                        {item.isMatched ? `${item.expectedQty} ${item.unit}` : 'Chưa thấy'}
+                        {item.isMatched
+                          ? `${item.detectedQty}/${item.expectedQty} ${item.unit}`
+                          : 'Chưa thấy'}
                       </span>
                       {item.isMatched && (
                         <CheckCircle2 className="h-3 w-3 text-emerald-600" />

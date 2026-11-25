@@ -1,10 +1,10 @@
 """
 ACM MVP – AI Camera-Assisted Component Return Inference Service
 Port: 5055 (default)
-Model: Ultralytics YOLO11n (85 classes)
+Model: Ultralytics YOLOv8s `best.pt` (86 classes)
 Security:
 - No database credentials / No database mutations
-- Strict payload size limit (< 5MB)
+- Strict payload size limit (< 10MB)
 - Concurrency limit (max 1 active inference per session)
 - No image storage or sensitive logging
 """
@@ -15,14 +15,16 @@ import hashlib
 import io
 import os
 import sys
+import tempfile
 import time
 import uuid
 from typing import Optional, Dict, Any, List
 
-# Disable automatic online pip installs by ultralytics
+# Disable automatic online pip installs and redirect Ultralytics config to writable temp dir
 os.environ["YOLO_AUTO_INSTALL"] = "0"
 os.environ["ULTRALYTICS_AUTOINSTALL"] = "0"
 os.environ["YOLO_VERBOSE"] = "False"
+os.environ.setdefault("YOLO_CONFIG_DIR", os.path.join(tempfile.gettempdir(), "ultralytics_acm"))
 
 from PIL import Image
 from starlette.applications import Starlette
@@ -38,24 +40,29 @@ from ultralytics import YOLO
 PORT = int(os.environ.get("PORT", os.environ.get("VISION_SERVICE_PORT", "5055")))
 HOST = os.environ.get("VISION_SERVICE_HOST", "0.0.0.0")
 MAX_PAYLOAD_BYTES = 10 * 1024 * 1024  # 10MB
-CONFIDENCE_THRESHOLD = 0.45
+CONFIDENCE_THRESHOLD = float(os.environ.get("CONFIDENCE_THRESHOLD", "0.35"))
+INFERENCE_IMGSZ = int(os.environ.get("INFERENCE_IMGSZ", "960"))
+MAX_INFERENCE_IMAGE_DIM = int(os.environ.get("MAX_INFERENCE_IMAGE_DIM", "1280"))
 INFERENCE_TIMEOUT_SEC = float(os.environ.get("INFERENCE_TIMEOUT_SEC", "30.0"))
+MODEL_VERSION_TAG = "yolov8s-acm-86-best"
 
 # Model Path Resolution
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 REPO_ROOT = os.path.abspath(os.path.join(SCRIPT_DIR, "..", ".."))
 
+
 def resolve_model_path() -> str:
     env_path = os.environ.get("MODEL_PATH")
     if env_path and os.path.exists(env_path):
         return env_path
-    repo_model = os.path.join(REPO_ROOT, "best.pt")
-    if os.path.exists(repo_model):
-        return repo_model
     script_model = os.path.join(SCRIPT_DIR, "best.pt")
     if os.path.exists(script_model):
         return script_model
-    return repo_model
+    repo_model = os.path.join(REPO_ROOT, "best.pt")
+    if os.path.exists(repo_model):
+        return repo_model
+    return script_model
+
 
 MODEL_PATH = resolve_model_path()
 
@@ -68,8 +75,10 @@ model_sha256: str = "unknown"
 classes_map: Dict[int, str] = {}
 
 # Mappings from detected classes to ACM catalog item codes
-# Invariant: Maps all 85 detected YOLO11 classes to ACM catalog item codes and UBTECH kits.
-CLASS_TO_ITEM_MAP = {
+# Invariant: Maps all 86 detected `best.pt` classes to ACM catalog item codes and UBTECH kits.
+CLASS_TO_ITEM_MAP: Dict[str, str] = {
+    # Class 0 added in `best` (86-class checkpoint)
+    "Large_curved_panel -White-": "PNL-LRG-CRV-WHT",
     # Main controllers & Switches
     "Main_1": "MAIN-01",
     "Main_2": "MAIN-02",
@@ -92,7 +101,7 @@ CLASS_TO_ITEM_MAP = {
     "Servo_wire -Blue-": "CAB-SRV-BLU",
     "Servo_wire_Gray": "CAB-SRV-GRY",
     "Servo_wire_-Short-": "CAB-SRV-SHT",
-    # Structural, Sticks & Joint Bricks (All 85 trained classes)
+    # Structural, Sticks & Joint Bricks (All 86 trained classes)
     "Single_joint_part -Yellow-": "JNT-SGL-YEL",
     "11-hole_stick": "STK-11H",
     "13-hole_stick": "STK-13H",
@@ -161,6 +170,37 @@ CLASS_TO_ITEM_MAP = {
     "Yellow_long_plug": "PLUG-YEL",
 }
 
+# Alternate SKU codes used across UBTECH kits and ACM inventory
+CLASS_TO_ALIAS_CODES: Dict[str, List[str]] = {
+    "Large_curved_panel -White-": ["PNL-LRG-CRV-WHT", "PNL-LRG-WHT", "PNL-CRV-WHT"],
+    "LED_lamp": ["LED-5MM-RGB", "ACT-LED", "LED-RGB"],
+    "Turning_brick": ["BRK-TURN", "WHL-TURN-BRICK"],
+    "Joint_brick": ["BRK-JNT", "JNT-BRICK-STD"],
+    "3x3_Joint_brick": ["BRK-3X3-JNT", "JNT-3X3-BRICK"],
+    "5x5_Joint_brick": ["BRK-5X5-JNT", "JNT-5X5-BRICK"],
+    "Round_joint_brick": ["BRK-RND-JNT", "JNT-RND-BRICK"],
+    "Dual-decked_joint_brick_blue": ["BRK-DD-BLU", "JNT-DD-BRICK-BLU"],
+    "Dual-decked_joint_brick_yellow": ["BRK-DD-YEL", "JNT-DD-BRICK-YEL"],
+    "2x2_Dual_joint": ["JNT-2X2", "JNT-2X2-DUAL"],
+    "1x2_Dual_joint": ["JNT-1X2", "JNT-1X2-DUAL"],
+    "1x3_Dual_joint": ["JNT-1X3", "JNT-1X3-DUAL"],
+    "3x7_Dual_curved_stick-blue-": ["STK-3X7-BLU", "STK-3X7-DC-BLU"],
+    "3x7_dual_curved stick -Gray-": ["STK-3X7-GRY", "STK-3X7-DC-GRY"],
+    "4x4_Curved_stick_-blue-": ["STK-4X4-BLU", "STK-4X4-CRV-BLU"],
+    "3x5_Curved_part_blue": ["BEAM-CSX5-BLU", "PRT-3X5-CRV-BLU"],
+    "3x5_Curved_part_-yellow-": ["BEAM-CSX5-YEL", "PRT-3X5-CRV-YEL"],
+    "Servo_wire_Gray": ["CAB-SRV-GRY", "WIRE-SRV-GRY"],
+    "Servo_wire -Blue-": ["CAB-SRV-BLU", "WIRE-SRV-BLU"],
+    "Servo_wire_-Short-": ["CAB-SRV-SHT", "WIRE-SRV-SHT"],
+    "Switch_wire_main_1": ["CAB-SW-M1", "WIRE-SW-M1"],
+    "Switch_wire_main_2": ["CAB-SW-M2", "WIRE-SW-M2"],
+    "Servo": ["SERVO-SG90", "ACT-SERVO", "SRV-01"],
+    "Motor": ["MOT-01", "ACT-MOTOR"],
+    "Bluetooth_speaker": ["SPK-BT-01", "ACT-SPK-BT"],
+    "Ultrasonic_sensor": ["SR04-ULTRASONIC", "SEN-ULTRASONIC"],
+    "Temp_hum_sensor": ["DHT22-AM2302", "SEN-TEMP-HUM"],
+}
+
 
 def compute_sha256(filepath: str) -> str:
     h = hashlib.sha256()
@@ -182,7 +222,7 @@ def load_model_if_needed():
     print(f"Model SHA256: {model_sha256}")
     model = YOLO(MODEL_PATH)
     classes_map = {int(k): str(v) for k, v in model.names.items()}
-    print(f"Model loaded successfully with {len(classes_map)} classes.")
+    print(f"Model loaded successfully with {len(classes_map)} classes (imgsz={INFERENCE_IMGSZ}, conf={CONFIDENCE_THRESHOLD}).")
 
 
 async def health_endpoint(request: Request) -> JSONResponse:
@@ -190,8 +230,8 @@ async def health_endpoint(request: Request) -> JSONResponse:
     return JSONResponse({
         "status": "ok",
         "service": "acm-camera-return-vision-inference",
-        "version": "1.0.0-mvp",
-        "modelVersion": "yolo11n-acm-85",
+        "version": "1.1.0-best",
+        "modelVersion": MODEL_VERSION_TAG,
         "modelHash": model_sha256,
         "classesCount": len(classes_map),
         "device": "cpu",
@@ -205,13 +245,14 @@ async def list_classes_endpoint(request: Request) -> JSONResponse:
         "total": len(classes_map),
         "classes": [{"classId": k, "className": v} for k, v in classes_map.items()],
         "mappedCatalogItems": CLASS_TO_ITEM_MAP,
+        "aliasCatalogItems": CLASS_TO_ALIAS_CODES,
     })
 
 
-def run_yolo_inference(img: Image.Image) -> List[Dict[str, Any]]:
+def run_yolo_inference(img: Image.Image, scale_x: float = 1.0, scale_y: float = 1.0) -> List[Dict[str, Any]]:
     assert model is not None
-    # Run YOLO inference on PIL Image
-    results = model.predict(img, imgsz=640, conf=CONFIDENCE_THRESHOLD, verbose=False)
+    # Run YOLO inference at native trained resolution (960px default for `best.pt`)
+    results = model.predict(img, imgsz=INFERENCE_IMGSZ, conf=CONFIDENCE_THRESHOLD, verbose=False)
     detections: List[Dict[str, Any]] = []
 
     if results and len(results) > 0:
@@ -224,18 +265,23 @@ def run_yolo_inference(img: Image.Image) -> List[Dict[str, Any]]:
                 cls_id = int(box.cls[0].item())
                 cls_name = model.names.get(cls_id, f"class_{cls_id}")
                 suggested_item = CLASS_TO_ITEM_MAP.get(cls_name, None)
+                candidate_codes = CLASS_TO_ALIAS_CODES.get(
+                    cls_name,
+                    [suggested_item] if suggested_item else [],
+                )
 
                 detections.append({
                     "classId": cls_id,
                     "className": cls_name,
                     "confidence": round(conf, 4),
                     "boundingBox": {
-                        "x1": round(xyxy[0], 2),
-                        "y1": round(xyxy[1], 2),
-                        "x2": round(xyxy[2], 2),
-                        "y2": round(xyxy[3], 2),
+                        "x1": round(xyxy[0] * scale_x, 2),
+                        "y1": round(xyxy[1] * scale_y, 2),
+                        "x2": round(xyxy[2] * scale_x, 2),
+                        "y2": round(xyxy[3] * scale_y, 2),
                     },
                     "suggestedItemCode": suggested_item,
+                    "candidateItemCodes": candidate_codes,
                 })
     return detections
 
@@ -295,7 +341,7 @@ async def detect_endpoint(request: Request) -> JSONResponse:
 
             if len(img_bytes) > MAX_PAYLOAD_BYTES:
                 return JSONResponse(
-                    {"success": False, "error": f"Payload size exceeds 5MB limit ({len(img_bytes)} bytes)"},
+                    {"success": False, "error": f"Payload size exceeds 10MB limit ({len(img_bytes)} bytes)"},
                     status_code=413,
                 )
 
@@ -304,11 +350,17 @@ async def detect_endpoint(request: Request) -> JSONResponse:
                 img = Image.open(io.BytesIO(img_bytes))
                 img.load()
                 img = img.convert("RGB")
-                # Downscale huge mobile camera uploads to max 1024px for fast CPU inference
-                max_dim = max(img.width, img.height)
-                if max_dim > 1024:
-                    scale = 1024.0 / max_dim
-                    img = img.resize((int(img.width * scale), int(img.height * scale)), Image.Resampling.BILINEAR)
+                orig_w, orig_h = img.width, img.height
+                scale_x, scale_y = 1.0, 1.0
+                # Downscale huge mobile camera uploads to MAX_INFERENCE_IMAGE_DIM for fast CPU inference
+                max_dim = max(orig_w, orig_h)
+                if max_dim > MAX_INFERENCE_IMAGE_DIM:
+                    scale = float(MAX_INFERENCE_IMAGE_DIM) / max_dim
+                    new_w = max(1, int(round(orig_w * scale)))
+                    new_h = max(1, int(round(orig_h * scale)))
+                    img = img.resize((new_w, new_h), Image.Resampling.BILINEAR)
+                    scale_x = orig_w / float(new_w)
+                    scale_y = orig_h / float(new_h)
             except Exception as e:
                 return JSONResponse(
                     {"success": False, "error": f"Invalid or malformed image data: {str(e)}"},
@@ -321,7 +373,7 @@ async def detect_endpoint(request: Request) -> JSONResponse:
             # Execute inference in executor to avoid blocking event loop, with timeout
             loop = asyncio.get_running_loop()
             detections = await asyncio.wait_for(
-                loop.run_in_executor(None, run_yolo_inference, img),
+                loop.run_in_executor(None, run_yolo_inference, img, scale_x, scale_y),
                 timeout=INFERENCE_TIMEOUT_SEC,
             )
             t1 = time.perf_counter()
@@ -331,9 +383,9 @@ async def detect_endpoint(request: Request) -> JSONResponse:
                 "success": True,
                 "frameId": frame_id,
                 "timestamp": time.time(),
-                "modelVersion": "yolo11n-acm-85",
+                "modelVersion": MODEL_VERSION_TAG,
                 "modelHash": model_sha256,
-                "imageDimensions": {"width": img.width, "height": img.height},
+                "imageDimensions": {"width": orig_w, "height": orig_h},
                 "inferenceTimeMs": inference_ms,
                 "detectionsCount": len(detections),
                 "detections": detections,

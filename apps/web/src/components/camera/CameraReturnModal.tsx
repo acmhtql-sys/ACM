@@ -25,10 +25,15 @@ import {
   detectFrameBase64,
   detectFrameFile,
   checkVisionHealth,
+  compressImageForVision,
   type VisionDetection,
   type VisionDetectResponse,
 } from '../../services/vision.service';
-import { YOLO11_85_CLASSES } from '../../services/vision-classes';
+import {
+  YOLO11_85_CLASSES,
+  CLASS_NAME_TO_DEFINITION_MAP,
+  normalizeComponentToken,
+} from '../../services/vision-classes';
 import type { ReturnCondition, ReturnInputRow } from '../../pages/borrowReturnPartial';
 import { useModalDismiss } from '../../hooks/useModalDismiss';
 import { apiClient } from '../../services/api';
@@ -146,6 +151,7 @@ export const CameraReturnModal: React.FC<CameraReturnModalProps> = ({
   const streamRef = useRef<MediaStream | null>(null);
   const isInFlightRef = useRef<boolean>(false);
   const intervalRef = useRef<number | null>(null);
+  const inferenceDimsRef = useRef<{ width: number; height: number } | null>(null);
 
   const [facingMode, setFacingMode] = useState<'environment' | 'user'>('environment');
   const [cameraActive, setCameraActive] = useState<boolean>(false);
@@ -153,6 +159,7 @@ export const CameraReturnModal: React.FC<CameraReturnModalProps> = ({
   const [permissionErrorMsg, setPermissionErrorMsg] = useState<string>('');
   const [isRecognizing, setIsRecognizing] = useState<boolean>(false);
   const [isServiceOnline, setIsServiceOnline] = useState<boolean | null>(null);
+  const [isCheckingHealth, setIsCheckingHealth] = useState<boolean>(false);
   const [verifiedCatalog, setVerifiedCatalog] = useState<CatalogItem[]>(catalogItems || []);
   const [isCatalogComplete, setIsCatalogComplete] = useState<boolean>(Boolean(catalogItems && catalogItems.length > 0));
   const [catalogLookupStatus, setCatalogLookupStatus] = useState<'IDLE' | 'LOADING' | 'READY' | 'UNAVAILABLE'>(
@@ -410,6 +417,26 @@ export const CameraReturnModal: React.FC<CameraReturnModalProps> = ({
     }
   }, [facingMode, stopCameraStream]);
 
+  // Manual retry connection to Vision Service (`best` model)
+  const handleRetryVisionHealth = useCallback(async () => {
+    setIsCheckingHealth(true);
+    try {
+      const res = await checkVisionHealth();
+      const online = res?.status === 'ok';
+      setIsServiceOnline(online);
+      if (online) {
+        setStatusNotice({
+          type: 'success',
+          text: `Đã kết nối mô hình AI best (${res?.classesCount || 86} lớp linh kiện). Sẵn sàng nhận diện hoàn trả.`,
+        });
+      }
+    } catch {
+      setIsServiceOnline(false);
+    } finally {
+      setIsCheckingHealth(false);
+    }
+  }, []);
+
   // Check backend vision service health on mount
   useEffect(() => {
     if (!isOpen) return;
@@ -425,7 +452,7 @@ export const CameraReturnModal: React.FC<CameraReturnModalProps> = ({
           setIsServiceOnline(false);
           setStatusNotice({
             type: 'warning',
-            text: 'Dịch vụ AI Vision (cổng 5055) chưa phản hồi. Vui lòng kiểm tra lại dịch vụ suy luận.',
+            text: 'Dịch vụ AI Vision (mô hình best) chưa phản hồi. Vui lòng kiểm tra lại hoặc bấm "Thử lại kết nối AI".',
           });
         }
       });
@@ -456,14 +483,14 @@ export const CameraReturnModal: React.FC<CameraReturnModalProps> = ({
         const img = imageRef.current;
         displayWidth = img.clientWidth || img.width;
         displayHeight = img.clientHeight || img.height;
-        naturalWidth = img.naturalWidth || 640;
-        naturalHeight = img.naturalHeight || 480;
+        naturalWidth = inferenceDimsRef.current?.width || img.naturalWidth || 640;
+        naturalHeight = inferenceDimsRef.current?.height || img.naturalHeight || 480;
       } else if (videoRef.current) {
         const video = videoRef.current;
         displayWidth = video.clientWidth;
         displayHeight = video.clientHeight;
-        naturalWidth = video.videoWidth || 640;
-        naturalHeight = video.videoHeight || 480;
+        naturalWidth = inferenceDimsRef.current?.width || video.videoWidth || 640;
+        naturalHeight = inferenceDimsRef.current?.height || video.videoHeight || 480;
       }
 
       if (displayWidth === 0 || displayHeight === 0) return;
@@ -538,29 +565,76 @@ export const CameraReturnModal: React.FC<CameraReturnModalProps> = ({
 
       // Analyze every detected object with catalog verification
       const analyzed: AnalyzedDetection[] = detectedList.map((det, index) => {
+        const trainedDef = CLASS_NAME_TO_DEFINITION_MAP.get(det.className.toLowerCase());
+
+        // Build verified candidate SKU codes when suggestedItemCode is provided by Vision Service (`best` model)
+        const candidateCodes = new Set<string>();
+        if (det.suggestedItemCode) {
+          candidateCodes.add(det.suggestedItemCode.toUpperCase());
+          det.candidateItemCodes?.forEach((code) => {
+            if (code) candidateCodes.add(code.toUpperCase());
+          });
+          if (trainedDef) {
+            candidateCodes.add(trainedDef.defaultItemCode.toUpperCase());
+            trainedDef.aliasCodes?.forEach((alias) => candidateCodes.add(alias.toUpperCase()));
+          }
+        }
+
         // Step 0: Check against verified active catalog from API
-        const catalogMatch = det.suggestedItemCode
+        let catalogMatch = det.suggestedItemCode
           ? activeCatalog.find(
               (c) =>
                 c.isActive !== false &&
-                c.code.toUpperCase() === det.suggestedItemCode?.toUpperCase()
-            )
+                candidateCodes.has(c.code.toUpperCase())
+            ) || null
           : null;
 
+        // If `det` is a verified 86-class `best` detection with suggestedItemCode, also match active catalog item by exact canonical name
+        if (!catalogMatch && det.suggestedItemCode && trainedDef) {
+          const normTrainedClass = normalizeComponentToken(trainedDef.className);
+          const normTrainedVi = normalizeComponentToken(trainedDef.friendlyNameVi);
+          catalogMatch =
+            activeCatalog.find((c) => {
+              if (c.isActive === false) return false;
+              const normName = normalizeComponentToken(c.name);
+              return (
+                Boolean(normName) &&
+                (normName === normTrainedClass || normName === normTrainedVi)
+              );
+            }) || null;
+        }
+
         // Step 1: Check match with borrow details
-        // Ground truth: Must match actual Item ID or verified Item Code.
-        // Fuzzy name is NOT used as the sole proof to auto-record returns.
+        // Ground truth: Must match actual Item ID, verified Item Code/Alias, or verified 86-class canonical name (when suggestedItemCode is present).
+        // Arbitrary fuzzy partial name alone is NEVER used to auto-record returns.
         const match = outstandingDetails.find((d) => {
-          const itemCode = d.item?.code || '';
+          const itemCode = (d.item?.code || '').toUpperCase();
           const itemId = d.itemId || d.item?.id || '';
-          if (catalogMatch && (itemId === catalogMatch.id || itemCode.toUpperCase() === catalogMatch.code.toUpperCase())) {
+          if (catalogMatch && (itemId === catalogMatch.id || itemCode === catalogMatch.code.toUpperCase())) {
             return true;
           }
-          if (
-            det.suggestedItemCode &&
-            itemCode.toUpperCase() === det.suggestedItemCode.toUpperCase()
-          ) {
-            return true;
+          if (det.suggestedItemCode && itemCode && candidateCodes.has(itemCode)) {
+            const isExplicitlyInactive = activeCatalog.some(
+              (c) => c.code.toUpperCase() === itemCode && c.isActive === false
+            );
+            if (!isExplicitlyInactive) return true;
+          }
+          if (det.suggestedItemCode && trainedDef && d.item?.name) {
+            const isExplicitlyInactive = activeCatalog.some(
+              (c) =>
+                (c.id === itemId || (itemCode && c.code.toUpperCase() === itemCode)) &&
+                c.isActive === false
+            );
+            if (!isExplicitlyInactive) {
+              const normBorrowName = normalizeComponentToken(d.item.name);
+              if (
+                normBorrowName &&
+                (normBorrowName === normalizeComponentToken(trainedDef.className) ||
+                  normBorrowName === normalizeComponentToken(trainedDef.friendlyNameVi))
+              ) {
+                return true;
+              }
+            }
           }
           return false;
         });
@@ -720,14 +794,19 @@ export const CameraReturnModal: React.FC<CameraReturnModalProps> = ({
 
     const video = videoRef.current;
     const offscreen = document.createElement('canvas');
-    offscreen.width = video.videoWidth || 640;
-    offscreen.height = video.videoHeight || 480;
+    const vw = video.videoWidth || 640;
+    const vh = video.videoHeight || 480;
+    const maxDim = 1024;
+    const scale = Math.min(1, maxDim / Math.max(vw, vh));
+    offscreen.width = Math.round(vw * scale);
+    offscreen.height = Math.round(vh * scale);
 
     const ctx = offscreen.getContext('2d');
     if (!ctx) return;
     ctx.drawImage(video, 0, 0, offscreen.width, offscreen.height);
 
-    const b64 = offscreen.toDataURL('image/jpeg', 0.8);
+    const b64 = offscreen.toDataURL('image/jpeg', 0.85);
+    inferenceDimsRef.current = { width: offscreen.width, height: offscreen.height };
 
     isInFlightRef.current = true;
     try {
@@ -738,6 +817,10 @@ export const CameraReturnModal: React.FC<CameraReturnModalProps> = ({
       }));
       const res: VisionDetectResponse = await detectFrameBase64(b64, contextItems);
       if (res.success && res.detections) {
+        setIsServiceOnline(true);
+        if (res.imageDimensions) {
+          inferenceDimsRef.current = res.imageDimensions;
+        }
         setInferenceTime(res.inferenceTimeMs || null);
         processDetections(res.detections);
 
@@ -794,10 +877,11 @@ export const CameraReturnModal: React.FC<CameraReturnModalProps> = ({
     } else {
       setIsRecognizing(true);
       captureAndDetect(); // trigger immediately
-      intervalRef.current = window.setInterval(captureAndDetect, 1000); // 1-second interval
+      const isCloud = typeof window !== 'undefined' && window.location.protocol === 'https:';
+      intervalRef.current = window.setInterval(captureAndDetect, isCloud ? 4500 : 1800);
       setStatusNotice({
         type: 'info',
-        text: 'Đang liên tục quét và nhận diện linh kiện qua camera...',
+        text: 'Đang quét và nhận diện linh kiện hoàn trả bằng mô hình AI best (86 lớp)...',
       });
     }
   }, [captureAndDetect, isRecognizing]);
@@ -855,9 +939,14 @@ export const CameraReturnModal: React.FC<CameraReturnModalProps> = ({
     isInFlightRef.current = true;
     setStatusNotice({ type: 'info', text: `Đang phân tích ảnh chụp bàn giao lúc ${timeStr}...` });
 
-    detectFrameBase64(dataUrl)
+    compressImageForVision(dataUrl, 1024, 0.85)
+      .then((compressed) => detectFrameBase64(compressed || dataUrl))
       .then((res) => {
         if (res.success && res.detections) {
+          setIsServiceOnline(true);
+          if (res.imageDimensions) {
+            inferenceDimsRef.current = res.imageDimensions;
+          }
           setInferenceTime(res.inferenceTimeMs || null);
           processDetections(res.detections);
           setStatusNotice({
@@ -913,6 +1002,8 @@ export const CameraReturnModal: React.FC<CameraReturnModalProps> = ({
         }));
         const res = await detectFrameFile(file, contextItems);
         if (res.success && res.detections) {
+          setIsServiceOnline(true);
+          inferenceDimsRef.current = res.imageDimensions || null;
           setInferenceTime(res.inferenceTimeMs || null);
           processDetections(res.detections);
 
@@ -1147,11 +1238,23 @@ export const CameraReturnModal: React.FC<CameraReturnModalProps> = ({
           </div>
 
           <div className="flex items-center space-x-2 sm:space-x-3 shrink-0 ml-2">
-            {isServiceOnline === false && (
-              <span className="hidden sm:inline-flex items-center text-xs text-amber-600 font-medium">
-                <AlertTriangle className="mr-1 h-3.5 w-3.5" />
-                AI Service Offline
+            {isServiceOnline === true && (
+              <span className="hidden sm:inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-0.5 text-[11px] text-emerald-800 font-semibold">
+                <span className="mr-1.5 h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                Model best (86 lớp)
               </span>
+            )}
+            {isServiceOnline === false && (
+              <button
+                type="button"
+                disabled={isCheckingHealth}
+                onClick={handleRetryVisionHealth}
+                className="inline-flex items-center rounded-lg bg-amber-100 hover:bg-amber-200 px-2.5 py-1 text-[11px] text-amber-800 font-semibold transition cursor-pointer disabled:opacity-50"
+                title="Bấm để kết nối lại dịch vụ nhận diện AI"
+              >
+                <RefreshCw className={`mr-1 h-3 w-3 ${isCheckingHealth ? 'animate-spin' : ''}`} />
+                <span>{isCheckingHealth ? 'Đang kết nối...' : 'AI Offline • Thử lại'}</span>
+              </button>
             )}
             <button
               type="button"
@@ -1373,7 +1476,7 @@ export const CameraReturnModal: React.FC<CameraReturnModalProps> = ({
                       <div className="flex items-center justify-between">
                         <span className="inline-flex items-center space-x-1.5 rounded-full bg-emerald-600/90 backdrop-blur-md px-2.5 py-1 text-[10px] font-bold text-white shadow-md">
                           <span className="h-2 w-2 rounded-full bg-white animate-ping" />
-                          <span>AI ĐANG QUÉT LIVE (YOLO11)</span>
+                          <span>AI ĐANG QUÉT LIVE (MODEL BEST • 86 LỚP)</span>
                         </span>
                       </div>
                       <div className="h-0.5 w-full bg-gradient-to-r from-transparent via-emerald-400 to-transparent shadow-[0_0_10px_#34d399] opacity-80" />
