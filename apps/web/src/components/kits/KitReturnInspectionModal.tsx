@@ -87,6 +87,7 @@ export const KitReturnInspectionModal: React.FC<KitReturnInspectionModalProps> =
   const [visionError, setVisionError] = useState<string | null>(null);
   const [isVisionOnline, setIsVisionOnline] = useState<boolean | null>(null);
   const [isCheckingHealth, setIsCheckingHealth] = useState<boolean>(false);
+  const [isDetectingFrame, setIsDetectingFrame] = useState<boolean>(false);
   const [qcPhotoUrl, setQcPhotoUrl] = useState<string | null>(null);
   const [qcTimestamp, setQcTimestamp] = useState<string | null>(null);
   const [rawDetections, setRawDetections] = useState<VisionDetection[]>([]);
@@ -119,17 +120,39 @@ export const KitReturnInspectionModal: React.FC<KitReturnInspectionModalProps> =
     setAiApplied(false);
     setUploadedPreview(null);
 
+    let cancelled = false;
+    let retryTimer: number | null = null;
     setIsCheckingHealth(true);
     checkVisionHealth()
       .then((health) => {
-        setIsVisionOnline(!!health);
-        if (health) setVisionError(null);
+        if (cancelled) return;
+        if (health) {
+          setIsVisionOnline(true);
+          setVisionError(null);
+          setIsCheckingHealth(false);
+        } else {
+          setIsVisionOnline(false);
+          // Auto-retry once in case Cloud Vision Service was waking from sleep
+          retryTimer = window.setTimeout(() => {
+            if (cancelled) return;
+            checkVisionHealth()
+              .then((h2) => {
+                if (cancelled) return;
+                setIsVisionOnline(!!h2);
+                if (h2) setVisionError(null);
+              })
+              .catch(() => {})
+              .finally(() => {
+                if (!cancelled) setIsCheckingHealth(false);
+              });
+          }, 3500);
+        }
       })
       .catch(() => {
-        setIsVisionOnline(false);
-      })
-      .finally(() => {
-        setIsCheckingHealth(false);
+        if (!cancelled) {
+          setIsVisionOnline(false);
+          setIsCheckingHealth(false);
+        }
       });
 
     const rows: ComponentInspectionRow[] = (kit.items || []).map((ki) => ({
@@ -145,6 +168,11 @@ export const KitReturnInspectionModal: React.FC<KitReturnInspectionModalProps> =
       aiVerified: false,
     }));
     setInspectionRows(rows);
+
+    return () => {
+      cancelled = true;
+      if (retryTimer) window.clearTimeout(retryTimer);
+    };
   }, [isOpen, kit]);
 
   // Clean up stream & intervals on unmount or close
@@ -311,10 +339,13 @@ export const KitReturnInspectionModal: React.FC<KitReturnInspectionModalProps> =
   const runAiDetection = useCallback(async (overrideB64?: string) => {
     if (isInFlightRef.current) return;
     isInFlightRef.current = true;
+    setIsDetectingFrame(true);
 
     try {
       let b64 = overrideB64 || '';
-      if (!b64) {
+      if (b64) {
+        b64 = (await compressImageForVision(b64, 1024, 0.85)) || b64;
+      } else {
         if (uploadedPreview) {
           b64 = uploadedPreview;
         } else if (videoRef.current && videoRef.current.readyState >= 2) {
@@ -331,7 +362,7 @@ export const KitReturnInspectionModal: React.FC<KitReturnInspectionModalProps> =
             b64 = offscreen.toDataURL('image/jpeg', 0.85);
           }
         } else if (qcPhotoUrl) {
-          b64 = qcPhotoUrl;
+          b64 = (await compressImageForVision(qcPhotoUrl, 1024, 0.85)) || qcPhotoUrl;
         }
       }
 
@@ -391,6 +422,7 @@ export const KitReturnInspectionModal: React.FC<KitReturnInspectionModalProps> =
       }
     } finally {
       isInFlightRef.current = false;
+      setIsDetectingFrame(false);
     }
   }, [uploadedPreview, qcPhotoUrl, drawBoundingBoxes, kit, isAiScanning]);
 
@@ -848,11 +880,12 @@ export const KitReturnInspectionModal: React.FC<KitReturnInspectionModalProps> =
 
                   <button
                     type="button"
+                    disabled={isDetectingFrame}
                     onClick={() => runAiDetection()}
-                    className="inline-flex items-center space-x-1 rounded-lg bg-slate-800 text-slate-200 border border-slate-700 px-2.5 py-1.5 text-xs font-medium hover:bg-slate-700 cursor-pointer"
+                    className="inline-flex items-center space-x-1 rounded-lg bg-slate-800 text-slate-200 border border-slate-700 px-2.5 py-1.5 text-xs font-medium hover:bg-slate-700 cursor-pointer disabled:opacity-60"
                   >
-                    <RefreshCw className="h-3 w-3" />
-                    <span>Quét 1 khung hình</span>
+                    <RefreshCw className={`h-3 w-3 ${isDetectingFrame ? 'animate-spin' : ''}`} />
+                    <span>{isDetectingFrame ? 'Đang quét AI...' : 'Quét 1 khung hình'}</span>
                   </button>
 
                   <button
@@ -1020,12 +1053,17 @@ export const KitReturnInspectionModal: React.FC<KitReturnInspectionModalProps> =
                 <div className="flex items-center space-x-2 shrink-0 self-end sm:self-center">
                   <button
                     type="button"
+                    disabled={isDetectingFrame}
                     onClick={() => runAiDetection(qcPhotoUrl)}
-                    className="inline-flex items-center space-x-1 rounded-lg bg-emerald-600 px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 shadow-2xs cursor-pointer transition active:scale-[0.99]"
+                    className="inline-flex items-center space-x-1 rounded-lg bg-emerald-600 px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 shadow-2xs cursor-pointer transition active:scale-[0.99] disabled:opacity-60"
                     title="Nhận diện lại các linh kiện trong ảnh đã chụp bằng AI"
                   >
-                    <Sparkles className="h-3.5 w-3.5" />
-                    <span>Quét AI ảnh này</span>
+                    {isDetectingFrame ? (
+                      <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Sparkles className="h-3.5 w-3.5" />
+                    )}
+                    <span>{isDetectingFrame ? 'Đang phân tích AI...' : 'Quét AI ảnh này'}</span>
                   </button>
                   <button
                     type="button"

@@ -163,7 +163,7 @@ export async function checkVisionHealth(): Promise<VisionHealthResponse | null> 
   for (const url of urlsToTry) {
     try {
       const isCloud = url.includes('render.com') || (typeof window !== 'undefined' && window.location.protocol === 'https:');
-      const timeoutMs = isCloud ? 12000 : 3000;
+      const timeoutMs = isCloud ? 30000 : 4000;
       const res = await fetch(url, { method: 'GET', signal: AbortSignal.timeout(timeoutMs) });
       if (res.ok) {
         return await res.json();
@@ -202,7 +202,7 @@ export async function detectFrameBase64(
   for (const url of urlsToTry) {
     try {
       const isCloud = url.includes('render.com') || (typeof window !== 'undefined' && window.location.protocol === 'https:');
-      const timeoutMs = isCloud ? 35000 : 12000;
+      const timeoutMs = isCloud ? 45000 : 15000;
       const res = await fetch(url, {
         method: 'POST',
         headers: {
@@ -264,7 +264,7 @@ export async function detectFrameFile(
   for (const url of urlsToTry) {
     try {
       const isCloud = url.includes('render.com') || (typeof window !== 'undefined' && window.location.protocol === 'https:');
-      const timeoutMs = isCloud ? 35000 : 12000;
+      const timeoutMs = isCloud ? 45000 : 15000;
       const formData = new FormData();
       formData.append('file', file, 'frame.jpg');
 

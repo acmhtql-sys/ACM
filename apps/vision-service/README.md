@@ -13,8 +13,8 @@ Lightweight, isolated inference service powering real-time component return iden
 4. **Zero Persistent Storage**: No captured camera frames or user credentials are stored or persisted to disk/DB.
 
 ## Model
-- Checkpoint: `best.pt` (Ultralytics YOLOv8s `best`, 86 classes, trained at `imgsz=960`).
-- SHA256: `2abe7ffa86c021095a6ba0bb8174476ad1eaa7d610cb46c931520e46a3b15288`.
+- Checkpoint: `best.onnx` (exported 1:1 from Ultralytics YOLOv8s `best.pt`, 86 classes, `imgsz=960`, accelerated via ONNX Runtime CPU with `best.pt` fallback).
+- Source `.pt` SHA256: `2abe7ffa86c021095a6ba0bb8174476ad1eaa7d610cb46c931520e46a3b15288`.
 - License: AGPL-3.0.
 
 ## Endpoints
