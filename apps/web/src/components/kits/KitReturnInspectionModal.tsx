@@ -20,6 +20,7 @@ import {
   Square,
   Layers,
   ArrowRight,
+  RotateCcw,
 } from 'lucide-react';
 import { useModalDismiss } from '../../hooks/useModalDismiss';
 import { apiClient } from '../../services/api';
@@ -89,6 +90,9 @@ export const KitReturnInspectionModal: React.FC<KitReturnInspectionModalProps> =
   const [isCheckingHealth, setIsCheckingHealth] = useState<boolean>(false);
   const [isDetectingFrame, setIsDetectingFrame] = useState<boolean>(false);
   const [qcPhotoUrl, setQcPhotoUrl] = useState<string | null>(null);
+  const [rawQcPhotoUrl, setRawQcPhotoUrl] = useState<string | null>(null);
+  const [isAccumulateMode, setIsAccumulateMode] = useState<boolean>(true);
+  const [aiConfidenceLevel, setAiConfidenceLevel] = useState<number>(0.22);
   const [qcTimestamp, setQcTimestamp] = useState<string | null>(null);
   const [rawDetections, setRawDetections] = useState<VisionDetection[]>([]);
   const [recognizedSummary, setRecognizedSummary] = useState<RecognizedItemSummary[]>([]);
@@ -111,6 +115,7 @@ export const KitReturnInspectionModal: React.FC<KitReturnInspectionModalProps> =
     setErrorMessage(null);
     setGeneralNotes('');
     setQcPhotoUrl(null);
+    setRawQcPhotoUrl(null);
     setQcTimestamp(null);
     setIsCameraActive(false);
     setIsAiScanning(false);
@@ -361,15 +366,16 @@ export const KitReturnInspectionModal: React.FC<KitReturnInspectionModalProps> =
             ctx.drawImage(videoRef.current, 0, 0, offscreen.width, offscreen.height);
             b64 = offscreen.toDataURL('image/jpeg', 0.85);
           }
-        } else if (qcPhotoUrl) {
-          b64 = (await compressImageForVision(qcPhotoUrl, 1024, 0.85)) || qcPhotoUrl;
+        } else if (rawQcPhotoUrl || qcPhotoUrl) {
+          const targetUrl = rawQcPhotoUrl || qcPhotoUrl || '';
+          b64 = (await compressImageForVision(targetUrl, 1024, 0.85)) || targetUrl;
         }
       }
 
       let detections: VisionDetection[] = [];
       if (b64) {
         try {
-          const res = await detectFrameBase64(b64);
+          const res = await detectFrameBase64(b64, undefined, { confidence: aiConfidenceLevel });
           if (res.success) {
             setVisionError(null);
             setIsVisionOnline(true);
@@ -402,29 +408,78 @@ export const KitReturnInspectionModal: React.FC<KitReturnInspectionModalProps> =
 
       // Build recognized items summary strictly based on real 86-class `best` detections
       if (kit?.items) {
-        const summary: RecognizedItemSummary[] = kit.items.map((ki) => {
-          const matchedDets = detections.filter((d) => doesDetectionMatchItem(d, ki.item));
-          const bestConf = matchedDets.reduce(
-            (max, d) => Math.max(max, d.confidence || 0.9),
-            0
-          );
-          return {
-            itemCode: ki.item?.code || 'N/A',
-            itemName: ki.item?.name || 'Linh kiện',
-            unit: ki.item?.unit || 'cái',
-            expectedQty: ki.quantity,
-            detectedQty: matchedDets.length,
-            isMatched: matchedDets.length > 0,
-            confidence: matchedDets.length > 0 ? Math.round(bestConf * 100) : 0,
-          };
+        setRecognizedSummary((prevSummary) => {
+          return kit.items.map((ki) => {
+            const matchedDets = detections.filter((d) => doesDetectionMatchItem(d, ki.item));
+            const prevItem = prevSummary.find((s) => s.itemCode === (ki.item?.code || 'N/A'));
+            const prevQty = prevItem?.detectedQty || 0;
+            const bestConf = matchedDets.reduce(
+              (max, d) => Math.max(max, d.confidence || 0.9),
+              prevItem?.confidence ? prevItem.confidence / 100 : 0
+            );
+
+            let detectedQty = matchedDets.length;
+            if (isAccumulateMode) {
+              if (isAiScanning && !overrideB64) {
+                // Continuous live stream: keep max seen so far while panning across compartments
+                detectedQty = Math.max(prevQty, matchedDets.length);
+              } else {
+                // Snapshot / manual upload / "Quét AI ảnh này": accumulate new detections
+                detectedQty = Math.min(ki.quantity, prevQty + matchedDets.length);
+              }
+            }
+
+            return {
+              itemCode: ki.item?.code || 'N/A',
+              itemName: ki.item?.name || 'Linh kiện',
+              unit: ki.item?.unit || 'cái',
+              expectedQty: ki.quantity,
+              detectedQty,
+              isMatched: detectedQty > 0,
+              confidence: detectedQty > 0 ? Math.round(bestConf * 100) : 0,
+            };
+          });
         });
-        setRecognizedSummary(summary);
       }
     } finally {
       isInFlightRef.current = false;
       setIsDetectingFrame(false);
     }
-  }, [uploadedPreview, qcPhotoUrl, drawBoundingBoxes, kit, isAiScanning]);
+  }, [
+    uploadedPreview,
+    qcPhotoUrl,
+    rawQcPhotoUrl,
+    isAccumulateMode,
+    aiConfidenceLevel,
+    drawBoundingBoxes,
+    kit,
+    isAiScanning,
+  ]);
+
+  // Reset accumulated AI detections
+  const handleResetAiDetections = useCallback(() => {
+    setRawDetections([]);
+    setAiApplied(false);
+    if (kit?.items) {
+      setRecognizedSummary(
+        kit.items.map((ki) => ({
+          itemCode: ki.item?.code || 'N/A',
+          itemName: ki.item?.name || 'Linh kiện',
+          unit: ki.item?.unit || 'cái',
+          expectedQty: ki.quantity,
+          detectedQty: 0,
+          isMatched: false,
+          confidence: 0,
+        }))
+      );
+    } else {
+      setRecognizedSummary([]);
+    }
+    if (canvasRef.current) {
+      const ctx = canvasRef.current.getContext('2d');
+      ctx?.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+    }
+  }, [kit]);
 
   // Toggle Continuous AI Scan
   const handleToggleAiScan = useCallback(() => {
@@ -525,6 +580,16 @@ export const KitReturnInspectionModal: React.FC<KitReturnInspectionModalProps> =
     ctx.fillStyle = '#E2E8F0';
     ctx.font = '12px sans-serif';
     ctx.fillText(timeStr, w - 180, h - 14);
+
+    // Save unannotated raw image so future AI rescanning is never obscured by watermarks
+    const rawCanvas = document.createElement('canvas');
+    rawCanvas.width = w;
+    rawCanvas.height = h;
+    const rawCtx = rawCanvas.getContext('2d');
+    if (rawCtx) {
+      rawCtx.drawImage(sourceEl, 0, 0, w, h);
+      setRawQcPhotoUrl(rawCanvas.toDataURL('image/jpeg', 0.9));
+    }
 
     const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
     setQcPhotoUrl(dataUrl);
@@ -763,7 +828,21 @@ export const KitReturnInspectionModal: React.FC<KitReturnInspectionModalProps> =
               </div>
 
               {/* Controls */}
-              <div className="flex items-center space-x-2">
+              <div className="flex items-center flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsAccumulateMode(!isAccumulateMode)}
+                  className={`inline-flex items-center space-x-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold border transition cursor-pointer shadow-2xs ${
+                    isAccumulateMode
+                      ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
+                      : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                  }`}
+                  title="Khi bật: quét từng ngăn/khay linh kiện sẽ được cộng dồn số lượng thay vì ghi đè"
+                >
+                  <Layers className={`h-3.5 w-3.5 ${isAccumulateMode ? 'text-emerald-600' : 'text-slate-400'}`} />
+                  <span>Cộng dồn khay: {isAccumulateMode ? 'BẬT' : 'TẮT'}</span>
+                </button>
+
                 {!isCameraActive && !uploadedPreview && (
                   <>
                     <label className="inline-flex items-center space-x-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 cursor-pointer shadow-2xs">
@@ -982,27 +1061,41 @@ export const KitReturnInspectionModal: React.FC<KitReturnInspectionModalProps> =
                     </div>
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={handleApplyAiToChecklist}
-                    className={`w-full sm:w-auto inline-flex items-center justify-center space-x-1.5 rounded-lg px-3.5 py-1.5 text-xs font-bold transition shadow-xs cursor-pointer ${
-                      aiApplied
-                        ? 'bg-slate-100 text-slate-600 border border-slate-200'
-                        : 'bg-emerald-600 text-white hover:bg-emerald-700 active:scale-[0.99]'
-                    }`}
-                  >
-                    {aiApplied ? (
-                      <>
-                        <Check className="h-3.5 w-3.5 text-emerald-600" />
-                        <span>Đã áp dụng kết quả AI</span>
-                      </>
-                    ) : (
-                      <>
-                        <Zap className="h-3.5 w-3.5 text-amber-300" />
-                        <span>Áp dụng số lượng AI vào bảng kiểm đếm</span>
-                      </>
+                  <div className="flex items-center flex-wrap gap-2">
+                    {recognizedSummary.some((s) => s.detectedQty > 0) && (
+                      <button
+                        type="button"
+                        onClick={handleResetAiDetections}
+                        className="inline-flex items-center space-x-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 shadow-2xs cursor-pointer transition active:scale-[0.99]"
+                        title="Xóa toàn bộ số lượng AI đã đếm để quét lại từ đầu"
+                      >
+                        <RotateCcw className="h-3 w-3 text-slate-500" />
+                        <span>Quét lại từ đầu</span>
+                      </button>
                     )}
-                  </button>
+
+                    <button
+                      type="button"
+                      onClick={handleApplyAiToChecklist}
+                      className={`w-full sm:w-auto inline-flex items-center justify-center space-x-1.5 rounded-lg px-3.5 py-1.5 text-xs font-bold transition shadow-xs cursor-pointer ${
+                        aiApplied
+                          ? 'bg-slate-100 text-slate-600 border border-slate-200'
+                          : 'bg-emerald-600 text-white hover:bg-emerald-700 active:scale-[0.99]'
+                      }`}
+                    >
+                      {aiApplied ? (
+                        <>
+                          <Check className="h-3.5 w-3.5 text-emerald-600" />
+                          <span>Đã áp dụng kết quả AI</span>
+                        </>
+                      ) : (
+                        <>
+                          <Zap className="h-3.5 w-3.5 text-amber-300" />
+                          <span>Áp dụng số lượng AI vào bảng kiểm đếm</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
                 </div>
 
                 {/* Detected Badges Row */}
@@ -1054,7 +1147,7 @@ export const KitReturnInspectionModal: React.FC<KitReturnInspectionModalProps> =
                   <button
                     type="button"
                     disabled={isDetectingFrame}
-                    onClick={() => runAiDetection(qcPhotoUrl)}
+                    onClick={() => runAiDetection(rawQcPhotoUrl || qcPhotoUrl)}
                     className="inline-flex items-center space-x-1 rounded-lg bg-emerald-600 px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 shadow-2xs cursor-pointer transition active:scale-[0.99] disabled:opacity-60"
                     title="Nhận diện lại các linh kiện trong ảnh đã chụp bằng AI"
                   >
@@ -1069,6 +1162,7 @@ export const KitReturnInspectionModal: React.FC<KitReturnInspectionModalProps> =
                     type="button"
                     onClick={() => {
                       setQcPhotoUrl(null);
+                      setRawQcPhotoUrl(null);
                       setQcTimestamp(null);
                     }}
                     className="text-xs text-slate-500 hover:text-slate-700 cursor-pointer font-medium px-2 py-1"

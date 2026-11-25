@@ -45,8 +45,8 @@ except ImportError:
 PORT = int(os.environ.get("PORT", os.environ.get("VISION_SERVICE_PORT", "5055")))
 HOST = os.environ.get("VISION_SERVICE_HOST", "0.0.0.0")
 MAX_PAYLOAD_BYTES = 10 * 1024 * 1024  # 10MB
-CONFIDENCE_THRESHOLD = float(os.environ.get("CONFIDENCE_THRESHOLD", "0.35"))
-NMS_IOU_THRESHOLD = float(os.environ.get("NMS_IOU_THRESHOLD", "0.70"))
+CONFIDENCE_THRESHOLD = float(os.environ.get("CONFIDENCE_THRESHOLD", "0.22"))
+NMS_IOU_THRESHOLD = float(os.environ.get("NMS_IOU_THRESHOLD", "0.60"))
 INFERENCE_IMGSZ = int(os.environ.get("INFERENCE_IMGSZ", "960"))
 MAX_INFERENCE_IMAGE_DIM = int(os.environ.get("MAX_INFERENCE_IMAGE_DIM", "1280"))
 INFERENCE_TIMEOUT_SEC = float(os.environ.get("INFERENCE_TIMEOUT_SEC", "45.0"))
@@ -366,7 +366,7 @@ async def health_endpoint(request: Request) -> JSONResponse:
     return JSONResponse({
         "status": "ok",
         "service": "acm-camera-return-vision-inference",
-        "version": "1.2.0-best-onnx",
+        "version": "1.3.0-best-optimized",
         "modelVersion": MODEL_VERSION_TAG,
         "modelHash": model_sha256,
         "classesCount": len(classes_map),
@@ -414,7 +414,12 @@ def _build_detection_dict(
     }
 
 
-def _run_ort_inference(img: Image.Image, scale_x: float, scale_y: float) -> List[Dict[str, Any]]:
+def _run_ort_inference(
+    img: Image.Image,
+    scale_x: float,
+    scale_y: float,
+    conf_thresh: float = CONFIDENCE_THRESHOLD,
+) -> List[Dict[str, Any]]:
     assert ort_session is not None
     w, h = img.width, img.height
     r = min(float(INFERENCE_IMGSZ) / h, float(INFERENCE_IMGSZ) / w)
@@ -440,7 +445,7 @@ def _run_ort_inference(img: Image.Image, scale_x: float, scale_y: float) -> List
     cls_ids = np.argmax(scores_all, axis=1)
     confs = scores_all[np.arange(scores_all.shape[0]), cls_ids]
 
-    mask = confs >= CONFIDENCE_THRESHOLD
+    mask = confs >= conf_thresh
     if not np.any(mask):
         return []
 
@@ -485,12 +490,17 @@ def _run_ort_inference(img: Image.Image, scale_x: float, scale_y: float) -> List
     return detections
 
 
-def run_yolo_inference(img: Image.Image, scale_x: float = 1.0, scale_y: float = 1.0) -> List[Dict[str, Any]]:
+def run_yolo_inference(
+    img: Image.Image,
+    scale_x: float = 1.0,
+    scale_y: float = 1.0,
+    conf_thresh: float = CONFIDENCE_THRESHOLD,
+) -> List[Dict[str, Any]]:
     if ort_session is not None:
-        return _run_ort_inference(img, scale_x, scale_y)
+        return _run_ort_inference(img, scale_x, scale_y, conf_thresh)
 
     assert pt_model is not None
-    results = pt_model.predict(img, imgsz=INFERENCE_IMGSZ, conf=CONFIDENCE_THRESHOLD, verbose=False)
+    results = pt_model.predict(img, imgsz=INFERENCE_IMGSZ, conf=conf_thresh, verbose=False)
     detections: List[Dict[str, Any]] = []
     if results and len(results) > 0 and results[0].boxes is not None:
         for box in results[0].boxes:
@@ -527,6 +537,15 @@ async def detect_endpoint(request: Request) -> JSONResponse:
     async with inference_lock:
         content_type = request.headers.get("content-type", "")
         img_bytes: Optional[bytes] = None
+        user_conf: Optional[float] = None
+
+        # Check query parameters for custom confidence
+        q_conf = request.query_params.get("conf") or request.query_params.get("confidence")
+        if q_conf:
+            try:
+                user_conf = float(q_conf)
+            except ValueError:
+                pass
 
         try:
             if "multipart/form-data" in content_type:
@@ -546,6 +565,13 @@ async def detect_endpoint(request: Request) -> JSONResponse:
                         {"success": False, "error": "Missing or invalid 'image' base64 string in JSON body."},
                         status_code=400,
                     )
+                if user_conf is None:
+                    c_body = body.get("confidence") or body.get("conf")
+                    if c_body is not None:
+                        try:
+                            user_conf = float(c_body)
+                        except (ValueError, TypeError):
+                            pass
                 if "," in b64_data:
                     b64_data = b64_data.split(",", 1)[1]
                 img_bytes = base64.b64decode(b64_data)
@@ -583,12 +609,18 @@ async def detect_endpoint(request: Request) -> JSONResponse:
                     status_code=400,
                 )
 
+            active_conf = (
+                user_conf
+                if (user_conf is not None and 0.05 <= user_conf <= 0.95)
+                else CONFIDENCE_THRESHOLD
+            )
+
             frame_id = f"frame_{uuid.uuid4().hex[:12]}"
             t0 = time.perf_counter()
 
             loop = asyncio.get_running_loop()
             detections = await asyncio.wait_for(
-                loop.run_in_executor(None, run_yolo_inference, img, scale_x, scale_y),
+                loop.run_in_executor(None, run_yolo_inference, img, scale_x, scale_y, active_conf),
                 timeout=INFERENCE_TIMEOUT_SEC,
             )
             t1 = time.perf_counter()
@@ -600,6 +632,7 @@ async def detect_endpoint(request: Request) -> JSONResponse:
                 "timestamp": time.time(),
                 "modelVersion": MODEL_VERSION_TAG,
                 "modelHash": model_sha256,
+                "confidenceThreshold": active_conf,
                 "imageDimensions": {"width": orig_w, "height": orig_h},
                 "inferenceTimeMs": inference_ms,
                 "detectionsCount": len(detections),

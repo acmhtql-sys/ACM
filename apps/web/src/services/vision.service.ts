@@ -186,7 +186,8 @@ function getAuthHeaders(): Record<string, string> {
  */
 export async function detectFrameBase64(
   imageBase64: string,
-  _contextItems?: Array<{ code?: string; name?: string; quantity?: number }>
+  _contextItems?: Array<{ code?: string; name?: string; quantity?: number }>,
+  options?: { confidence?: number }
 ): Promise<VisionDetectResponse> {
   const base = getVisionServiceUrl();
   const urlsToTry = [
@@ -198,6 +199,7 @@ export async function detectFrameBase64(
   ].filter(Boolean) as string[];
 
   let lastError = 'Không thể kết nối Vision Service (Offline)';
+  const activeConfidence = typeof options?.confidence === 'number' ? options.confidence : 0.22;
 
   for (const url of urlsToTry) {
     try {
@@ -209,7 +211,10 @@ export async function detectFrameBase64(
           'Content-Type': 'application/json',
           ...getAuthHeaders(),
         },
-        body: JSON.stringify({ image: imageBase64 }),
+        body: JSON.stringify({
+          image: imageBase64,
+          confidence: activeConfidence,
+        }),
         signal: AbortSignal.timeout(timeoutMs),
       });
 
