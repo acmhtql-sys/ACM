@@ -21,6 +21,8 @@ import {
   Layers,
   ArrowRight,
   RotateCcw,
+  EyeOff,
+  Filter,
 } from 'lucide-react';
 import { useModalDismiss } from '../../hooks/useModalDismiss';
 import { apiClient } from '../../services/api';
@@ -32,7 +34,7 @@ import {
   type VisionDetection,
   type VisionDetectResponse,
 } from '../../services/vision.service';
-import { doesDetectionMatchItem } from '../../services/vision-classes';
+import { doesDetectionMatchItem, findMatchingTrainedClass } from '../../services/vision-classes';
 import type { KitRecordForBorrow } from './StudentBorrowKitModal';
 
 export type ComponentCondition = 'GOOD' | 'DAMAGED' | 'LOST';
@@ -98,6 +100,14 @@ export const KitReturnInspectionModal: React.FC<KitReturnInspectionModalProps> =
   const [recognizedSummary, setRecognizedSummary] = useState<RecognizedItemSummary[]>([]);
   const [aiApplied, setAiApplied] = useState<boolean>(false);
   const [uploadedPreview, setUploadedPreview] = useState<string | null>(null);
+  const [overlayMode, setOverlayMode] = useState<'all' | 'boxes_only' | 'hidden'>('all');
+  const [summaryFilter, setSummaryFilter] = useState<'all' | 'matched' | 'missing'>('all');
+
+  const filteredSummary = useMemo(() => {
+    if (summaryFilter === 'matched') return recognizedSummary.filter((s) => s.isMatched);
+    if (summaryFilter === 'missing') return recognizedSummary.filter((s) => !s.isMatched);
+    return recognizedSummary;
+  }, [recognizedSummary, summaryFilter]);
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -260,8 +270,8 @@ export const KitReturnInspectionModal: React.FC<KitReturnInspectionModalProps> =
     }
   };
 
-  // Draw bounding boxes on canvas overlay
-  const drawBoundingBoxes = useCallback((detections: VisionDetection[]) => {
+  // Draw bounding boxes on canvas overlay (modern, minimalist, elegant styling)
+  const drawBoundingBoxes = useCallback((detections: VisionDetection[], forceMode?: 'all' | 'boxes_only' | 'hidden') => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
@@ -292,37 +302,105 @@ export const KitReturnInspectionModal: React.FC<KitReturnInspectionModalProps> =
     canvas.height = displayH;
     ctx.clearRect(0, 0, displayW, displayH);
 
+    const activeMode = forceMode || overlayMode;
+    if (activeMode === 'hidden') return;
+
     const scaleX = displayW / naturalW;
     const scaleY = displayH / naturalH;
 
     for (const det of detections) {
       const { x1, y1, x2, y2 } = det.boundingBox;
-      const rx = x1 * scaleX;
-      const ry = y1 * scaleY;
-      const rw = (x2 - x1) * scaleX;
-      const rh = (y2 - y1) * scaleY;
+      const rx = Math.round(x1 * scaleX);
+      const ry = Math.round(y1 * scaleY);
+      const rw = Math.round((x2 - x1) * scaleX);
+      const rh = Math.round((y2 - y1) * scaleY);
 
-      // Color scheme: Green for matched kit item, Blue for others
-      const isMatched = kit?.items?.some((ki) => doesDetectionMatchItem(det, ki.item));
+      if (rw <= 2 || rh <= 2) continue;
 
-      const strokeColor = isMatched ? '#10B981' : '#3B82F6';
+      // Color scheme: Green for matched kit item, Blue/Cyan for others
+      const matchedKi = kit?.items?.find((ki) => doesDetectionMatchItem(det, ki.item));
+      const isMatched = Boolean(matchedKi);
+
+      const strokeColor = isMatched ? '#10B981' : '#0284C7';
+      const fillColor = isMatched ? 'rgba(16, 185, 129, 0.08)' : 'rgba(2, 132, 199, 0.05)';
+
+      // 1. Soft subtle fill tint inside box
+      ctx.fillStyle = fillColor;
+      ctx.fillRect(rx, ry, rw, rh);
+
+      // 2. Clean thin border
       ctx.strokeStyle = strokeColor;
+      ctx.lineWidth = 1.5;
+      if (typeof ctx.roundRect === 'function') {
+        ctx.beginPath();
+        ctx.roundRect(rx, ry, rw, rh, 4);
+        ctx.stroke();
+      } else {
+        ctx.strokeRect(rx, ry, rw, rh);
+      }
+
+      // 3. High-tech corner bracket accents
+      const cl = Math.max(4, Math.min(8, Math.floor(Math.min(rw, rh) / 3)));
       ctx.lineWidth = 2.5;
-      ctx.strokeRect(rx, ry, rw, rh);
+      ctx.beginPath();
+      // Top-Left
+      ctx.moveTo(rx, ry + cl); ctx.lineTo(rx, ry); ctx.lineTo(rx + cl, ry);
+      // Top-Right
+      ctx.moveTo(rx + rw - cl, ry); ctx.lineTo(rx + rw, ry); ctx.lineTo(rx + rw, ry + cl);
+      // Bottom-Left
+      ctx.moveTo(rx, ry + rh - cl); ctx.lineTo(rx, ry + rh); ctx.lineTo(rx + cl, ry + rh);
+      // Bottom-Right
+      ctx.moveTo(rx + rw - cl, ry + rh); ctx.lineTo(rx + rw, ry + rh); ctx.lineTo(rx + rw, ry + rh - cl);
+      ctx.stroke();
 
-      // Label background & text
+      // If mode is 'boxes_only', skip rendering labels to keep view 100% clean
+      if (activeMode === 'boxes_only') continue;
+
+      // 4. Sleek glassmorphism pill badge (replaces ugly bulky solid blocks)
+      const friendlyDef = findMatchingTrainedClass(det.className);
+      const rawName = matchedKi?.item?.name || friendlyDef?.friendlyNameVi || det.className;
+      const cleanName = rawName.length > 18 ? rawName.slice(0, 17) + '…' : rawName;
       const confPct = Math.round((det.confidence || 0.95) * 100);
-      const label = `${det.className} (${confPct}%)${isMatched ? ' [Khớp kit]' : ''}`;
-      ctx.font = 'bold 11px sans-serif';
-      const textWidth = ctx.measureText(label).width;
+      const labelText = `${cleanName} ${confPct}%`;
 
+      ctx.font = '600 10px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+      const textMetrics = ctx.measureText(labelText);
+      const pillW = Math.round(textMetrics.width + 18);
+      const pillH = 17;
+      const pillX = Math.max(2, Math.min(rx, displayW - pillW - 2));
+      const pillY = ry >= 20 ? ry - 19 : Math.min(displayH - pillH - 2, ry + rh + 3);
+
+      // Dark glass pill background
+      ctx.fillStyle = 'rgba(15, 23, 42, 0.88)';
+      if (typeof ctx.roundRect === 'function') {
+        ctx.beginPath();
+        ctx.roundRect(pillX, pillY, pillW, pillH, 3.5);
+        ctx.fill();
+      } else {
+        ctx.fillRect(pillX, pillY, pillW, pillH);
+      }
+
+      // Small color dot indicator
       ctx.fillStyle = strokeColor;
-      ctx.fillRect(rx, Math.max(0, ry - 20), textWidth + 8, 20);
+      ctx.beginPath();
+      ctx.arc(pillX + 6.5, pillY + pillH / 2, 2.5, 0, Math.PI * 2);
+      ctx.fill();
 
+      // White crisp text
       ctx.fillStyle = '#FFFFFF';
-      ctx.fillText(label, rx + 4, Math.max(14, ry - 5));
+      ctx.fillText(labelText, pillX + 13, pillY + 12);
     }
-  }, [uploadedPreview, kit]);
+  }, [uploadedPreview, kit, overlayMode]);
+
+  // Re-render bounding boxes whenever overlayMode changes
+  useEffect(() => {
+    if (rawDetections.length > 0) {
+      drawBoundingBoxes(rawDetections);
+    } else if (canvasRef.current) {
+      const ctx = canvasRef.current.getContext('2d');
+      ctx?.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+    }
+  }, [overlayMode, rawDetections, drawBoundingBoxes]);
 
   // Manual retry connection to Vision Service
   const handleCheckHealth = useCallback(async () => {
@@ -549,20 +627,75 @@ export const KitReturnInspectionModal: React.FC<KitReturnInspectionModalProps> =
     // Draw base image
     ctx.drawImage(sourceEl, 0, 0, w, h);
 
-    // Draw detected bounding boxes on top of snapshot
+    // Draw detected bounding boxes on top of snapshot (sleek and compact)
     if (rawDetections.length > 0) {
       for (const det of rawDetections) {
         const { x1, y1, x2, y2 } = det.boundingBox;
-        ctx.strokeStyle = '#10B981';
-        ctx.lineWidth = 3;
-        ctx.strokeRect(x1, y1, x2 - x1, y2 - y1);
+        const rx = Math.round(x1);
+        const ry = Math.round(y1);
+        const rw = Math.round(x2 - x1);
+        const rh = Math.round(y2 - y1);
+        if (rw <= 2 || rh <= 2) continue;
 
-        ctx.fillStyle = '#10B981';
-        ctx.fillRect(x1, Math.max(0, y1 - 22), 140, 22);
+        const matchedKi = kit?.items?.find((ki) => doesDetectionMatchItem(det, ki.item));
+        const isMatched = Boolean(matchedKi);
+        const strokeColor = isMatched ? '#10B981' : '#0284C7';
+
+        // Semi-transparent box fill
+        ctx.fillStyle = isMatched ? 'rgba(16, 185, 129, 0.08)' : 'rgba(2, 132, 199, 0.05)';
+        ctx.fillRect(rx, ry, rw, rh);
+
+        // Thin rounded border
+        ctx.strokeStyle = strokeColor;
+        ctx.lineWidth = 1.5;
+        if (typeof ctx.roundRect === 'function') {
+          ctx.beginPath();
+          ctx.roundRect(rx, ry, rw, rh, 4);
+          ctx.stroke();
+        } else {
+          ctx.strokeRect(rx, ry, rw, rh);
+        }
+
+        // Corner accents
+        const cl = Math.max(4, Math.min(8, Math.floor(Math.min(rw, rh) / 3)));
+        ctx.lineWidth = 2.5;
+        ctx.beginPath();
+        ctx.moveTo(rx, ry + cl); ctx.lineTo(rx, ry); ctx.lineTo(rx + cl, ry);
+        ctx.moveTo(rx + rw - cl, ry); ctx.lineTo(rx + rw, ry); ctx.lineTo(rx + rw, ry + cl);
+        ctx.moveTo(rx, ry + rh - cl); ctx.lineTo(rx, ry + rh); ctx.lineTo(rx + cl, ry + rh);
+        ctx.moveTo(rx + rw - cl, ry + rh); ctx.lineTo(rx + rw, ry + rh); ctx.lineTo(rx + rw, ry + rh - cl);
+        ctx.stroke();
+
+        // Sleek compact pill label
+        const friendlyDef = findMatchingTrainedClass(det.className);
+        const rawName = matchedKi?.item?.name || friendlyDef?.friendlyNameVi || det.className;
+        const cleanName = rawName.length > 18 ? rawName.slice(0, 17) + '…' : rawName;
+        const confPct = Math.round((det.confidence || 0.95) * 100);
+        const labelText = `${cleanName} ${confPct}%`;
+
+        ctx.font = '600 10px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+        const textMetrics = ctx.measureText(labelText);
+        const pillW = Math.round(textMetrics.width + 18);
+        const pillH = 17;
+        const pillX = Math.max(2, Math.min(rx, w - pillW - 2));
+        const pillY = ry >= 20 ? ry - 19 : Math.min(h - pillH - 2, ry + rh + 3);
+
+        ctx.fillStyle = 'rgba(15, 23, 42, 0.88)';
+        if (typeof ctx.roundRect === 'function') {
+          ctx.beginPath();
+          ctx.roundRect(pillX, pillY, pillW, pillH, 3.5);
+          ctx.fill();
+        } else {
+          ctx.fillRect(pillX, pillY, pillW, pillH);
+        }
+
+        ctx.fillStyle = strokeColor;
+        ctx.beginPath();
+        ctx.arc(pillX + 6.5, pillY + pillH / 2, 2.5, 0, Math.PI * 2);
+        ctx.fill();
 
         ctx.fillStyle = '#FFFFFF';
-        ctx.font = 'bold 12px sans-serif';
-        ctx.fillText(`${det.className}`, x1 + 4, Math.max(16, y1 - 6));
+        ctx.fillText(labelText, pillX + 13, pillY + 12);
       }
     }
 
@@ -964,7 +1097,30 @@ export const KitReturnInspectionModal: React.FC<KitReturnInspectionModalProps> =
                     className="inline-flex items-center space-x-1 rounded-lg bg-slate-800 text-slate-200 border border-slate-700 px-2.5 py-1.5 text-xs font-medium hover:bg-slate-700 cursor-pointer disabled:opacity-60"
                   >
                     <RefreshCw className={`h-3 w-3 ${isDetectingFrame ? 'animate-spin' : ''}`} />
-                    <span>{isDetectingFrame ? 'Đang quét AI...' : 'Quét 1 khung hình'}</span>
+                    <span>{isDetectingFrame ? 'Đang quét...' : 'Quét 1 ảnh'}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const next = overlayMode === 'all' ? 'boxes_only' : overlayMode === 'boxes_only' ? 'hidden' : 'all';
+                      setOverlayMode(next);
+                    }}
+                    className={`inline-flex items-center space-x-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition cursor-pointer border ${
+                      overlayMode === 'all'
+                        ? 'bg-slate-800 text-emerald-400 border-emerald-500/50'
+                        : overlayMode === 'boxes_only'
+                        ? 'bg-slate-800 text-cyan-400 border-cyan-500/50'
+                        : 'bg-slate-800 text-slate-400 border-slate-700'
+                    }`}
+                    title="Chế độ hiển thị khung: Đầy đủ (Khung + Nhãn) ➔ Chỉ viền (Không chữ che mắt) ➔ Ẩn khung"
+                  >
+                    {overlayMode === 'all' && <Eye className="h-3 w-3 text-emerald-400" />}
+                    {overlayMode === 'boxes_only' && <Layers className="h-3 w-3 text-cyan-400" />}
+                    {overlayMode === 'hidden' && <EyeOff className="h-3 w-3 text-slate-400" />}
+                    <span>
+                      {overlayMode === 'all' ? 'Khung: Đầy đủ' : overlayMode === 'boxes_only' ? 'Khung: Chỉ viền' : 'Khung: Ẩn'}
+                    </span>
                   </button>
 
                   <button
@@ -1042,21 +1198,22 @@ export const KitReturnInspectionModal: React.FC<KitReturnInspectionModalProps> =
 
             {/* AI DETECTION RESULTS & AUTO-APPLY BAR */}
             {rawDetections.length > 0 && (
-              <div className="rounded-xl border border-emerald-200 bg-white p-3 space-y-2.5 shadow-2xs transition-all duration-500">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                  <div className="flex items-center space-x-2">
-                    <span className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-100 text-emerald-700 text-xs font-bold">
-                      <Sparkles className="h-3.5 w-3.5" />
+              <div className="rounded-xl border border-emerald-200 bg-white p-3.5 space-y-3 shadow-2xs transition-all duration-300">
+                {/* Header Row */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                  <div className="flex items-center space-x-2.5">
+                    <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700 text-xs font-bold shrink-0">
+                      <Sparkles className="h-4 w-4" />
                     </span>
                     <div>
                       <div className="text-xs font-bold text-slate-900 flex items-center flex-wrap gap-1.5">
-                        <span>AI đã phát hiện {rawDetections.length} đối tượng linh kiện</span>
-                        <span className="text-[10px] bg-emerald-100 text-emerald-800 px-1.5 py-0.2 rounded font-semibold">
-                          Khớp {recognizedSummary.filter((s) => s.isMatched).length}/{kit.items?.length || 0} linh kiện trong kit
+                        <span>Đã phát hiện {rawDetections.length} đối tượng</span>
+                        <span className="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-semibold">
+                          Khớp {recognizedSummary.filter((s) => s.isMatched).length}/{kit.items?.length || 0} loại linh kiện
                         </span>
                       </div>
-                      <p className="text-[11px] text-slate-500 break-words">
-                        Hệ thống đã nhận diện các linh kiện và định vị trong khung hình hộp kit
+                      <p className="text-[11px] text-slate-500">
+                        Kiểm tra các linh kiện đã quét bên dưới và áp dụng vào bảng nghiệm thu
                       </p>
                     </div>
                   </div>
@@ -1066,7 +1223,7 @@ export const KitReturnInspectionModal: React.FC<KitReturnInspectionModalProps> =
                       <button
                         type="button"
                         onClick={handleResetAiDetections}
-                        className="inline-flex items-center space-x-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 shadow-2xs cursor-pointer transition active:scale-[0.99]"
+                        className="inline-flex items-center space-x-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 hover:text-slate-800 shadow-2xs cursor-pointer transition active:scale-[0.99]"
                         title="Xóa toàn bộ số lượng AI đã đếm để quét lại từ đầu"
                       >
                         <RotateCcw className="h-3 w-3 text-slate-500" />
@@ -1098,28 +1255,107 @@ export const KitReturnInspectionModal: React.FC<KitReturnInspectionModalProps> =
                   </div>
                 </div>
 
-                {/* Detected Badges Row */}
-                <div className="flex flex-wrap gap-1.5 pt-1">
-                  {recognizedSummary.map((item) => (
-                    <span
-                      key={item.itemCode}
-                      className={`inline-flex items-center space-x-1 rounded-md px-2 py-0.5 text-[11px] font-medium border ${
-                        item.isMatched
-                          ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
-                          : 'bg-slate-50 text-slate-500 border-slate-200'
-                      }`}
-                    >
-                      <span className="font-semibold">{item.itemName}:</span>
-                      <span>
-                        {item.isMatched
-                          ? `${item.detectedQty}/${item.expectedQty} ${item.unit}`
-                          : 'Chưa thấy'}
+                {/* Progress Bar & Filter Bar */}
+                {kit.items && kit.items.length > 0 && (
+                  <div className="space-y-1.5 pt-1 border-t border-slate-100">
+                    <div className="flex items-center justify-between text-[11px] text-slate-600">
+                      <span className="font-medium">Tiến độ nhận diện hộp kit:</span>
+                      <span className="font-bold text-emerald-700">
+                        {Math.round((recognizedSummary.filter((s) => s.isMatched).length / kit.items.length) * 100)}%
+                        <span className="font-normal text-slate-400 ml-1">
+                          ({recognizedSummary.filter((s) => s.isMatched).length}/{kit.items.length} loại)
+                        </span>
                       </span>
-                      {item.isMatched && (
-                        <CheckCircle2 className="h-3 w-3 text-emerald-600" />
-                      )}
-                    </span>
-                  ))}
+                    </div>
+                    <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                      <div
+                        className="bg-emerald-500 h-full rounded-full transition-all duration-500"
+                        style={{
+                          width: `${Math.min(100, Math.round((recognizedSummary.filter((s) => s.isMatched).length / kit.items.length) * 100))}%`,
+                        }}
+                      />
+                    </div>
+
+                    {/* Filter Segmented Control */}
+                    <div className="flex items-center space-x-1.5 pt-1">
+                      <button
+                        type="button"
+                        onClick={() => setSummaryFilter('all')}
+                        className={`px-2 py-0.5 rounded text-[10px] font-semibold transition cursor-pointer ${
+                          summaryFilter === 'all'
+                            ? 'bg-slate-800 text-white'
+                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                        }`}
+                      >
+                        Tất cả ({recognizedSummary.length})
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setSummaryFilter('matched')}
+                        className={`px-2 py-0.5 rounded text-[10px] font-semibold transition cursor-pointer ${
+                          summaryFilter === 'matched'
+                            ? 'bg-emerald-700 text-white'
+                            : 'bg-emerald-50 text-emerald-800 hover:bg-emerald-100'
+                        }`}
+                      >
+                        Đã thấy ({recognizedSummary.filter((s) => s.isMatched).length})
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setSummaryFilter('missing')}
+                        className={`px-2 py-0.5 rounded text-[10px] font-semibold transition cursor-pointer ${
+                          summaryFilter === 'missing'
+                            ? 'bg-amber-700 text-white'
+                            : 'bg-amber-50 text-amber-800 hover:bg-amber-100'
+                        }`}
+                      >
+                        Chưa thấy ({recognizedSummary.filter((s) => !s.isMatched).length})
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Detected Items Clean Structured Grid */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 pt-1 max-h-56 overflow-y-auto pr-1">
+                  {filteredSummary.map((item) => {
+                    const isFull = item.detectedQty >= item.expectedQty;
+                    const isPartial = item.detectedQty > 0 && item.detectedQty < item.expectedQty;
+                    return (
+                      <div
+                        key={item.itemCode}
+                        className={`p-2 rounded-lg border text-xs flex items-center justify-between transition shadow-2xs ${
+                          isFull
+                            ? 'bg-emerald-50/80 border-emerald-200 text-emerald-950'
+                            : isPartial
+                            ? 'bg-amber-50/80 border-amber-200 text-amber-950'
+                            : 'bg-slate-50/70 border-slate-200 text-slate-500'
+                        }`}
+                      >
+                        <div className="min-w-0 pr-2">
+                          <p className="font-semibold truncate leading-tight">{item.itemName}</p>
+                          <p className="text-[10px] text-slate-400 font-mono mt-0.5">{item.itemCode}</p>
+                        </div>
+                        <div className="shrink-0 flex items-center space-x-1.5">
+                          <span
+                            className={`px-2 py-0.5 rounded text-[11px] font-bold ${
+                              isFull
+                                ? 'bg-emerald-100 text-emerald-800'
+                                : isPartial
+                                ? 'bg-amber-100 text-amber-800'
+                                : 'bg-slate-100 text-slate-500'
+                            }`}
+                          >
+                            {item.detectedQty}/{item.expectedQty} {item.unit}
+                          </span>
+                          {isFull ? (
+                            <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
+                          ) : isPartial ? (
+                            <span className="h-2 w-2 rounded-full bg-amber-500 shrink-0" title="Còn thiếu linh kiện" />
+                          ) : null}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             )}

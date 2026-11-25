@@ -504,41 +504,81 @@ export const CameraReturnModal: React.FC<CameraReturnModalProps> = ({
 
       for (const det of detectedList) {
         const { x1, y1, x2, y2 } = det.boundingBox;
-        const rx = x1 * scaleX;
-        const ry = y1 * scaleY;
-        const rw = (x2 - x1) * scaleX;
-        const rh = (y2 - y1) * scaleY;
+        const rx = Math.round(x1 * scaleX);
+        const ry = Math.round(y1 * scaleY);
+        const rw = Math.round((x2 - x1) * scaleX);
+        const rh = Math.round((y2 - y1) * scaleY);
+
+        if (rw <= 2 || rh <= 2) continue;
 
         let strokeColor = '#F59E0B'; // Amber default for unmapped
-        let labelTag = '';
+        let fillColor = 'rgba(245, 158, 11, 0.05)';
 
         if (det.matchStatus === 'MATCHED_BORROW') {
-          strokeColor = '#10B981'; // Green
-          labelTag = ' [Khớp phiếu]';
+          strokeColor = '#10B981'; // Emerald Green
+          fillColor = 'rgba(16, 185, 129, 0.08)';
         } else if (det.matchStatus === 'MATCHED_CATALOG_ONLY') {
-          strokeColor = '#3B82F6'; // Blue
-          labelTag = ` [Khớp DM: ${det.suggestedItemCode}]`;
+          strokeColor = '#0284C7'; // Sky Blue
+          fillColor = 'rgba(2, 132, 199, 0.05)';
         } else if (det.matchStatus === 'CATALOG_UNVERIFIED') {
           strokeColor = '#8B5CF6'; // Purple
-          labelTag = ' [Chưa xác minh DM]';
-        } else {
-          strokeColor = '#F59E0B'; // Amber
-          labelTag = ' [Chưa ánh xạ]';
+          fillColor = 'rgba(139, 92, 246, 0.05)';
         }
 
-        ctx.strokeStyle = strokeColor;
-        ctx.lineWidth = 2.5;
-        ctx.strokeRect(rx, ry, rw, rh);
+        // 1. Soft tint
+        ctx.fillStyle = fillColor;
+        ctx.fillRect(rx, ry, rw, rh);
 
-        const label = `${det.className} (${Math.round(det.confidence * 100)}%)${labelTag}`;
-        ctx.font = 'bold 11px sans-serif';
-        const textWidth = ctx.measureText(label).width;
+        // 2. Clean rounded rectangle
+        ctx.strokeStyle = strokeColor;
+        ctx.lineWidth = 1.5;
+        if (typeof ctx.roundRect === 'function') {
+          ctx.beginPath();
+          ctx.roundRect(rx, ry, rw, rh, 4);
+          ctx.stroke();
+        } else {
+          ctx.strokeRect(rx, ry, rw, rh);
+        }
+
+        // 3. High-tech corner accents
+        const cl = Math.max(4, Math.min(8, Math.floor(Math.min(rw, rh) / 3)));
+        ctx.lineWidth = 2.5;
+        ctx.beginPath();
+        ctx.moveTo(rx, ry + cl); ctx.lineTo(rx, ry); ctx.lineTo(rx + cl, ry);
+        ctx.moveTo(rx + rw - cl, ry); ctx.lineTo(rx + rw, ry); ctx.lineTo(rx + rw, ry + cl);
+        ctx.moveTo(rx, ry + rh - cl); ctx.lineTo(rx, ry + rh); ctx.lineTo(rx + cl, ry + rh);
+        ctx.moveTo(rx + rw - cl, ry + rh); ctx.lineTo(rx + rw, ry + rh); ctx.lineTo(rx + rw, ry + rh - cl);
+        ctx.stroke();
+
+        // 4. Sleek glassmorphism pill badge
+        const friendlyName = getFriendlyClassName(det.className, det.matchedDetail, det.suggestedItemCode);
+        const cleanName = friendlyName.length > 18 ? friendlyName.slice(0, 17) + '…' : friendlyName;
+        const confPct = Math.round(det.confidence * 100);
+        const labelText = `${cleanName} ${confPct}%`;
+
+        ctx.font = '600 10px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+        const textMetrics = ctx.measureText(labelText);
+        const pillW = Math.round(textMetrics.width + 18);
+        const pillH = 17;
+        const pillX = Math.max(2, Math.min(rx, displayWidth - pillW - 2));
+        const pillY = ry >= 20 ? ry - 19 : Math.min(displayHeight - pillH - 2, ry + rh + 3);
+
+        ctx.fillStyle = 'rgba(15, 23, 42, 0.88)';
+        if (typeof ctx.roundRect === 'function') {
+          ctx.beginPath();
+          ctx.roundRect(pillX, pillY, pillW, pillH, 3.5);
+          ctx.fill();
+        } else {
+          ctx.fillRect(pillX, pillY, pillW, pillH);
+        }
 
         ctx.fillStyle = strokeColor;
-        ctx.fillRect(rx, Math.max(0, ry - 20), textWidth + 8, 20);
+        ctx.beginPath();
+        ctx.arc(pillX + 6.5, pillY + pillH / 2, 2.5, 0, Math.PI * 2);
+        ctx.fill();
 
         ctx.fillStyle = '#FFFFFF';
-        ctx.fillText(label, rx + 4, Math.max(14, ry - 5));
+        ctx.fillText(labelText, pillX + 13, pillY + 12);
       }
     },
     [uploadedPreview]
