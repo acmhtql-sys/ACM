@@ -501,6 +501,8 @@ export const CameraReturnModal: React.FC<CameraReturnModalProps> = ({
 
       const scaleX = displayWidth / naturalWidth;
       const scaleY = displayHeight / naturalHeight;
+      const isDense = detectedList.length > 7;
+      const placedLabels: Array<{ x: number; y: number; w: number; h: number }> = [];
 
       for (const det of detectedList) {
         const { x1, y1, x2, y2 } = det.boundingBox;
@@ -550,18 +552,45 @@ export const CameraReturnModal: React.FC<CameraReturnModalProps> = ({
         ctx.moveTo(rx + rw - cl, ry + rh); ctx.lineTo(rx + rw, ry + rh); ctx.lineTo(rx + rw, ry + rh - cl);
         ctx.stroke();
 
-        // 4. Sleek glassmorphism pill badge
+        // 4. Sleek glassmorphism pill badge with collision avoidance
         const friendlyName = getFriendlyClassName(det.className, det.matchedDetail, det.suggestedItemCode);
-        const cleanName = friendlyName.length > 18 ? friendlyName.slice(0, 17) + '…' : friendlyName;
+        const maxLen = isDense ? 12 : 18;
+        const cleanName = friendlyName.length > maxLen ? friendlyName.slice(0, maxLen - 1) + '…' : friendlyName;
         const confPct = Math.round(det.confidence * 100);
-        const labelText = `${cleanName} ${confPct}%`;
+        const labelText = isDense ? cleanName : `${cleanName} ${confPct}%`;
 
-        ctx.font = '600 10px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+        ctx.font = isDense
+          ? '600 9px system-ui, -apple-system, sans-serif'
+          : '600 10px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
         const textMetrics = ctx.measureText(labelText);
-        const pillW = Math.round(textMetrics.width + 18);
-        const pillH = 17;
-        const pillX = Math.max(2, Math.min(rx, displayWidth - pillW - 2));
-        const pillY = ry >= 20 ? ry - 19 : Math.min(displayHeight - pillH - 2, ry + rh + 3);
+        const pillW = Math.round(textMetrics.width + (isDense ? 14 : 18));
+        const pillH = isDense ? 15 : 17;
+
+        let pillX = Math.max(2, Math.min(rx, displayWidth - pillW - 2));
+        let pillY = ry >= pillH + 2 ? ry - (pillH + 2) : Math.min(displayHeight - pillH - 2, ry + rh + 2);
+
+        // Check overlap against placed label badges
+        const isOverlap = placedLabels.some(
+          (pl) =>
+            Math.abs(pl.x - pillX) < (pl.w + pillW) * 0.45 &&
+            Math.abs(pl.y - pillY) < (pl.h + pillH) * 0.7
+        );
+
+        if (isOverlap) {
+          const altY = Math.min(displayHeight - pillH - 2, ry + rh + 2);
+          const altOverlap = placedLabels.some(
+            (pl) =>
+              Math.abs(pl.x - pillX) < (pl.w + pillW) * 0.45 &&
+              Math.abs(pl.y - altY) < (pl.h + pillH) * 0.7
+          );
+          if (!altOverlap) {
+            pillY = altY;
+          } else if (isDense) {
+            continue; // Suppress messy overlapping pills
+          }
+        }
+
+        placedLabels.push({ x: pillX, y: pillY, w: pillW, h: pillH });
 
         ctx.fillStyle = 'rgba(15, 23, 42, 0.88)';
         if (typeof ctx.roundRect === 'function') {
@@ -574,11 +603,11 @@ export const CameraReturnModal: React.FC<CameraReturnModalProps> = ({
 
         ctx.fillStyle = strokeColor;
         ctx.beginPath();
-        ctx.arc(pillX + 6.5, pillY + pillH / 2, 2.5, 0, Math.PI * 2);
+        ctx.arc(pillX + 5.5, pillY + pillH / 2, 2.5, 0, Math.PI * 2);
         ctx.fill();
 
         ctx.fillStyle = '#FFFFFF';
-        ctx.fillText(labelText, pillX + 13, pillY + 12);
+        ctx.fillText(labelText, pillX + (isDense ? 11 : 13), pillY + (isDense ? 11 : 12));
       }
     },
     [uploadedPreview]

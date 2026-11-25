@@ -307,6 +307,8 @@ export const KitReturnInspectionModal: React.FC<KitReturnInspectionModalProps> =
 
     const scaleX = displayW / naturalW;
     const scaleY = displayH / naturalH;
+    const isDense = detections.length > 7;
+    const placedLabels: Array<{ x: number; y: number; w: number; h: number }> = [];
 
     for (const det of detections) {
       const { x1, y1, x2, y2 } = det.boundingBox;
@@ -356,19 +358,48 @@ export const KitReturnInspectionModal: React.FC<KitReturnInspectionModalProps> =
       // If mode is 'boxes_only', skip rendering labels to keep view 100% clean
       if (activeMode === 'boxes_only') continue;
 
-      // 4. Sleek glassmorphism pill badge (replaces ugly bulky solid blocks)
+      // 4. Sleek glassmorphism pill badge with collision avoidance
       const friendlyDef = findMatchingTrainedClass(det.className);
       const rawName = matchedKi?.item?.name || friendlyDef?.friendlyNameVi || det.className;
-      const cleanName = rawName.length > 18 ? rawName.slice(0, 17) + '…' : rawName;
+      const maxLen = isDense ? 12 : 18;
+      const cleanName = rawName.length > maxLen ? rawName.slice(0, maxLen - 1) + '…' : rawName;
       const confPct = Math.round((det.confidence || 0.95) * 100);
-      const labelText = `${cleanName} ${confPct}%`;
+      const labelText = isDense ? cleanName : `${cleanName} ${confPct}%`;
 
-      ctx.font = '600 10px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+      ctx.font = isDense
+        ? '600 9px system-ui, -apple-system, sans-serif'
+        : '600 10px system-ui, -apple-system, sans-serif';
       const textMetrics = ctx.measureText(labelText);
-      const pillW = Math.round(textMetrics.width + 18);
-      const pillH = 17;
-      const pillX = Math.max(2, Math.min(rx, displayW - pillW - 2));
-      const pillY = ry >= 20 ? ry - 19 : Math.min(displayH - pillH - 2, ry + rh + 3);
+      const pillW = Math.round(textMetrics.width + (isDense ? 14 : 18));
+      const pillH = isDense ? 15 : 17;
+
+      let pillX = Math.max(2, Math.min(rx, displayW - pillW - 2));
+      let pillY = ry >= pillH + 2 ? ry - (pillH + 2) : Math.min(displayH - pillH - 2, ry + rh + 2);
+
+      // Check overlap against previously placed label badges
+      const isOverlap = placedLabels.some(
+        (pl) =>
+          Math.abs(pl.x - pillX) < (pl.w + pillW) * 0.45 &&
+          Math.abs(pl.y - pillY) < (pl.h + pillH) * 0.7
+      );
+
+      if (isOverlap) {
+        // Try bottom placement
+        const altY = Math.min(displayH - pillH - 2, ry + rh + 2);
+        const altOverlap = placedLabels.some(
+          (pl) =>
+            Math.abs(pl.x - pillX) < (pl.w + pillW) * 0.45 &&
+            Math.abs(pl.y - altY) < (pl.h + pillH) * 0.7
+        );
+        if (!altOverlap) {
+          pillY = altY;
+        } else if (isDense) {
+          // In dense clusters, suppress overlapping duplicate text badges to avoid messy clutter
+          continue;
+        }
+      }
+
+      placedLabels.push({ x: pillX, y: pillY, w: pillW, h: pillH });
 
       // Dark glass pill background
       ctx.fillStyle = 'rgba(15, 23, 42, 0.88)';
@@ -383,12 +414,12 @@ export const KitReturnInspectionModal: React.FC<KitReturnInspectionModalProps> =
       // Small color dot indicator
       ctx.fillStyle = strokeColor;
       ctx.beginPath();
-      ctx.arc(pillX + 6.5, pillY + pillH / 2, 2.5, 0, Math.PI * 2);
+      ctx.arc(pillX + 5.5, pillY + pillH / 2, 2.5, 0, Math.PI * 2);
       ctx.fill();
 
       // White crisp text
       ctx.fillStyle = '#FFFFFF';
-      ctx.fillText(labelText, pillX + 13, pillY + 12);
+      ctx.fillText(labelText, pillX + (isDense ? 11 : 13), pillY + (isDense ? 11 : 12));
     }
   }, [uploadedPreview, kit, overlayMode]);
 
@@ -1065,16 +1096,49 @@ export const KitReturnInspectionModal: React.FC<KitReturnInspectionModalProps> =
                 className="absolute inset-0 pointer-events-none w-full h-full"
               />
 
-              {/* Floating Camera Actions Toolbar */}
-              <div className="absolute bottom-2 left-2 right-2 flex flex-wrap items-center justify-between gap-2 bg-slate-900/80 backdrop-blur-xs p-2 rounded-xl border border-slate-700/80">
-                <div className="flex items-center space-x-2">
+              {/* Minimal Top HUD: Status (Left) & Camera/Overlay Toggles (Right) */}
+              <div className="absolute top-2.5 left-2.5 flex items-center space-x-1.5 px-2.5 py-1 rounded-full bg-slate-950/75 backdrop-blur-md border border-slate-700/60 text-[10px] font-semibold text-white shadow-md pointer-events-none z-10">
+                <span className={`h-2 w-2 rounded-full ${isAiScanning ? 'bg-emerald-400 animate-pulse' : 'bg-slate-400'}`} />
+                <span>{isAiScanning ? `AI Đang quét (${rawDetections.length} vật thể)` : 'Camera sẵn sàng'}</span>
+              </div>
+
+              <div className="absolute top-2.5 right-2.5 flex items-center space-x-1.5 z-10">
+                <button
+                  type="button"
+                  onClick={handleToggleFacingMode}
+                  className="h-7 w-7 flex items-center justify-center rounded-full bg-slate-950/75 backdrop-blur-md border border-slate-700/60 text-slate-200 hover:text-white shadow-md cursor-pointer transition active:scale-95"
+                  title="Đổi camera trước / sau"
+                >
+                  <RefreshCw className="h-3.5 w-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const next = overlayMode === 'all' ? 'boxes_only' : overlayMode === 'boxes_only' ? 'hidden' : 'all';
+                    setOverlayMode(next);
+                  }}
+                  className="h-7 px-2 flex items-center space-x-1 rounded-full bg-slate-950/75 backdrop-blur-md border border-slate-700/60 text-[10px] font-semibold text-slate-200 hover:text-white shadow-md cursor-pointer transition active:scale-95"
+                  title="Chế độ hiển thị khung nhận diện"
+                >
+                  {overlayMode === 'all' && <Eye className="h-3 w-3 text-emerald-400" />}
+                  {overlayMode === 'boxes_only' && <Layers className="h-3 w-3 text-cyan-400" />}
+                  {overlayMode === 'hidden' && <EyeOff className="h-3 w-3 text-slate-400" />}
+                  <span>{overlayMode === 'all' ? 'Nhãn' : overlayMode === 'boxes_only' ? 'Chỉ viền' : 'Ẩn'}</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Clean Camera Control Dock (Placed BELOW video to keep camera frame 100% visible & uncluttered) */}
+            {(isCameraActive || uploadedPreview) && (
+              <div className="mt-2.5 flex flex-wrap items-center justify-between gap-2 p-2 rounded-xl bg-slate-100/90 border border-slate-200">
+                <div className="flex items-center space-x-2 flex-1 min-w-[200px]">
                   <button
                     type="button"
                     onClick={handleToggleAiScan}
-                    className={`inline-flex items-center space-x-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition shadow-md cursor-pointer ${
+                    className={`flex-1 sm:flex-initial inline-flex items-center justify-center space-x-1.5 rounded-lg px-3.5 py-1.5 text-xs font-bold transition shadow-xs cursor-pointer active:scale-95 ${
                       isAiScanning
                         ? 'bg-amber-500 text-slate-950 hover:bg-amber-400'
-                        : 'bg-blue-600 text-white hover:bg-blue-500'
+                        : 'bg-blue-600 text-white hover:bg-blue-700'
                     }`}
                   >
                     {isAiScanning ? (
@@ -1094,58 +1158,23 @@ export const KitReturnInspectionModal: React.FC<KitReturnInspectionModalProps> =
                     type="button"
                     disabled={isDetectingFrame}
                     onClick={() => runAiDetection()}
-                    className="inline-flex items-center space-x-1 rounded-lg bg-slate-800 text-slate-200 border border-slate-700 px-2.5 py-1.5 text-xs font-medium hover:bg-slate-700 cursor-pointer disabled:opacity-60"
+                    className="inline-flex items-center justify-center space-x-1 rounded-lg bg-white text-slate-700 border border-slate-300 px-3 py-1.5 text-xs font-semibold hover:bg-slate-50 cursor-pointer disabled:opacity-60 active:scale-95 transition"
                   >
                     <RefreshCw className={`h-3 w-3 ${isDetectingFrame ? 'animate-spin' : ''}`} />
                     <span>{isDetectingFrame ? 'Đang quét...' : 'Quét 1 ảnh'}</span>
                   </button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const next = overlayMode === 'all' ? 'boxes_only' : overlayMode === 'boxes_only' ? 'hidden' : 'all';
-                      setOverlayMode(next);
-                    }}
-                    className={`inline-flex items-center space-x-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition cursor-pointer border ${
-                      overlayMode === 'all'
-                        ? 'bg-slate-800 text-emerald-400 border-emerald-500/50'
-                        : overlayMode === 'boxes_only'
-                        ? 'bg-slate-800 text-cyan-400 border-cyan-500/50'
-                        : 'bg-slate-800 text-slate-400 border-slate-700'
-                    }`}
-                    title="Chế độ hiển thị khung: Đầy đủ (Khung + Nhãn) ➔ Chỉ viền (Không chữ che mắt) ➔ Ẩn khung"
-                  >
-                    {overlayMode === 'all' && <Eye className="h-3 w-3 text-emerald-400" />}
-                    {overlayMode === 'boxes_only' && <Layers className="h-3 w-3 text-cyan-400" />}
-                    {overlayMode === 'hidden' && <EyeOff className="h-3 w-3 text-slate-400" />}
-                    <span>
-                      {overlayMode === 'all' ? 'Khung: Đầy đủ' : overlayMode === 'boxes_only' ? 'Khung: Chỉ viền' : 'Khung: Ẩn'}
-                    </span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={handleToggleFacingMode}
-                    className="inline-flex items-center space-x-1 rounded-lg bg-slate-800 text-slate-200 border border-slate-700 px-2.5 py-1.5 text-xs font-medium hover:bg-slate-700 cursor-pointer"
-                    title="Đổi camera trước / sau (tiện cho điện thoại)"
-                  >
-                    <RefreshCw className="h-3 w-3 text-blue-400" />
-                    <span>{facingMode === 'environment' ? 'Camera sau' : 'Camera trước'}</span>
-                  </button>
                 </div>
 
-                <div className="flex items-center space-x-2">
-                  <button
-                    type="button"
-                    onClick={handleCapturePhoto}
-                    className="inline-flex items-center space-x-1.5 rounded-lg bg-emerald-600 px-3.5 py-1.5 text-xs font-bold text-white hover:bg-emerald-500 shadow-md cursor-pointer"
-                  >
-                    <Camera className="h-3.5 w-3.5" />
-                    <span>Chụp ảnh nghiệm thu QC</span>
-                  </button>
-                </div>
+                <button
+                  type="button"
+                  onClick={handleCapturePhoto}
+                  className="w-full sm:w-auto inline-flex items-center justify-center space-x-1.5 rounded-lg bg-emerald-600 px-3.5 py-1.5 text-xs font-bold text-white hover:bg-emerald-700 shadow-xs cursor-pointer active:scale-95 transition"
+                >
+                  <Camera className="h-3.5 w-3.5" />
+                  <span>Chụp ảnh nghiệm thu QC</span>
+                </button>
               </div>
-            </div>
+            )}
 
             {/* VISION SERVICE OFFLINE NOTICE */}
             {visionError && (
@@ -1737,32 +1766,32 @@ export const KitReturnInspectionModal: React.FC<KitReturnInspectionModalProps> =
             />
           </div>
 
-          {/* Actions */}
-          <div className="pt-3 border-t border-slate-200 flex flex-col-reverse sm:flex-row sm:items-center sm:justify-end gap-2 sticky bottom-0 bg-white/95 backdrop-blur-sm z-10 pb-2 sm:pb-0">
+          {/* Actions - Single Compact Row on Mobile to avoid jumping and screen occlusion */}
+          <div className="pt-2.5 border-t border-slate-200 flex flex-row items-center justify-between sm:justify-end gap-2 sticky bottom-0 bg-white/95 backdrop-blur-md z-20 pb-3 sm:pb-0 -mx-3.5 sm:mx-0 px-3.5 sm:px-0">
             <button
               type="button"
               onClick={onClose}
               disabled={submitting}
-              className="w-full sm:w-auto rounded-xl border border-slate-300 bg-white px-4 py-2.5 sm:py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 cursor-pointer transition text-center active:scale-95"
+              className="w-24 sm:w-auto rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 cursor-pointer transition text-center active:scale-95 shrink-0"
             >
               Hủy bỏ
             </button>
             <button
               type="submit"
               disabled={submitting}
-              className={`w-full sm:w-auto inline-flex items-center justify-center space-x-2 rounded-xl px-5 py-2.5 sm:py-2 text-xs font-bold text-white shadow-md cursor-pointer transition disabled:opacity-60 active:scale-95 ${
+              className={`flex-1 sm:flex-initial inline-flex items-center justify-center space-x-1.5 rounded-xl px-4 py-2 text-xs font-bold text-white shadow-md cursor-pointer transition disabled:opacity-60 active:scale-95 ${
                 assessment.isPerfect
                   ? 'bg-emerald-600 hover:bg-emerald-700'
                   : 'bg-amber-600 hover:bg-amber-700'
               }`}
             >
-              <ClipboardCheck className="h-4 w-4" />
-              <span>
+              <ClipboardCheck className="h-4 w-4 shrink-0" />
+              <span className="truncate">
                 {submitting
-                  ? 'Đang ghi nhận nghiệm thu...'
+                  ? 'Đang ghi nhận...'
                   : assessment.isPerfect
-                  ? 'Xác nhận Nghiệm thu ➔ Đưa về Sẵn sàng'
-                  : 'Xác nhận Nghiệm thu ➔ Chuyển sang Bảo trì'}
+                  ? 'Xác nhận Nghiệm thu ➔ Sẵn sàng'
+                  : 'Xác nhận Nghiệm thu ➔ Bảo trì'}
               </span>
             </button>
           </div>
