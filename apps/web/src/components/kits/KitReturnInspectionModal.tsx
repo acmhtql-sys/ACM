@@ -100,6 +100,9 @@ export const KitReturnInspectionModal: React.FC<KitReturnInspectionModalProps> =
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const scanIntervalRef = useRef<number | null>(null);
   const isInFlightRef = useRef<boolean>(false);
+  // Debounce: only commit detection to UI if same count appears ≥2 consecutive scans
+  const lastDetectionCountRef = useRef<number>(-1);
+  const stableCountRef = useRef<number>(0);
 
   // Initialize checklist rows from kit items
   useEffect(() => {
@@ -360,8 +363,18 @@ export const KitReturnInspectionModal: React.FC<KitReturnInspectionModalProps> =
       setRawDetections(detections);
       drawBoundingBoxes(detections);
 
+      // Debounce: only update summary UI when detection count is stable across ≥2 consecutive scans
+      // This prevents the result panel from flickering every frame
+      if (detections.length === lastDetectionCountRef.current) {
+        stableCountRef.current += 1;
+      } else {
+        stableCountRef.current = 1;
+        lastDetectionCountRef.current = detections.length;
+      }
+      const shouldUpdateSummary = stableCountRef.current >= 2 || !!overrideB64;
+
       // Build recognized items summary strictly based on real detections
-      if (kit?.items) {
+      if (kit?.items && shouldUpdateSummary) {
         const summary: RecognizedItemSummary[] = kit.items.map((ki) => {
           const matchedClass = findMatchingTrainedClass(ki.item?.code || ki.item?.name || '');
           const matchedDets = detections.filter(
@@ -399,8 +412,12 @@ export const KitReturnInspectionModal: React.FC<KitReturnInspectionModalProps> =
       setIsAiScanning(false);
     } else {
       setIsAiScanning(true);
+      // Reset debounce state before new scan session
+      lastDetectionCountRef.current = -1;
+      stableCountRef.current = 0;
       runAiDetection();
-      scanIntervalRef.current = window.setInterval(runAiDetection, 1200);
+      // 6000ms interval — matches cloud inference latency (~3-5s), avoids UI thrash
+      scanIntervalRef.current = window.setInterval(runAiDetection, 6000);
     }
   }, [isAiScanning, runAiDetection]);
 
@@ -922,7 +939,7 @@ export const KitReturnInspectionModal: React.FC<KitReturnInspectionModalProps> =
 
             {/* AI DETECTION RESULTS & AUTO-APPLY BAR */}
             {rawDetections.length > 0 && (
-              <div className="rounded-xl border border-emerald-200 bg-white p-3 space-y-2.5 shadow-2xs">
+              <div className="rounded-xl border border-emerald-200 bg-white p-3 space-y-2.5 shadow-2xs transition-all duration-500">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                   <div className="flex items-center space-x-2">
                     <span className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-100 text-emerald-700 text-xs font-bold">
