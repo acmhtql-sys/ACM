@@ -186,18 +186,18 @@ export const DashboardPage: React.FC = () => {
             Hệ thống giám sát tồn kho linh kiện, thiết bị phòng Lab & AI Robotic thời gian thực
           </p>
         </div>
-        <div className="flex items-center space-x-2.5">
+        <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center sm:space-x-2.5">
           <button
             onClick={fetchSummary}
             disabled={loading}
-            className="inline-flex items-center space-x-2 rounded-xl border border-slate-200/90 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 shadow-card hover:bg-slate-50 transition-colors disabled:opacity-50"
+            className="inline-flex min-h-[42px] justify-center items-center space-x-2 rounded-xl border border-slate-200/90 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 shadow-card hover:bg-slate-50 active:scale-95 transition-all disabled:opacity-50"
           >
             <RefreshCw className={`h-3.5 w-3.5 text-slate-500 ${loading ? 'animate-spin' : ''}`} />
             <span>Làm mới</span>
           </button>
           <Link
             to="/borrow-return"
-            className="inline-flex items-center space-x-2 rounded-xl bg-blue-600 px-4 py-2 text-xs font-semibold text-white shadow-sm shadow-blue-500/20 hover:bg-blue-700 transition-colors"
+            className="inline-flex min-h-[42px] justify-center items-center space-x-2 rounded-xl bg-blue-600 px-4 py-2 text-xs font-semibold text-white shadow-sm shadow-blue-500/20 hover:bg-blue-700 active:scale-95 transition-all"
           >
             <PlusCircle className="h-4 w-4" />
             <span>Mượn & Trả</span>

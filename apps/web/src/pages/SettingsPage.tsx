@@ -60,13 +60,13 @@ export const SettingsPage: React.FC = () => {
           </p>
         </div>
 
-        <div className="flex items-center space-x-2.5">
+        <div className="flex items-center space-x-2.5 w-full sm:w-auto">
           <button
             type="button"
             onClick={checkHealth}
             disabled={checking}
             title="Kiểm tra lại kết nối"
-            className="inline-flex items-center space-x-1.5 rounded-xl border border-slate-200/80 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 shadow-soft hover:bg-slate-50 hover:text-slate-900 transition-all disabled:opacity-50"
+            className="w-full sm:w-auto min-h-[44px] justify-center inline-flex items-center space-x-1.5 rounded-xl border border-slate-200/80 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 shadow-soft hover:bg-slate-50 hover:text-slate-900 active:scale-95 transition-all disabled:opacity-50"
           >
             <RefreshCw className={`h-3.5 w-3.5 text-slate-500 ${checking ? 'animate-spin text-blue-600' : ''}`} />
             <span>Làm mới trạng thái</span>

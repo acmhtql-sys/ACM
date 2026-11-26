@@ -134,7 +134,7 @@ export const CategoriesPage: React.FC = () => {
         {canManage ? (
           <button
             onClick={handleOpenCreate}
-            className="inline-flex items-center space-x-1.5 rounded-xl bg-brand-600 px-4 py-2.5 text-xs font-semibold text-white shadow-soft hover:bg-brand-700 active:scale-[0.99] focus:outline-none focus:ring-2 focus:ring-brand-500/20 transition-all cursor-pointer"
+            className="w-full sm:w-auto min-h-[44px] justify-center inline-flex items-center space-x-1.5 rounded-xl bg-brand-600 px-4 py-2.5 text-xs font-semibold text-white shadow-soft hover:bg-brand-700 active:scale-[0.99] focus:outline-none focus:ring-2 focus:ring-brand-500/20 transition-all cursor-pointer"
           >
             <Plus className="h-4 w-4" />
             <span>Tạo danh mục mới</span>
@@ -214,16 +214,16 @@ export const CategoriesPage: React.FC = () => {
                         <button
                           onClick={() => handleOpenEdit(cat)}
                           title="Chỉnh sửa danh mục"
-                          className="rounded-lg p-1.5 text-slate-400 hover:bg-brand-50 hover:text-brand-600 transition-colors"
+                          className="min-h-[38px] min-w-[38px] flex items-center justify-center rounded-lg p-2 text-slate-400 hover:bg-brand-50 hover:text-brand-600 active:scale-95 transition-colors"
                         >
-                          <Edit2 className="h-3.5 w-3.5" />
+                          <Edit2 className="h-4 w-4" />
                         </button>
                         <button
                           onClick={() => handleOpenDelete(cat)}
                           title="Xóa danh mục"
-                          className="rounded-lg p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition-colors"
+                          className="min-h-[38px] min-w-[38px] flex items-center justify-center rounded-lg p-2 text-slate-400 hover:bg-rose-50 hover:text-rose-600 active:scale-95 transition-colors"
                         >
-                          <Trash2 className="h-3.5 w-3.5" />
+                          <Trash2 className="h-4 w-4" />
                         </button>
                       </>
                     )}

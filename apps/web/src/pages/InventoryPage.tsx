@@ -357,7 +357,7 @@ export const InventoryPage: React.FC = () => {
             treeQuery.isFetching ||
             locationDetailQuery.isFetching
           }
-          className="inline-flex items-center space-x-1.5 rounded-xl border border-slate-200/80 bg-white px-3.5 py-2.5 text-xs font-semibold text-slate-700 shadow-soft transition-all hover:bg-slate-50 hover:text-slate-900 disabled:opacity-50 cursor-pointer"
+          className="w-full sm:w-auto min-h-[44px] justify-center inline-flex items-center space-x-1.5 rounded-xl border border-slate-200/80 bg-white px-3.5 py-2.5 text-xs font-semibold text-slate-700 shadow-soft transition-all hover:bg-slate-50 hover:text-slate-900 active:scale-95 disabled:opacity-50 cursor-pointer"
         >
           <RefreshCw
             className={`h-3.5 w-3.5 text-slate-500 ${
@@ -374,10 +374,10 @@ export const InventoryPage: React.FC = () => {
       </div>
 
       {/* Tab Navigation Pill Bar */}
-      <div className="flex flex-wrap gap-1 rounded-2xl border border-slate-200/80 bg-white p-1.5 shadow-card text-xs font-semibold text-slate-600 sm:w-fit">
+      <div className="flex w-full overflow-x-auto no-scrollbar flex-nowrap sm:flex-wrap gap-1 rounded-2xl border border-slate-200/80 bg-white p-1.5 shadow-card text-xs font-semibold text-slate-600 sm:w-fit">
         <button
           onClick={() => handleTabChange('overview')}
-          className={`flex items-center space-x-2 rounded-xl px-4 py-2 transition-all cursor-pointer ${
+          className={`flex min-h-[40px] items-center space-x-2 rounded-xl px-4 py-2 transition-all cursor-pointer shrink-0 ${
             currentTab === 'overview'
               ? 'bg-brand-50 text-brand-700 border border-brand-200/60 shadow-xs'
               : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
@@ -388,7 +388,7 @@ export const InventoryPage: React.FC = () => {
         </button>
         <button
           onClick={() => handleTabChange('balances')}
-          className={`flex items-center space-x-2 rounded-xl px-4 py-2 transition-all cursor-pointer ${
+          className={`flex min-h-[40px] items-center space-x-2 rounded-xl px-4 py-2 transition-all cursor-pointer shrink-0 ${
             currentTab === 'balances'
               ? 'bg-brand-50 text-brand-700 border border-brand-200/60 shadow-xs'
               : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
@@ -399,7 +399,7 @@ export const InventoryPage: React.FC = () => {
         </button>
         <button
           onClick={() => handleTabChange('locations')}
-          className={`flex items-center space-x-2 rounded-xl px-4 py-2 transition-all cursor-pointer ${
+          className={`flex min-h-[40px] items-center space-x-2 rounded-xl px-4 py-2 transition-all cursor-pointer shrink-0 ${
             currentTab === 'locations'
               ? 'bg-brand-50 text-brand-700 border border-brand-200/60 shadow-xs'
               : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'

@@ -108,7 +108,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
             type="button"
             aria-label="Đóng menu điều hướng"
             onClick={onClose}
-            className="rounded-lg p-2 text-slate-400 hover:bg-slate-800 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-400 lg:hidden"
+            className="rounded-xl p-2.5 min-h-[44px] min-w-[44px] flex items-center justify-center text-slate-400 hover:bg-slate-800 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-400 lg:hidden"
           >
             <X className="h-5 w-5" />
           </button>
@@ -135,7 +135,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
                       to={item.path}
                       onClick={() => onClose()}
                       className={({ isActive }) =>
-                        `flex items-center space-x-3 rounded-xl px-3 py-2 text-xs font-medium transition-all duration-150 ${
+                        `flex items-center space-x-3 rounded-xl px-3.5 py-2.5 min-h-[44px] text-xs font-medium transition-all duration-150 ${
                           isActive
                             ? 'bg-blue-600 text-white shadow-sm shadow-blue-600/30 font-semibold'
                             : 'text-slate-400 hover:bg-slate-800/60 hover:text-slate-100'

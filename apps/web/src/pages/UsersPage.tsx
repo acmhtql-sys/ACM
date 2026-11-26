@@ -201,7 +201,7 @@ export const UsersPage: React.FC = () => {
   }
 
   return <div className="space-y-6">
-    <header className="flex flex-wrap items-center justify-between gap-3">
+    <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
       <div>
         <div className="flex items-center space-x-2.5">
           <h1 className="text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">Quản trị người dùng</h1>
@@ -211,7 +211,7 @@ export const UsersPage: React.FC = () => {
         </div>
         <p className="mt-1 text-xs text-slate-500">Quản lý tài khoản, vai trò và trạng thái; backend là nguồn phân quyền cuối cùng.</p>
       </div>
-      <button type="button" className={primaryButton} onClick={() => { setOperation('create'); setCreateForm(blankCreate()); }} disabled={busy}>
+      <button type="button" className={`${primaryButton} w-full sm:w-auto min-h-[44px] justify-center inline-flex items-center space-x-1.5`} onClick={() => { setOperation('create'); setCreateForm(blankCreate()); }} disabled={busy}>
         Thêm người dùng
       </button>
     </header>
@@ -222,18 +222,18 @@ export const UsersPage: React.FC = () => {
     </div>}
 
     <section className={panel} aria-label="Bộ lọc người dùng">
-      <div className="flex flex-wrap items-end gap-3">
-        <label className="min-w-48 flex-1 text-xs font-semibold text-slate-700">Tìm kiếm
-          <input className={`${inputStyle} mt-1`} value={query} onChange={e => setQuery(e.target.value)}
+      <div className="grid grid-cols-1 sm:flex sm:flex-wrap items-end gap-3">
+        <label className="w-full sm:flex-1 sm:min-w-48 text-xs font-semibold text-slate-700">Tìm kiếm
+          <input className={`${inputStyle} mt-1 min-h-[42px]`} value={query} onChange={e => setQuery(e.target.value)}
             placeholder="Tên, email, mã số hoặc đơn vị" />
         </label>
-        <label className="w-48 text-xs font-semibold text-slate-700">Vai trò
-          <select className={`${inputStyle} mt-1 cursor-pointer`} value={roleFilter} onChange={e => setRoleFilter(e.target.value as AcmRole | 'ALL')}>
+        <label className="w-full sm:w-48 text-xs font-semibold text-slate-700">Vai trò
+          <select className={`${inputStyle} mt-1 min-h-[42px] cursor-pointer`} value={roleFilter} onChange={e => setRoleFilter(e.target.value as AcmRole | 'ALL')}>
             <option value="ALL">Tất cả</option>
             {ACM_ROLES.map(role => <option key={role} value={role}>{role}</option>)}
           </select>
         </label>
-        <button type="button" className={secondaryButton} disabled={loading || busy} onClick={() => void loadUsers()}>
+        <button type="button" className={`${secondaryButton} w-full sm:w-auto min-h-[42px] justify-center`} disabled={loading || busy} onClick={() => void loadUsers()}>
           {loading ? 'Đang tải...' : 'Làm mới'}
         </button>
       </div>

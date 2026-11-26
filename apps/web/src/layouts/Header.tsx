@@ -261,7 +261,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenSidebar, isSidebarOpen }) 
           aria-label="Mở menu điều hướng"
           aria-controls="acm-mobile-sidebar"
           aria-expanded={isSidebarOpen}
-          className="rounded-xl p-2 text-slate-600 hover:bg-slate-100 hover:text-slate-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600 lg:hidden transition-colors"
+          className="rounded-xl p-2.5 min-h-[44px] min-w-[44px] flex items-center justify-center text-slate-600 hover:bg-slate-100 hover:text-slate-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600 lg:hidden transition-colors"
         >
           <Menu className="h-5 w-5" />
         </button>
@@ -304,15 +304,15 @@ export const Header: React.FC<HeaderProps> = ({ onOpenSidebar, isSidebarOpen }) 
             onClick={() => setIsNotifOpen((prev) => !prev)}
             aria-label="Thông báo hệ thống"
             aria-expanded={isNotifOpen}
-            className={`relative rounded-xl p-2 transition-all ${
+            className={`relative rounded-xl p-2.5 min-h-[44px] min-w-[44px] flex items-center justify-center transition-all ${
               isNotifOpen
                 ? 'bg-blue-50 text-blue-600 ring-2 ring-blue-500/20'
                 : 'text-slate-400 hover:bg-slate-100 hover:text-slate-700'
             }`}
           >
-            <Bell className="h-4 w-4" />
+            <Bell className="h-4.5 w-4.5" />
             {unreadCount > 0 && (
-              <span className="absolute right-1.5 top-1.5 flex h-2 w-2">
+              <span className="absolute right-2 top-2 flex h-2 w-2">
                 <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-blue-400 opacity-75"></span>
                 <span className="relative inline-flex h-2 w-2 rounded-full bg-blue-600 ring-2 ring-white"></span>
               </span>
@@ -509,9 +509,10 @@ export const Header: React.FC<HeaderProps> = ({ onOpenSidebar, isSidebarOpen }) 
           <button
             onClick={logout}
             title="Đăng xuất khỏi hệ thống"
-            className="rounded-xl p-2 text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition-colors"
+            aria-label="Đăng xuất khỏi hệ thống"
+            className="rounded-xl p-2.5 min-h-[44px] min-w-[44px] flex items-center justify-center text-slate-400 hover:bg-rose-50 hover:text-rose-600 active:scale-95 transition-colors"
           >
-            <LogOut className="h-4 w-4" />
+            <LogOut className="h-4.5 w-4.5" />
           </button>
         </div>
       </div>

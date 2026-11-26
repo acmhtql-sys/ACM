@@ -203,11 +203,11 @@ export const AuditLogsPage: React.FC = () => {
             Truy vết biến động dữ liệu, kiểm toán thao tác người dùng và đảm bảo tính bất biến của hệ thống
           </p>
         </div>
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center space-x-2 w-full sm:w-auto">
           <button
             onClick={fetchLogs}
             disabled={loading}
-            className="inline-flex items-center space-x-1.5 rounded-xl border border-slate-200/80 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 shadow-soft hover:bg-slate-50 hover:text-slate-900 disabled:opacity-50 transition-all cursor-pointer"
+            className="w-full sm:w-auto min-h-[44px] justify-center inline-flex items-center space-x-1.5 rounded-xl border border-slate-200/80 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 shadow-soft hover:bg-slate-50 hover:text-slate-900 active:scale-95 disabled:opacity-50 transition-all cursor-pointer"
           >
             <RefreshCw className={`h-3.5 w-3.5 text-slate-500 ${loading ? 'animate-spin text-brand-600' : ''}`} />
             <span>Tải lại</span>
@@ -238,7 +238,7 @@ export const AuditLogsPage: React.FC = () => {
             placeholder="Tìm theo hành động, đối tượng, người thực hiện hoặc nội dung..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full rounded-xl border border-slate-200 bg-slate-50/50 pl-10 pr-4 py-2 text-xs text-slate-800 placeholder-slate-400 focus:border-brand-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-500/20 transition-all"
+            className="w-full min-h-[42px] rounded-xl border border-slate-200 bg-slate-50/50 pl-10 pr-4 py-2 text-xs text-slate-800 placeholder-slate-400 focus:border-brand-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-500/20 transition-all"
           />
         </div>
 
@@ -248,7 +248,7 @@ export const AuditLogsPage: React.FC = () => {
             <select
               value={selectedAction}
               onChange={(e) => setSelectedAction(e.target.value)}
-              className="w-full lg:w-auto rounded-xl border border-slate-200 bg-slate-50/50 px-3 py-2 text-xs text-slate-700 focus:border-brand-500 focus:bg-white focus:outline-none cursor-pointer"
+              className="w-full min-h-[42px] lg:w-auto rounded-xl border border-slate-200 bg-slate-50/50 px-3 py-2 text-xs text-slate-700 focus:border-brand-500 focus:bg-white focus:outline-none cursor-pointer"
             >
               <option value="ALL">Tất cả hành động ({availableActions.length})</option>
               {availableActions.map((action) => (

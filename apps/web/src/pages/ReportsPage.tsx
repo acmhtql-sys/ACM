@@ -213,7 +213,7 @@ export const ReportsPage: React.FC = () => {
         <button
           onClick={() => fetchReportData()}
           disabled={loading}
-          className="inline-flex items-center space-x-1.5 rounded-xl border border-slate-200/80 bg-white px-3.5 py-2.5 text-xs font-semibold text-slate-700 shadow-soft hover:bg-slate-50 hover:text-slate-900 transition-all cursor-pointer"
+          className="w-full sm:w-auto min-h-[44px] justify-center inline-flex items-center space-x-1.5 rounded-xl border border-slate-200/80 bg-white px-3.5 py-2.5 text-xs font-semibold text-slate-700 shadow-soft hover:bg-slate-50 hover:text-slate-900 active:scale-95 transition-all cursor-pointer"
         >
           <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin text-brand-600' : 'text-slate-500'}`} />
           <span>Làm mới</span>
@@ -221,10 +221,10 @@ export const ReportsPage: React.FC = () => {
       </div>
 
       {/* Tabs */}
-      <div className="flex flex-wrap gap-1 rounded-2xl border border-slate-200/80 bg-white p-1.5 shadow-card text-xs font-semibold text-slate-600 sm:w-fit">
+      <div className="flex w-full overflow-x-auto no-scrollbar flex-nowrap sm:flex-wrap gap-1 rounded-2xl border border-slate-200/80 bg-white p-1.5 shadow-card text-xs font-semibold text-slate-600 sm:w-fit">
         <button
           onClick={() => setActiveTab('inventory')}
-          className={`flex items-center space-x-2 rounded-xl px-4 py-2 transition-all cursor-pointer ${
+          className={`shrink-0 flex min-h-[40px] items-center space-x-2 rounded-xl px-4 py-2 transition-all cursor-pointer ${
             activeTab === 'inventory'
               ? 'bg-brand-50 text-brand-700 border border-brand-200/60 shadow-xs'
               : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
@@ -236,7 +236,7 @@ export const ReportsPage: React.FC = () => {
 
         <button
           onClick={() => setActiveTab('borrowReturn')}
-          className={`flex items-center space-x-2 rounded-xl px-4 py-2 transition-all cursor-pointer ${
+          className={`shrink-0 flex min-h-[40px] items-center space-x-2 rounded-xl px-4 py-2 transition-all cursor-pointer ${
             activeTab === 'borrowReturn'
               ? 'bg-brand-50 text-brand-700 border border-brand-200/60 shadow-xs'
               : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
@@ -248,7 +248,7 @@ export const ReportsPage: React.FC = () => {
 
         <button
           onClick={() => setActiveTab('lowStock')}
-          className={`flex items-center space-x-2 rounded-xl px-4 py-2 transition-all cursor-pointer ${
+          className={`shrink-0 flex min-h-[40px] items-center space-x-2 rounded-xl px-4 py-2 transition-all cursor-pointer ${
             activeTab === 'lowStock'
               ? 'bg-brand-50 text-brand-700 border border-brand-200/60 shadow-xs'
               : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'

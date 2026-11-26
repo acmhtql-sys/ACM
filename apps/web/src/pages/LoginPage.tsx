@@ -103,10 +103,10 @@ export const LoginPage: React.FC = () => {
       </div>
 
       {/* Right Login Form */}
-      <div className="flex w-full lg:w-1/2 items-center justify-center p-6 sm:p-12 bg-slate-50">
-        <div className="w-full max-w-md space-y-7 rounded-2xl bg-white p-8 sm:p-10 shadow-modal border border-slate-200/80">
+      <div className="flex w-full lg:w-1/2 items-center justify-center p-4 sm:p-12 bg-slate-50 min-h-screen">
+        <div className="w-full max-w-md space-y-6 sm:space-y-7 rounded-2xl bg-white p-5 sm:p-10 shadow-modal border border-slate-200/80">
           <div>
-            <div className="lg:hidden flex items-center space-x-2.5 mb-6">
+            <div className="lg:hidden flex items-center space-x-2.5 mb-5">
               <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand-600 font-extrabold text-white text-xs">
                 ACM
               </div>
@@ -115,7 +115,7 @@ export const LoginPage: React.FC = () => {
                 <span className="text-[10px] text-slate-500">Components & Equipment Management System</span>
               </div>
             </div>
-            <h2 className="text-2xl font-bold tracking-tight text-slate-900">Đăng nhập ACM</h2>
+            <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">Đăng nhập ACM</h2>
             <p className="mt-1 text-xs text-slate-500">
               Nhập tài khoản để truy cập hệ thống quản lý phòng Lab
             </p>
@@ -128,7 +128,7 @@ export const LoginPage: React.FC = () => {
             </div>
           )}
 
-          <form onSubmit={handleLogin} className="space-y-4.5">
+          <form onSubmit={handleLogin} className="space-y-4">
             <div>
               <label className="block text-xs font-semibold text-slate-700">Email người dùng</label>
               <input
@@ -136,7 +136,7 @@ export const LoginPage: React.FC = () => {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                className="mt-1.5 w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3.5 py-2.5 text-xs text-slate-900 placeholder-slate-400 focus:bg-white focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 transition-all"
+                className="mt-1.5 w-full min-h-[44px] rounded-xl border border-slate-200 bg-slate-50/50 px-3.5 py-2.5 text-sm sm:text-xs text-slate-900 placeholder-slate-400 focus:bg-white focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 transition-all"
                 placeholder="ten.nguoidung@acm.local"
               />
             </div>
@@ -150,7 +150,7 @@ export const LoginPage: React.FC = () => {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
-                className="mt-1.5 w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3.5 py-2.5 text-xs text-slate-900 placeholder-slate-400 focus:bg-white focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 transition-all"
+                className="mt-1.5 w-full min-h-[44px] rounded-xl border border-slate-200 bg-slate-50/50 px-3.5 py-2.5 text-sm sm:text-xs text-slate-900 placeholder-slate-400 focus:bg-white focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 transition-all"
                 placeholder="••••••••••••"
               />
             </div>
@@ -158,7 +158,7 @@ export const LoginPage: React.FC = () => {
             <button
               type="submit"
               disabled={isLoading}
-              className="flex w-full items-center justify-center space-x-2 rounded-xl bg-brand-600 py-2.5 px-4 text-xs font-semibold text-white shadow-soft hover:bg-brand-700 active:scale-[0.99] focus:outline-none focus:ring-2 focus:ring-brand-500/20 transition-all disabled:opacity-70 cursor-pointer"
+              className="flex w-full min-h-[44px] items-center justify-center space-x-2 rounded-xl bg-brand-600 py-2.5 px-4 text-xs font-bold text-white shadow-soft hover:bg-brand-700 active:scale-[0.99] focus:outline-none focus:ring-2 focus:ring-brand-500/20 transition-all disabled:opacity-70 cursor-pointer"
             >
               <span>{isLoading ? 'Đang xác thực...' : 'Đăng nhập vào hệ thống'}</span>
               <ArrowRight className="h-4 w-4" />
