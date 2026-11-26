@@ -279,15 +279,34 @@ export const CameraBorrowModal: React.FC<CameraBorrowModalProps> = ({
       canvas.height = displayHeight;
       ctx.clearRect(0, 0, displayWidth, displayHeight);
 
-      const scaleX = displayWidth / naturalWidth;
-      const scaleY = displayHeight / naturalHeight;
+      // Calculate aspect ratio & letterbox/pillarbox offsets for object-contain
+      const videoAspect = naturalWidth / naturalHeight;
+      const elementAspect = displayWidth / displayHeight;
+
+      let renderedW = displayWidth;
+      let renderedH = displayHeight;
+      let offsetX = 0;
+      let offsetY = 0;
+
+      if (videoAspect > elementAspect) {
+        renderedW = displayWidth;
+        renderedH = displayWidth / videoAspect;
+        offsetY = (displayHeight - renderedH) / 2;
+      } else {
+        renderedH = displayHeight;
+        renderedW = displayHeight * videoAspect;
+        offsetX = (displayWidth - renderedW) / 2;
+      }
+
+      const scaleX = renderedW / naturalWidth;
+      const scaleY = renderedH / naturalHeight;
 
       for (const det of detections) {
         const { x1, y1, x2, y2 } = det.boundingBox;
-        const rx = x1 * scaleX;
-        const ry = y1 * scaleY;
-        const rw = (x2 - x1) * scaleX;
-        const rh = (y2 - y1) * scaleY;
+        const rx = Math.round(offsetX + x1 * scaleX);
+        const ry = Math.round(offsetY + y1 * scaleY);
+        const rw = Math.round((x2 - x1) * scaleX);
+        const rh = Math.round((y2 - y1) * scaleY);
 
         const matchedItem = findMatchingCatalogItem(det.className, det.suggestedItemCode);
         const strokeColor = matchedItem ? '#10B981' : '#F59E0B';
@@ -307,10 +326,12 @@ export const CameraBorrowModal: React.FC<CameraBorrowModalProps> = ({
         const textWidth = ctx.measureText(label).width;
 
         ctx.fillStyle = strokeColor;
-        ctx.fillRect(rx, Math.max(0, ry - 22), textWidth + 12, 22);
+        const labelY = ry >= 24 ? ry - 22 : ry + rh + 2;
+        const textY = ry >= 24 ? ry - 6 : ry + rh + 16;
+        ctx.fillRect(Math.max(offsetX, rx), labelY, textWidth + 12, 22);
 
         ctx.fillStyle = '#FFFFFF';
-        ctx.fillText(label, rx + 6, Math.max(15, ry - 6));
+        ctx.fillText(label, Math.max(offsetX, rx) + 6, textY);
       }
     },
     [findMatchingCatalogItem]

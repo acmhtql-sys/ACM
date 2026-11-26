@@ -305,15 +305,36 @@ export const KitReturnInspectionModal: React.FC<KitReturnInspectionModalProps> =
     const activeMode = forceMode || overlayMode;
     if (activeMode === 'hidden') return;
 
-    const scaleX = displayW / naturalW;
-    const scaleY = displayH / naturalH;
+    // Calculate aspect ratio & letterbox/pillarbox offsets for object-contain
+    const videoAspect = naturalW / naturalH;
+    const elementAspect = displayW / displayH;
+
+    let renderedW = displayW;
+    let renderedH = displayH;
+    let offsetX = 0;
+    let offsetY = 0;
+
+    if (videoAspect > elementAspect) {
+      // Letterbox: black bars top and bottom
+      renderedW = displayW;
+      renderedH = displayW / videoAspect;
+      offsetY = (displayH - renderedH) / 2;
+    } else {
+      // Pillarbox: black bars left and right
+      renderedH = displayH;
+      renderedW = displayH * videoAspect;
+      offsetX = (displayW - renderedW) / 2;
+    }
+
+    const scaleX = renderedW / naturalW;
+    const scaleY = renderedH / naturalH;
     const isDense = detections.length > 7;
     const placedLabels: Array<{ x: number; y: number; w: number; h: number }> = [];
 
     for (const det of detections) {
       const { x1, y1, x2, y2 } = det.boundingBox;
-      const rx = Math.round(x1 * scaleX);
-      const ry = Math.round(y1 * scaleY);
+      const rx = Math.round(offsetX + x1 * scaleX);
+      const ry = Math.round(offsetY + y1 * scaleY);
       const rw = Math.round((x2 - x1) * scaleX);
       const rh = Math.round((y2 - y1) * scaleY);
 
@@ -373,8 +394,8 @@ export const KitReturnInspectionModal: React.FC<KitReturnInspectionModalProps> =
       const pillW = Math.round(textMetrics.width + (isDense ? 14 : 18));
       const pillH = isDense ? 15 : 17;
 
-      let pillX = Math.max(2, Math.min(rx, displayW - pillW - 2));
-      let pillY = ry >= pillH + 2 ? ry - (pillH + 2) : Math.min(displayH - pillH - 2, ry + rh + 2);
+      let pillX = Math.max(offsetX + 2, Math.min(rx, offsetX + renderedW - pillW - 2));
+      let pillY = ry >= pillH + 2 ? ry - (pillH + 2) : Math.min(offsetY + renderedH - pillH - 2, ry + rh + 2);
 
       // Check overlap against previously placed label badges
       const isOverlap = placedLabels.some(
@@ -385,7 +406,7 @@ export const KitReturnInspectionModal: React.FC<KitReturnInspectionModalProps> =
 
       if (isOverlap) {
         // Try bottom placement
-        const altY = Math.min(displayH - pillH - 2, ry + rh + 2);
+        const altY = Math.min(offsetY + renderedH - pillH - 2, ry + rh + 2);
         const altOverlap = placedLabels.some(
           (pl) =>
             Math.abs(pl.x - pillX) < (pl.w + pillW) * 0.45 &&

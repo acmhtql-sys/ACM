@@ -499,15 +499,36 @@ export const CameraReturnModal: React.FC<CameraReturnModalProps> = ({
       canvas.height = displayHeight;
       ctx.clearRect(0, 0, displayWidth, displayHeight);
 
-      const scaleX = displayWidth / naturalWidth;
-      const scaleY = displayHeight / naturalHeight;
+      // Calculate aspect ratio & letterbox/pillarbox offsets for object-contain
+      const videoAspect = naturalWidth / naturalHeight;
+      const elementAspect = displayWidth / displayHeight;
+
+      let renderedW = displayWidth;
+      let renderedH = displayHeight;
+      let offsetX = 0;
+      let offsetY = 0;
+
+      if (videoAspect > elementAspect) {
+        // Letterbox: black bars top and bottom
+        renderedW = displayWidth;
+        renderedH = displayWidth / videoAspect;
+        offsetY = (displayHeight - renderedH) / 2;
+      } else {
+        // Pillarbox: black bars left and right
+        renderedH = displayHeight;
+        renderedW = displayHeight * videoAspect;
+        offsetX = (displayWidth - renderedW) / 2;
+      }
+
+      const scaleX = renderedW / naturalWidth;
+      const scaleY = renderedH / naturalHeight;
       const isDense = detectedList.length > 7;
       const placedLabels: Array<{ x: number; y: number; w: number; h: number }> = [];
 
       for (const det of detectedList) {
         const { x1, y1, x2, y2 } = det.boundingBox;
-        const rx = Math.round(x1 * scaleX);
-        const ry = Math.round(y1 * scaleY);
+        const rx = Math.round(offsetX + x1 * scaleX);
+        const ry = Math.round(offsetY + y1 * scaleY);
         const rw = Math.round((x2 - x1) * scaleX);
         const rh = Math.round((y2 - y1) * scaleY);
 
@@ -566,8 +587,8 @@ export const CameraReturnModal: React.FC<CameraReturnModalProps> = ({
         const pillW = Math.round(textMetrics.width + (isDense ? 14 : 18));
         const pillH = isDense ? 15 : 17;
 
-        let pillX = Math.max(2, Math.min(rx, displayWidth - pillW - 2));
-        let pillY = ry >= pillH + 2 ? ry - (pillH + 2) : Math.min(displayHeight - pillH - 2, ry + rh + 2);
+        let pillX = Math.max(offsetX + 2, Math.min(rx, offsetX + renderedW - pillW - 2));
+        let pillY = ry >= pillH + 2 ? ry - (pillH + 2) : Math.min(offsetY + renderedH - pillH - 2, ry + rh + 2);
 
         // Check overlap against placed label badges
         const isOverlap = placedLabels.some(
@@ -577,7 +598,7 @@ export const CameraReturnModal: React.FC<CameraReturnModalProps> = ({
         );
 
         if (isOverlap) {
-          const altY = Math.min(displayHeight - pillH - 2, ry + rh + 2);
+          const altY = Math.min(offsetY + renderedH - pillH - 2, ry + rh + 2);
           const altOverlap = placedLabels.some(
             (pl) =>
               Math.abs(pl.x - pillX) < (pl.w + pillW) * 0.45 &&
@@ -1405,7 +1426,7 @@ export const CameraReturnModal: React.FC<CameraReturnModalProps> = ({
               {/* Chips container */}
               <div
                 data-testid="ai-recognition-chips"
-                className="mt-1.5 flex flex-wrap items-center gap-1.5"
+                className="mt-1.5 flex flex-wrap items-center gap-1.5 max-h-24 overflow-y-auto"
               >
                 {uniqueDetectedClasses.length === 0 ? (
                   <span
