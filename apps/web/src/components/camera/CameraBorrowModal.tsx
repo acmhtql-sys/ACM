@@ -268,43 +268,50 @@ export const CameraBorrowModal: React.FC<CameraBorrowModalProps> = ({
       const ctx = canvas.getContext('2d');
       if (!ctx) return;
 
-      const displayWidth = video.clientWidth;
-      const displayHeight = video.clientHeight;
+      const canvasRect = canvas.getBoundingClientRect();
+      const videoRect = video.getBoundingClientRect();
+
+      if (canvasRect.width === 0 || canvasRect.height === 0 || videoRect.width === 0 || videoRect.height === 0) return;
+
+      canvas.width = Math.round(canvasRect.width);
+      canvas.height = Math.round(canvasRect.height);
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
       const naturalWidth = video.videoWidth || 640;
       const naturalHeight = video.videoHeight || 480;
 
-      if (displayWidth === 0 || displayHeight === 0) return;
-
-      canvas.width = displayWidth;
-      canvas.height = displayHeight;
-      ctx.clearRect(0, 0, displayWidth, displayHeight);
+      const originX = videoRect.left - canvasRect.left;
+      const originY = videoRect.top - canvasRect.top;
 
       // Calculate aspect ratio & letterbox/pillarbox offsets for object-contain
       const videoAspect = naturalWidth / naturalHeight;
-      const elementAspect = displayWidth / displayHeight;
+      const targetAspect = videoRect.width / videoRect.height;
 
-      let renderedW = displayWidth;
-      let renderedH = displayHeight;
-      let offsetX = 0;
-      let offsetY = 0;
+      let renderedW = videoRect.width;
+      let renderedH = videoRect.height;
+      let innerOffsetX = 0;
+      let innerOffsetY = 0;
 
-      if (videoAspect > elementAspect) {
-        renderedW = displayWidth;
-        renderedH = displayWidth / videoAspect;
-        offsetY = (displayHeight - renderedH) / 2;
+      if (videoAspect > targetAspect) {
+        renderedW = videoRect.width;
+        renderedH = videoRect.width / videoAspect;
+        innerOffsetY = (videoRect.height - renderedH) / 2;
       } else {
-        renderedH = displayHeight;
-        renderedW = displayHeight * videoAspect;
-        offsetX = (displayWidth - renderedW) / 2;
+        renderedH = videoRect.height;
+        renderedW = videoRect.height * videoAspect;
+        innerOffsetX = (videoRect.width - renderedW) / 2;
       }
+
+      const finalOffsetX = originX + innerOffsetX;
+      const finalOffsetY = originY + innerOffsetY;
 
       const scaleX = renderedW / naturalWidth;
       const scaleY = renderedH / naturalHeight;
 
       for (const det of detections) {
         const { x1, y1, x2, y2 } = det.boundingBox;
-        const rx = Math.round(offsetX + x1 * scaleX);
-        const ry = Math.round(offsetY + y1 * scaleY);
+        const rx = Math.round(finalOffsetX + x1 * scaleX);
+        const ry = Math.round(finalOffsetY + y1 * scaleY);
         const rw = Math.round((x2 - x1) * scaleX);
         const rh = Math.round((y2 - y1) * scaleY);
 
@@ -328,10 +335,10 @@ export const CameraBorrowModal: React.FC<CameraBorrowModalProps> = ({
         ctx.fillStyle = strokeColor;
         const labelY = ry >= 24 ? ry - 22 : ry + rh + 2;
         const textY = ry >= 24 ? ry - 6 : ry + rh + 16;
-        ctx.fillRect(Math.max(offsetX, rx), labelY, textWidth + 12, 22);
+        ctx.fillRect(Math.max(finalOffsetX, rx), labelY, textWidth + 12, 22);
 
         ctx.fillStyle = '#FFFFFF';
-        ctx.fillText(label, Math.max(offsetX, rx) + 6, textY);
+        ctx.fillText(label, Math.max(finalOffsetX, rx) + 6, textY);
       }
     },
     [findMatchingCatalogItem]

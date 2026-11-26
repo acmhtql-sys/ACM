@@ -458,9 +458,8 @@ def _run_ort_inference(
     x2 = boxes[:, 0] + boxes[:, 2] / 2.0
     y2 = boxes[:, 1] + boxes[:, 3] / 2.0
 
-    # Per-class batched NMS
-    offset = cls_ids.astype(np.float32) * 4096.0
-    nx1, ny1, nx2, ny2 = x1 + offset, y1 + offset, x2 + offset, y2 + offset
+    # Class-agnostic NMS to eliminate overlapping ghost boxes from different classes on the same physical component
+    nx1, ny1, nx2, ny2 = x1, y1, x2, y2
     areas = np.maximum(0.0, nx2 - nx1) * np.maximum(0.0, ny2 - ny1)
     order = confs.argsort()[::-1]
 
@@ -500,7 +499,7 @@ def run_yolo_inference(
         return _run_ort_inference(img, scale_x, scale_y, conf_thresh)
 
     assert pt_model is not None
-    results = pt_model.predict(img, imgsz=INFERENCE_IMGSZ, conf=conf_thresh, verbose=False)
+    results = pt_model.predict(img, imgsz=INFERENCE_IMGSZ, conf=conf_thresh, agnostic_nms=True, verbose=False)
     detections: List[Dict[str, Any]] = []
     if results and len(results) > 0 and results[0].boxes is not None:
         for box in results[0].boxes:

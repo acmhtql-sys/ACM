@@ -471,54 +471,61 @@ export const CameraReturnModal: React.FC<CameraReturnModalProps> = ({
       const canvas = canvasRef.current;
       if (!canvas) return;
 
+      const targetEl = uploadedPreview ? imageRef.current : videoRef.current;
+      if (!targetEl) return;
+
       const ctx = canvas.getContext('2d');
       if (!ctx) return;
 
-      let displayWidth = 0;
-      let displayHeight = 0;
+      const canvasRect = canvas.getBoundingClientRect();
+      const targetRect = targetEl.getBoundingClientRect();
+
+      if (canvasRect.width === 0 || canvasRect.height === 0 || targetRect.width === 0 || targetRect.height === 0) return;
+
+      canvas.width = Math.round(canvasRect.width);
+      canvas.height = Math.round(canvasRect.height);
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
       let naturalWidth = 640;
       let naturalHeight = 480;
 
       if (uploadedPreview && imageRef.current) {
         const img = imageRef.current;
-        displayWidth = img.clientWidth || img.width;
-        displayHeight = img.clientHeight || img.height;
         naturalWidth = inferenceDimsRef.current?.width || img.naturalWidth || 640;
         naturalHeight = inferenceDimsRef.current?.height || img.naturalHeight || 480;
       } else if (videoRef.current) {
         const video = videoRef.current;
-        displayWidth = video.clientWidth;
-        displayHeight = video.clientHeight;
         naturalWidth = inferenceDimsRef.current?.width || video.videoWidth || 640;
         naturalHeight = inferenceDimsRef.current?.height || video.videoHeight || 480;
       }
 
-      if (displayWidth === 0 || displayHeight === 0) return;
+      // Exact layout alignment between canvas viewport and video element
+      const originX = targetRect.left - canvasRect.left;
+      const originY = targetRect.top - canvasRect.top;
 
-      canvas.width = displayWidth;
-      canvas.height = displayHeight;
-      ctx.clearRect(0, 0, displayWidth, displayHeight);
-
-      // Calculate aspect ratio & letterbox/pillarbox offsets for object-contain
+      // Calculate aspect ratio & letterbox/pillarbox offsets for object-contain inside targetRect
       const videoAspect = naturalWidth / naturalHeight;
-      const elementAspect = displayWidth / displayHeight;
+      const targetAspect = targetRect.width / targetRect.height;
 
-      let renderedW = displayWidth;
-      let renderedH = displayHeight;
-      let offsetX = 0;
-      let offsetY = 0;
+      let renderedW = targetRect.width;
+      let renderedH = targetRect.height;
+      let innerOffsetX = 0;
+      let innerOffsetY = 0;
 
-      if (videoAspect > elementAspect) {
+      if (videoAspect > targetAspect) {
         // Letterbox: black bars top and bottom
-        renderedW = displayWidth;
-        renderedH = displayWidth / videoAspect;
-        offsetY = (displayHeight - renderedH) / 2;
+        renderedW = targetRect.width;
+        renderedH = targetRect.width / videoAspect;
+        innerOffsetY = (targetRect.height - renderedH) / 2;
       } else {
         // Pillarbox: black bars left and right
-        renderedH = displayHeight;
-        renderedW = displayHeight * videoAspect;
-        offsetX = (displayWidth - renderedW) / 2;
+        renderedH = targetRect.height;
+        renderedW = targetRect.height * videoAspect;
+        innerOffsetX = (targetRect.width - renderedW) / 2;
       }
+
+      const finalOffsetX = originX + innerOffsetX;
+      const finalOffsetY = originY + innerOffsetY;
 
       const scaleX = renderedW / naturalWidth;
       const scaleY = renderedH / naturalHeight;
@@ -527,8 +534,8 @@ export const CameraReturnModal: React.FC<CameraReturnModalProps> = ({
 
       for (const det of detectedList) {
         const { x1, y1, x2, y2 } = det.boundingBox;
-        const rx = Math.round(offsetX + x1 * scaleX);
-        const ry = Math.round(offsetY + y1 * scaleY);
+        const rx = Math.round(finalOffsetX + x1 * scaleX);
+        const ry = Math.round(finalOffsetY + y1 * scaleY);
         const rw = Math.round((x2 - x1) * scaleX);
         const rh = Math.round((y2 - y1) * scaleY);
 
@@ -587,8 +594,8 @@ export const CameraReturnModal: React.FC<CameraReturnModalProps> = ({
         const pillW = Math.round(textMetrics.width + (isDense ? 14 : 18));
         const pillH = isDense ? 15 : 17;
 
-        let pillX = Math.max(offsetX + 2, Math.min(rx, offsetX + renderedW - pillW - 2));
-        let pillY = ry >= pillH + 2 ? ry - (pillH + 2) : Math.min(offsetY + renderedH - pillH - 2, ry + rh + 2);
+        let pillX = Math.max(finalOffsetX + 2, Math.min(rx, finalOffsetX + renderedW - pillW - 2));
+        let pillY = ry >= pillH + 2 ? ry - (pillH + 2) : Math.min(finalOffsetY + renderedH - pillH - 2, ry + rh + 2);
 
         // Check overlap against placed label badges
         const isOverlap = placedLabels.some(
@@ -598,7 +605,7 @@ export const CameraReturnModal: React.FC<CameraReturnModalProps> = ({
         );
 
         if (isOverlap) {
-          const altY = Math.min(offsetY + renderedH - pillH - 2, ry + rh + 2);
+          const altY = Math.min(finalOffsetY + renderedH - pillH - 2, ry + rh + 2);
           const altOverlap = placedLabels.some(
             (pl) =>
               Math.abs(pl.x - pillX) < (pl.w + pillW) * 0.45 &&
@@ -1538,7 +1545,7 @@ export const CameraReturnModal: React.FC<CameraReturnModalProps> = ({
                   />
                   <canvas
                     ref={canvasRef}
-                    className="pointer-events-none absolute inset-0 h-full w-full object-contain"
+                    className="pointer-events-none absolute inset-0 h-full w-full"
                   />
                   {capturedLivePhoto && (
                     <div className="absolute top-2 left-2 bg-emerald-600/90 text-white text-[11px] font-bold px-2.5 py-1 rounded-md shadow-md flex items-center space-x-1.5 z-10">
@@ -1558,7 +1565,7 @@ export const CameraReturnModal: React.FC<CameraReturnModalProps> = ({
                   />
                   <canvas
                     ref={canvasRef}
-                    className="pointer-events-none absolute inset-0 h-full w-full object-contain"
+                    className="pointer-events-none absolute inset-0 h-full w-full"
                   />
                   {/* Real-time scanning visual pulse line */}
                   {cameraActive && isRecognizing && (
