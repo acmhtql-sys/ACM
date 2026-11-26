@@ -23,6 +23,7 @@ import { ToastContainer, ToastMessage } from '../components/Toast';
 import { ItemFormModal } from '../components/items/ItemFormModal';
 import { ItemDetailModal } from '../components/items/ItemDetailModal';
 import { ItemStatusModal } from '../components/items/ItemStatusModal';
+import { ItemThumbnail } from '../components/items/ItemThumbnail';
 import { apiClient } from '../services/api';
 import { useAuth } from '../hooks/useAuth';
 import {
@@ -496,14 +497,29 @@ export const ItemsPage: React.FC = () => {
                       </div>
                     </td>
 
-                    {/* Name */}
+                    {/* Name & Thumbnail */}
                     <td className="py-3 px-4">
-                      <div className="font-medium text-slate-900 break-words">{item.name}</div>
-                      {item.description && (
-                        <div className="text-[11px] text-slate-500 line-clamp-2 break-words max-w-xs mt-0.5">
-                          {item.description}
+                      <div className="flex items-center space-x-3">
+                        <ItemThumbnail
+                          imageUrl={item.imageUrl}
+                          name={item.name}
+                          code={item.code}
+                          type={item.type}
+                          size="sm"
+                          onClick={() => {
+                            setSelectedItemIdForDetail(item.id);
+                            setDetailModalOpen(true);
+                          }}
+                        />
+                        <div className="min-w-0 flex-1">
+                          <div className="font-medium text-slate-900 break-words">{item.name}</div>
+                          {item.description && (
+                            <div className="text-[11px] text-slate-500 line-clamp-2 break-words max-w-xs mt-0.5">
+                              {item.description}
+                            </div>
+                          )}
                         </div>
-                      )}
+                      </div>
                     </td>
 
                     {/* Category */}
@@ -678,17 +694,31 @@ export const ItemsPage: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Title & Category */}
-                <div>
-                  <h3 className="text-sm font-bold text-slate-900 leading-snug break-words">
-                    {item.name}
-                  </h3>
-                  <div className="flex items-center space-x-2 text-xs text-slate-500 mt-1">
-                    <span className="font-medium text-slate-600">
-                      {item.category?.name || item.categoryName || 'Chưa phân loại'}
-                    </span>
-                    <span>•</span>
-                    <StatusBadge status={item.type} variant="itemType" />
+                {/* Main Content: Thumbnail & Title & Category */}
+                <div className="flex items-start space-x-3">
+                  <ItemThumbnail
+                    imageUrl={item.imageUrl}
+                    name={item.name}
+                    code={item.code}
+                    type={item.type}
+                    size="md"
+                    className="mt-0.5"
+                    onClick={() => {
+                      setSelectedItemIdForDetail(item.id);
+                      setDetailModalOpen(true);
+                    }}
+                  />
+                  <div className="min-w-0 flex-1">
+                    <h3 className="text-sm font-bold text-slate-900 leading-snug break-words">
+                      {item.name}
+                    </h3>
+                    <div className="flex items-center space-x-2 text-xs text-slate-500 mt-1 flex-wrap gap-y-1">
+                      <span className="font-medium text-slate-600">
+                        {item.category?.name || item.categoryName || 'Chưa phân loại'}
+                      </span>
+                      <span>•</span>
+                      <StatusBadge status={item.type} variant="itemType" />
+                    </div>
                   </div>
                 </div>
 
