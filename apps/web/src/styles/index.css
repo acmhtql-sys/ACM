@@ -76,3 +76,13 @@
 .fixed.inset-0 {
   margin: 0 !important;
 }
+
+/* Ensure mobile bottom navigation is strictly hidden on desktop/mouse devices even when split-screened */
+@media (pointer: fine), (min-width: 768px) {
+  #acm-mobile-bottom-nav {
+    display: none !important;
+  }
+  .pb-28 {
+    padding-bottom: 2rem !important;
+  }
+}
